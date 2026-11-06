@@ -9,6 +9,8 @@ dependencies = [
   "PySide6-Essentials>=6.8,<7",
   "av>=14",
   "sounddevice>=0.5",
+  "yt-dlp",
+  "yt-dlp-ejs",
   "numpy",
 ]
 

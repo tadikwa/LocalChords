@@ -24,6 +24,12 @@ Mis à jour le 2026-11-06.
 - Une seule longueur de mesure par morceau ; hors 4 temps, validé seulement sur signaux construits.
 - Glisser-déposer physique jamais joué dans l'exécutable (l'événement est testé hors écran).
 - Non testé sur un autre PC.
+- **Instabilité non élucidée dans les tests :** 2 exécutions complètes de pytest sur 8 se sont arrêtées vers le
+  100e test, sur une erreur interne (`SystemError` dans `compile`, ou pile d'appels fatale) ; les 6 autres sont
+  passées, dont les 4 dernières à la suite (165 tests). Pas reproduit en isolant les fichiers. Hypothèse non
+  vérifiée : Qt et torch dans le même processus, ce qui n'arrive que sous pytest, le programme les séparant.
+  À l'appui : 20 analyses sur 20 sans erreur par le vrai processus d'analyse (`scripts/soak_worker.py`), et
+  environ 260 analyses de mesure sans plantage. Si le processus d'analyse tombe, l'interface propose de réessayer.
 - L'import YouTube dépend d'un site qui change, et parfois de Node.js ou Deno.
 - 928 Mo sur disque, 418 Mo en zip (`dist/LocalChords-windows-x64.zip`). Programme non signé : SmartScreen avertit.
 - Diffusion publique : libx264 et libx265 (GPL) sont dans le paquet, voir LICENCES-TIERS.md.
