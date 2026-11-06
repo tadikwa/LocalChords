@@ -341,20 +341,42 @@ class Project:
         return tempo(self.grid())
 
     def bars(self) -> list[Bar]:
-        """The beats in bars. Beats before the first downbeat make a pickup bar, padded in front."""
+        """The beats in bars, from the analysis's bar lines or from a count the user set.
+
+        Beats before the first bar line make a pickup bar, padded in front. A bar cut short pads
+        behind; one that overruns its length carries on into a bar of its own.
+        """
         if "bars" in self._cache:
             return self._cache["bars"]
         meter = self.meter()
-        per_bar, first = int(meter["beats_per_bar"]), int(meter["first_downbeat"])
+        per_bar = int(meter["beats_per_bar"])
         n = len(self.grid())
+        lines = meter.get("bar_lines")
+        # Bar lines count beats of the analysis's grid, so a corrected grid counts afresh.
+        if lines is None or self.edits["grid"]:
+            lines = list(range(int(meter["first_downbeat"]), n, per_bar))
+        lines = [line for line in lines if line < n]
         bars: list[Bar] = []
+        first = lines[0] if lines else n
         if first:
-            bars.append(Bar(0, [None] * (per_bar - first) + list(range(min(first, n)))))
-        for number, start in enumerate(range(first, n, per_bar), start=1):
-            cells: list[int | None] = list(range(start, min(start + per_bar, n)))
-            bars.append(Bar(number, cells + [None] * (per_bar - len(cells))))
+            # A long intro counts back from the first bar line, the pickup against it.
+            bars = _pickup_bars(first, per_bar)
+        number = 1
+        for line, end in zip(lines, [*lines[1:], n], strict=True):
+            for start in range(line, end, per_bar):
+                cells = list(range(start, min(start + per_bar, end)))
+                bars.append(Bar(number, cells + [None] * (per_bar - len(cells))))
+                number += 1
         self._cache["bars"] = bars
         return bars
+
+    def bar_position(self, beat: int) -> tuple[int, int] | None:
+        """(bar number, beat in the bar, from 1) of a beat; the bar number is 0 in a pickup."""
+        for bar in self.bars():
+            if beat in bar.beats:
+                played = [b for b in bar.beats if b is not None]
+                return bar.number, played.index(beat) + 1
+        return None
 
     def beat_at(self, t: float) -> int:
         """Index of the beat playing at t, -1 before the first one."""
@@ -369,6 +391,15 @@ class Project:
     def sounding_shift(self) -> int:
         """Semitones between what plays and what the chart shows: transposition less capo."""
         return int(self.view["transpose"]) - int(self.view["capo"])
+
+
+def _pickup_bars(first: int, per_bar: int) -> list[Bar]:
+    """Full bars counted back from the first bar line; the short one comes first, padded in front."""
+    short = first % per_bar
+    bars = [Bar(0, [None] * (per_bar - short) + list(range(short)))] if short else []
+    for start in range(short, first, per_bar):
+        bars.append(Bar(0, list(range(start, start + per_bar))))
+    return bars
 
 
 def _absorb_short(runs: list[Segment], min_beats: int) -> list[Segment]:

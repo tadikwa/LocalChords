@@ -367,3 +367,34 @@ def test_view_settings_come_back_with_the_project(app, wav, tmp_path):
     assert window.song.capo.value == 3
     assert window.song.grid.symbols[0][0] == "A"
     window.close()
+
+
+def test_dropping_a_file_opens_it(app, wav, tmp_path):
+    from PySide6.QtCore import QMimeData, QUrl
+    from PySide6.QtGui import QDragEnterEvent, QDropEvent
+
+    a = make_analysis()
+    audio = {"path": str(wav), "title": "x", "duration": 8.0}
+    Project(audio, a).save(tmp_path / "déposé.lchords")
+    window = MainWindow(muted=True)
+    window.show()
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(tmp_path / "déposé.lchords"))])
+    actions = Qt.DropAction.CopyAction
+    button = Qt.MouseButton.LeftButton
+    keys = Qt.KeyboardModifier.NoModifier
+    enter = QDragEnterEvent(window.rect().center(), actions, mime, button, keys)
+    window.dragEnterEvent(enter)
+    assert enter.isAccepted() and window.drop_hint.isVisible()
+    window.dropEvent(QDropEvent(QPointF(10, 10), actions, mime, button, keys))
+    assert not window.drop_hint.isVisible()
+    assert window.stack.currentWidget() is window.song
+    window.close()
+
+
+def test_held_chord_is_named_again_at_each_bar(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.apply_chord(0, 11, "C:maj", None)
+    assert window.song.grid.continued[4] == "C"
+    assert window.song.grid.continued[8] == "C"
+    window.close()

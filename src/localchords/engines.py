@@ -16,6 +16,7 @@ import sys
 import tempfile
 import wave
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,6 +27,9 @@ from . import rhythm
 Progress = Callable[[float, str], None]
 ANALYSIS_SR = 22050
 SILENCE_RMS = 1e-4
+# Under this agreement between the one-tempo grid and Beat This!'s own beats, the song's tempo moves
+# and the grid follows those beats instead. docs/BENCHMARKS.md has the measure behind this value.
+FOLLOW_TEMPO_BELOW = 0.9
 
 
 class AnalysisError(Exception):
@@ -88,16 +92,57 @@ class _Stages:
         self.progress = progress
         self.beat_logits: np.ndarray | None = None
         self.downbeat_logits: np.ndarray | None = None
+        self.followed_tempo = False
+        self.fit_before: float | None = None
 
     def run(self, fn, *args, **kwargs):
         name = fn.__name__
         share = STAGE_SHARE.get(name)
         if share:
             self.progress(share[0], STAGE_TEXT[name])
-        result = self._activation(args[0]) if name == "activation" else fn(*args, **kwargs)
+        if name == "activation":
+            result = self._activation(args[0])
+        elif name == "beat_features":
+            with self._tracker_that_follows_tempo():
+                result = fn(*args, **kwargs)
+        else:
+            result = fn(*args, **kwargs)
         if share:
             self.progress(share[1], STAGE_TEXT[name])
         return result
+
+    @contextmanager
+    def _tracker_that_follows_tempo(self):
+        """chordotomy's grid has one tempo per file, which drifts off a song whose tempo moves.
+
+        Its tracker is librosa's, called once inside beat_features; this wraps that one call. All
+        that reads the grid afterwards (chords, bass, harmony) stays as it is.
+        """
+        import librosa
+        from chordotomy.beats import FPS
+        from chordotomy.features import HOP, SR
+        from scipy.special import expit
+
+        original = librosa.beat.beat_track
+
+        def track(**kwargs):
+            tempo, frames = original(**kwargs)
+            if self.beat_logits is None or len(frames) == 0:
+                return tempo, frames  # the DSP engine: nothing better to follow
+            peaks = rhythm.peak_times(expit(self.beat_logits), FPS)
+            grid = librosa.frames_to_time(frames, sr=SR, hop_length=HOP)
+            self.fit_before = rhythm.grid_fit(grid, peaks)
+            if self.fit_before >= FOLLOW_TEMPO_BELOW or len(peaks) < 8:
+                return tempo, frames
+            self.followed_tempo = True
+            followed = librosa.time_to_frames(peaks, sr=SR, hop_length=HOP)
+            return np.array([60.0 / float(np.median(np.diff(peaks)))]), followed
+
+        librosa.beat.beat_track = track
+        try:
+            yield
+        finally:
+            librosa.beat.beat_track = original
 
     def _activation(self, y: np.ndarray) -> np.ndarray:
         import librosa
@@ -140,8 +185,12 @@ def _rhythm_of(result: dict, stages: _Stages, y: np.ndarray) -> dict:
         if s["start_beat"] < len(changes):
             changes[s["start_beat"]] = 1
     peaks = rhythm.peak_times(expit(stages.beat_logits), fps)
+    meter = rhythm.infer_meter(evidence, changes)
+    meter["bar_lines"] = rhythm.place_bar_lines(evidence, changes, meter["beats_per_bar"])
+    if meter["bar_lines"]:
+        meter["first_downbeat"] = meter["bar_lines"][0] % meter["beats_per_bar"]
     return {
-        "meter": rhythm.infer_meter(evidence, changes),
+        "meter": meter,
         "tempo": rhythm.tempo(grid),
         "grid_fit": round(rhythm.grid_fit(grid, peaks), 3),
     }
@@ -175,6 +224,7 @@ def _chordotomy(engine: str, y: np.ndarray, progress: Progress) -> dict:
             "name": engine,
             "generator": result["generator"],
         },
+        "followed_tempo": stages.followed_tempo,
         "beats": result["beats"],
         "segments": result["segments"],
         "global_key": result["global_key"],

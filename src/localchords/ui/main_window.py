@@ -424,7 +424,7 @@ class SongPage(QWidget):
         )
         controls.addWidget(self.speed)
         self.transpose = Stepper(
-            "Transp.",
+            "Transposer",
             -11,
             11,
             0,
@@ -951,6 +951,7 @@ class MainWindow(QMainWindow):
         s.undo.setEnabled(project.can_undo)
         s.redo.setEnabled(project.can_redo)
         self._last_beat = None
+        self._tick()
         if save and has_grid:
             self.save_timer.start()
 
@@ -1116,15 +1117,11 @@ class MainWindow(QMainWindow):
         s = self.song
         place = ""
         if beat >= 0 and project.analysis["segments"]:
-            meter = project.meter()
-            per_bar = int(meter["beats_per_bar"])
-            first = int(meter["first_downbeat"])
-            if beat >= first:
-                place = (
-                    f"mesure {(beat - first) // per_bar + 1} · temps {(beat - first) % per_bar + 1}"
-                )
-            else:
-                place = "levée"
+            position = project.bar_position(beat)
+            if position and position[0]:
+                place = f"mesure {position[0]} · temps {position[1]}"
+            elif position:
+                place = "introduction"
         s.place.setText(place)
         now = next_ = ""
         segments = project.segments()

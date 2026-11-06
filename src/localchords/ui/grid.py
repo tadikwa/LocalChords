@@ -144,6 +144,7 @@ class ChordGrid(QWidget):
                 if beat is not None:
                     self.cells[beat] = QRectF(x + j * cell_w, y, cell_w, self.row_h)
                     self.row_of[beat] = row
+        bar_starts = {next((b for b in bar.beats if b is not None), None) for bar in bars}
         for s in segments:
             text = texts[s.start_beat]
             for beat in range(s.start_beat, s.end_beat):
@@ -155,9 +156,9 @@ class ChordGrid(QWidget):
                     break
                 span += 1
             self.symbols[s.start_beat] = (text, span * cell_w, s)
-            # A chord held across a line break is named again, dimly, at the start of the line.
+            # A chord held over a bar line is named again, dimly: an empty bar reads as nothing.
             for beat in range(s.start_beat + 1, s.end_beat):
-                if self.row_of.get(beat) != self.row_of.get(beat - 1):
+                if beat in bar_starts:
                     self.continued[beat] = text
         height = int(self.rows[-1][1] + MARGIN) if self.rows else 0
         self.setMinimumHeight(height)

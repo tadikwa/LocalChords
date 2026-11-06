@@ -17,7 +17,11 @@ def _job(path: str, engine: str, conn) -> None:
         if getattr(sys, name) is None:
             setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115
     try:
-        from . import audio, engines, project
+        from . import audio, library
+
+        # librosa's beat tracker is compiled at first use; kept, later analyses start much faster.
+        os.environ.setdefault("NUMBA_CACHE_DIR", str(library.data_dir() / "cache"))
+        from . import engines, project
 
         file = Path(path)
         conn.send(("progress", 0.01, "Décodage de l'audio…"))

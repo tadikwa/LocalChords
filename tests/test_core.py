@@ -349,3 +349,54 @@ def test_parse_symbol(typed, expected):
     from localchords.chords import parse_symbol
 
     assert parse_symbol(typed) == expected
+
+
+def test_place_bar_lines_follows_a_regular_count():
+    d = np.full(40, 0.1)
+    d[2::4] = 0.9
+    assert rhythm.place_bar_lines(d, np.zeros(40), 4) == list(range(2, 40, 4))
+
+
+def test_place_bar_lines_ignores_a_stray_activation():
+    d = np.full(40, 0.1)
+    d[0::4] = 0.8
+    d[13] = 0.95
+    assert rhythm.place_bar_lines(d, np.zeros(40), 4) == list(range(0, 40, 4))
+
+
+def test_place_bar_lines_recovers_after_a_missed_beat():
+    # A beat is missing at 20: from there on the bar lines sit one beat earlier.
+    lines = [*range(0, 20, 4), *range(19, 80, 4)]
+    d = np.full(80, 0.05)
+    d[lines] = 0.95
+    found = rhythm.place_bar_lines(d, np.zeros(80), 4)
+    assert found[:4] == [0, 4, 8, 12] and found[-4:] == lines[-4:]
+
+
+def test_bars_from_irregular_bar_lines_keep_every_beat_once():
+    p = project()
+    p.analysis["meter"]["bar_lines"] = [1, 5, 8, 12]
+    bars = p.bars()
+    assert bars[0].number == 0 and bars[0].beats == [None, None, None, 0]
+    assert bars[1].beats == [1, 2, 3, 4]
+    assert bars[2].beats == [5, 6, 7, None]  # a bar cut short by the next bar line
+    cells = [b for bar in bars for b in bar.beats if b is not None]
+    assert cells == list(range(16))
+    assert p.bar_position(6) == (2, 2)
+    assert p.bar_position(0) == (0, 1)
+
+
+def test_long_intro_is_counted_back_from_the_first_bar_line():
+    p = project()
+    p.analysis["meter"]["bar_lines"] = [6, 10, 14]
+    bars = p.bars()
+    assert bars[0].beats == [None, None, 0, 1]
+    assert bars[1].beats == [2, 3, 4, 5] and bars[1].number == 0
+    assert bars[2].beats == [6, 7, 8, 9] and bars[2].number == 1
+
+
+def test_user_meter_overrides_the_bar_lines():
+    p = project()
+    p.analysis["meter"]["bar_lines"] = [1, 5, 8, 12]
+    p.set_meter(3, 0)
+    assert p.bars()[0].beats == [0, 1, 2] and p.bars()[1].number == 2
