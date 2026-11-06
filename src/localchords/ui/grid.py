@@ -371,12 +371,10 @@ class ChordGrid(QWidget):
 
         # The lit cell always names the chord, so the eye can stay on it.
         rect = self.cells.get(self.current)
-        if rect and rect.intersects(area) and current_segment is not None:
-            if self.current != current_segment.start_beat and current_segment.chord != "N":
-                text = self.symbols[current_segment.start_beat][0]
-                self._draw_symbol(
-                    p, rect, text, self.cell_w, base_size * 0.72, theme.ON_ACCENT, 600
-                )
+        lit = rect and rect.intersects(area) and current_segment is not None
+        if lit and self.current != current_segment.start_beat and current_segment.chord != "N":
+            text = self.symbols[current_segment.start_beat][0]
+            self._draw_symbol(p, rect, text, self.cell_w, base_size * 0.72, theme.ON_ACCENT, 600)
 
         # The beat's progress, a thin line along the bottom of the current cell.
         rect = self.cells.get(self.current)

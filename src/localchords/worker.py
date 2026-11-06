@@ -4,12 +4,18 @@ the interface. Top-level imports stay light: the interface imports this module."
 from __future__ import annotations
 
 import multiprocessing as mp
+import os
+import sys
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
 
 def _job(path: str, engine: str, conn) -> None:
+    # The windowed program has no console: libraries that write to one must not crash on it.
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115
     try:
         from . import audio, engines, project
 

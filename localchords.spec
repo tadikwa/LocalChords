@@ -1,4 +1,5 @@
 # PyInstaller: a portable folder, dist/LocalChords/LocalChords.exe. See scripts/build.ps1.
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
@@ -16,12 +17,17 @@ datas = [
 for package in ("chordotomy", "lv-chordia", "beat-this", "librosa", "soundfile", "numpy"):
     datas += copy_metadata(package)
 datas += collect_data_files("lv_chordia")
+# The nets' weights sit outside the package; lv_chordia looks for them two levels above itself.
+nets = next(Path(sys.prefix).rglob("*.sdict")).parent
+datas += [(str(f), "cache_data") for f in nets.glob("*.sdict")]
 datas += collect_data_files("librosa")
 
 hidden = (
     collect_submodules("chordotomy")
     + collect_submodules("lv_chordia")
     + collect_submodules("beat_this")
+    + collect_submodules("librosa")
+    + ["localchords.selftest"]
     + ["sklearn.utils._typedefs", "scipy.special.cython_special"]
 )
 
@@ -30,7 +36,7 @@ excludes = [
     "tkinter", "matplotlib", "IPython", "jupyter", "pytest", "torchvision", "tensorboard",
     "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtNetwork", "PySide6.QtOpenGL",
     "PySide6.QtSvg", "PySide6.QtPdfWidgets", "PySide6.QtWebEngineCore",
-    "chordotomy.evaluate", "mir_eval", "pooch",
+    "mir_eval",
 ]
 
 a = Analysis(
@@ -48,7 +54,9 @@ a.datas = [
     d
     for d in a.datas
     if not d[0].startswith(("PySide6/translations", "torch/include", "torch/share"))
-    and not d[0].endswith((".pyi", ".h", ".hpp", ".lib"))
+    and not d[0].endswith((".h", ".hpp", ".lib"))
+    # librosa finds its own lazy imports through its .pyi files at run time.
+    and not (d[0].endswith(".pyi") and not d[0].startswith("librosa"))
 ]
 
 pyz = PYZ(a.pure)

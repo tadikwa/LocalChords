@@ -203,7 +203,7 @@ def _take_root(text: str) -> tuple[str, str] | None:
 
 
 def parse_symbol(text: str) -> tuple[str, str | None] | None:
-    """(label, bass) for a typed chord such as `F#m7b5/A`, `Bb`, `Rém7` or `N.C.`; None if unread."""
+    """(label, bass) for a typed chord such as `F#m7b5/A`, `Bb`, `Rém7`, `N.C.`; None if unread."""
     text = text.strip()
     if not text:
         return None

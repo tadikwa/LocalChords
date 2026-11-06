@@ -11,6 +11,11 @@ def main() -> int:
     import traceback
     from pathlib import Path
 
+    if len(sys.argv) >= 4 and sys.argv[1] == "--self-test":
+        from .selftest import run
+
+        return run(Path(sys.argv[2]), Path(sys.argv[3]))
+
     from PySide6.QtWidgets import QMessageBox
 
     from . import library
