@@ -16,7 +16,7 @@ from . import theme
 MARGIN = 16
 BAR_GAP = 8
 ROW_GAP = 10
-MIN_CELL = 72
+MIN_CELL = 56
 MAX_CELL = 210
 ROW_MAX = 132
 # Bars per line, in the multiples that keep phrases lined up.
@@ -431,8 +431,10 @@ class ChordGrid(QWidget):
         for piece, ratio, lift, piece_weight in parts:
             font = theme.app_font(size * scale * ratio, piece_weight or weight)
             p.setFont(font)
-            p.drawText(QPointF(x, baseline - lift * size * scale), piece)
-            x += QFontMetricsF(font).horizontalAdvance(piece)
+            # The accidental's glyph comes with a wide side bearing: closer to its letter.
+            nudge = 0.07 * size * scale if lift else 0.0
+            p.drawText(QPointF(x - nudge, baseline - lift * size * scale), piece)
+            x += QFontMetricsF(font).horizontalAdvance(piece) - nudge
 
 
 _SYMBOL = re.compile(r"^(Do|Ré|Mi|Fa|Sol|La|Si|[A-G])([♯♭]?)([^/]*)(/.*)?$")

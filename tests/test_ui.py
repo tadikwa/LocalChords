@@ -259,7 +259,7 @@ def test_layout_uses_the_width_of_the_window(app, wav, tmp_path, size):
     grid = window.song.grid
     grid.refresh()
     rightmost = max(r.right() for r in grid.cells.values())
-    assert grid.cell_w >= 72
+    assert grid.cell_w >= 56
     assert rightmost <= grid.width()
     assert window.width() == size[0], "the controls must not force the window wider"
     assert grid.row_h <= 150
@@ -527,4 +527,23 @@ def test_editor_uses_latin_names_when_asked(app, wav, tmp_path):
     assert editor.apply_button.isEnabled()
     editor._accept()
     assert editor.result_label == "F:maj(9)"
+    window.close()
+
+
+@pytest.mark.parametrize("width", [1000, 1120, 2560])
+def test_transport_controls_fit_whatever_the_window_manager_imposes(app, wav, tmp_path, width):
+    a = make_analysis(chords=("C:maj", "A:min", "F:maj", "G:7") * 12)
+    audio = {"path": str(wav), "title": "Long", "duration": a["segments"][-1]["end_time"]}
+    Project(audio, a).save(tmp_path / "long.lchords")
+    window = MainWindow(muted=True)
+    window.show()
+    window.open_project_file(tmp_path / "long.lchords")
+    window.resize(width, 800)
+    app.processEvents()
+    s = window.song
+    s.adapt_to_width(width)
+    app.processEvents()
+    needed = s.play.parent().minimumSizeHint().width()
+    assert needed <= width, f"the transport needs {needed} px"
+    assert s.grid.bars_per_row >= 4, "a narrow window still reads four bars to a line"
     window.close()

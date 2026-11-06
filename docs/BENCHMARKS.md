@@ -116,6 +116,9 @@ transposition, trois exports, réouverture sans recalcul. **Tout réussi.** Lanc
 fichier en argument, lecture et transposition au clavier réel (`SendKeys`), capture d'écran, fermeture propre (code 0),
 transposition retrouvée dans le fichier.
 
+Clavier réel, focus vérifié avant chaque touche (`scripts/key_check.ps1`) : 3 Ctrl + ↑ envoyés, transposition 3
+retrouvée dans le fichier enregistré.
+
 Environnement dépouillé : même scénario réussi avec le dossier du programme renommé en `dist/Été 音楽 test/`, `PATH`
 réduit à `System32`, et profil utilisateur vide (donc sans Python, sans cache et sans poids téléchargés).
 Import de lien dans l'exécutable : film Big Buck Bunny (CC BY), 634,6 s décodées. Fichier introuvable : message

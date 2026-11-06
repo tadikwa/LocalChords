@@ -497,6 +497,20 @@ class SongPage(QWidget):
         controls.addWidget(self.volume_icon)
         controls.addWidget(self.volume)
         layout.addWidget(bottom)
+        self.adapt_to_width(1360)
+
+    def adapt_to_width(self, width: int) -> None:
+        """A tiling window manager can make the window narrower than its minimum, so what is
+        rarely needed gives way first; all of it stays on the keyboard."""
+        for widget in (self.volume, self.volume_icon):
+            widget.setVisible(width >= 1120)
+        for widget in (self.loop_a, self.loop_b):
+            widget.setVisible(width >= 960)
+        self.capo.setVisible(width >= 860)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.adapt_to_width(event.size().width())
 
     def _choices(self, title: str, options) -> QActionGroup:
         """A titled group of exclusive choices in the display menu."""
