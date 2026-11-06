@@ -54,7 +54,7 @@ def write_pdf(project: Project, path: Path) -> None:
 
     row_h = 62
     bar_w = width / BARS_PER_LINE
-    number = 0
+    numbers = [bar.number for bar in project.bars()]
     for i in range(0, len(bars), BARS_PER_LINE):
         if y + row_h > height:
             writer.newPage()
@@ -64,11 +64,12 @@ def write_pdf(project: Project, path: Path) -> None:
             p.setPen(QPen(INK, 1.4))
             p.drawLine(int(x), int(y), int(x), int(y + row_h))
             beat_w = bar_w / max(len(cells), 1)
-            if any(cells) or cells:
-                number += 1
-            p.setPen(FAINT)
-            p.setFont(theme.app_font(10))
-            p.drawText(QRectF(x + 5, y, bar_w, 16), Qt.AlignmentFlag.AlignLeft, str(number))
+            if numbers[i + col]:
+                p.setPen(FAINT)
+                p.setFont(theme.app_font(10))
+                p.drawText(
+                    QRectF(x + 5, y, bar_w, 16), Qt.AlignmentFlag.AlignLeft, str(numbers[i + col])
+                )
             for j, text in enumerate(cells):
                 if not text:
                     continue

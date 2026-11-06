@@ -1178,6 +1178,9 @@ class MainWindow(QMainWindow):
                 "Lancer l'analyse",
                 lambda: self.start_analysis(self.job_path, self.job_engine),
             )
+        # Nothing to say about the song's key or tempo before there is an analysis.
+        for widget in (s.key_button, s.rhythm_button, s.undo, s.redo, s.export):
+            widget.setVisible(has_grid)
         self._update_facts()
         self._update_loop_display()
         s.undo.setEnabled(project.can_undo)
