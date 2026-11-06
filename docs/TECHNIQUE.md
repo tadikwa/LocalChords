@@ -88,5 +88,6 @@ le plus. Une analyse qui change de grille ne perd donc rien.
 
 `scripts\build.ps1`, puis `dist\LocalChords\LocalChords.exe --self-test <audio> <dossier>` : code de
 sortie 0 et `report.json` détaillent chaque étape. `requirements-lock.txt` fige les versions testées.
-`chordotomy` est épinglé à 0.3.1 car `engines.py` appelle quatre de ses fonctions privées
-(`_tracker`, `_log_mel`, `_chunked`) et son argument `cache` : à revérifier à toute mise à jour.
+`chordotomy` est épinglé à 0.3.1 car `engines.py` appelle trois de ses fonctions privées
+(`_tracker`, `_log_mel`, `_chunked`), passe par son argument `cache` et remplace le temps d'un appel
+`librosa.beat.beat_track` : à revérifier à toute mise à jour.

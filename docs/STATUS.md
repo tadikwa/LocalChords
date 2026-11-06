@@ -25,12 +25,12 @@ Mis à jour le 2026-11-06.
 - Glisser-déposer physique jamais joué dans l'exécutable (l'événement est testé hors écran).
 - Non testé sur un autre PC.
 - L'import YouTube dépend d'un site qui change, et parfois de Node.js ou Deno.
-- 900 Mo sur disque, 412 Mo en zip. Programme non signé : SmartScreen avertit.
+- 928 Mo sur disque, 418 Mo en zip (`dist/LocalChords-windows-x64.zip`). Programme non signé : SmartScreen avertit.
 - Diffusion publique : libx264 et libx265 (GPL) sont dans le paquet, voir LICENCES-TIERS.md.
 
 ## Revue indépendante
 
-Relecture par un agent séparé : 15 constats, tous traités, avec un test pour chaque défaut réel. Les plus graves :
+Relecture par un agent séparé : 15 constats, tous traités, avec des tests pour les défauts les plus graves. Parmi eux :
 une tonalité bémol choisie à la main cassait le projet ; une boucle jusqu'à la fin du morceau plantait le flux
 audio ; l'affichage se figeait à chaque tour de boucle ; une comparaison annulée pouvait jeter l'analyse suivante.
 

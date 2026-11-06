@@ -81,7 +81,9 @@ Analyse dans un processus neuf comme dans le programme (`scripts/bench_speed.py`
 | 61 min | `model` | 240,6 s | 3,9 s | 11,06 Go |
 | 61 min | `dsp` | 191,4 s | 3,1 s | 10,78 Go |
 
-Environ 10 s de chargement, puis 4 s par minute. Dans le programme compilé : 13,5 s pour le morceau de 2 min 03.
+Environ 10 s de chargement, puis 4 s par minute. Dans le programme compilé : de 12,7 à 19,1 s pour le morceau
+de 2 min 03, selon les lancements. Le cache numba reste vide dans le programme compilé : le gain de 6,5 s entre
+froid et chaud, mesuré en développement, ne s'y applique pas.
 
 Fenêtre visible 0,82 s après le lancement du programme compilé (mesure externe, `scripts/real_launch.ps1`).
 Projet rouvert en 0,06 s. Mémoire de l'interface : 219 Mo, morceau de 2 min chargé.
@@ -105,7 +107,7 @@ qu'entend un musicien.
 
 ## Programme compilé
 
-`dist/LocalChords` : 922 Mo, zip 412 Mo. Postes principaux : `torch_cpu.dll` 295 Mo, `llvmlite` 115 Mo (requis par
+`dist/LocalChords` : 928 Mo, zip 418 Mo. Postes principaux : `torch_cpu.dll` 295 Mo, `llvmlite` 115 Mo (requis par
 librosa), poids Beat This! 79 Mo, FFmpeg 64 Mo, Qt 51 Mo, poids lv-chordia 27 Mo.
 
 Scénario complet dans l'exécutable (`--self-test`), chemins accentués et japonais, sur le morceau de 2 min 03 :
@@ -114,5 +116,10 @@ transposition, trois exports, réouverture sans recalcul. **Tout réussi.** Lanc
 fichier en argument, lecture et transposition au clavier réel (`SendKeys`), capture d'écran, fermeture propre (code 0),
 transposition retrouvée dans le fichier.
 
+Environnement dépouillé : même scénario réussi avec le dossier du programme renommé en `dist/Été 音楽 test/`, `PATH`
+réduit à `System32`, et profil utilisateur vide (donc sans Python, sans cache et sans poids téléchargés).
+Import de lien dans l'exécutable : film Big Buck Bunny (CC BY), 634,6 s décodées. Fichier introuvable : message
+clair, capture vérifiée.
+
 **Non testé dans l'exécutable :** le glisser-déposer à la souris (l'événement est testé dans l'interface hors écran) ;
-un PC sans Python ni outils de développement ; un PC sans carte son, sinon par le code d'erreur.
+un autre PC, notamment sans NVIDIA ; un PC sans carte son, sinon par le code d'erreur.

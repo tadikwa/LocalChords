@@ -5,7 +5,7 @@ To add an engine, write a function `run(wav_path, y, progress) -> dict` returnin
 register it in ENGINES. Nothing outside this file knows what produced the analysis.
 
 Both current engines are chordotomy's (MIT): the lv-chordia model on Beat This!'s grid, and a DSP
-front end on librosa's. Four private names of chordotomy.beats are used so that Beat This!'s
+front end on librosa's. Three private functions of chordotomy.beats are used so that Beat This!'s
 downbeat head, which chordotomy throws away, comes out of the same pass of the net.
 """
 

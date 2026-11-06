@@ -19,7 +19,8 @@ def _job(path: str, engine: str, conn) -> None:
     try:
         from . import audio, library
 
-        # librosa's beat tracker is compiled at first use; kept, later analyses start much faster.
+        # librosa's beat tracker is compiled at first use. Kept for later runs in development; the
+        # packaged program writes nothing here (measured) and compiles it on every analysis.
         os.environ.setdefault("NUMBA_CACHE_DIR", str(library.data_dir() / "cache"))
         from . import engines, project
 

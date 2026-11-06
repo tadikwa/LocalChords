@@ -84,7 +84,7 @@ téléchargement à vérifier. Licences MIT, redistribution permise.
 ## Distribution en dossier (`--onedir`), pas en fichier unique
 
 Un exécutable unique se décompresserait dans un dossier temporaire à chaque lancement : 900 Mo et plusieurs
-secondes, pour le processus d'analyse aussi. Le dossier démarre en 0,4 s. Zip : 412 Mo.
+secondes, pour le processus d'analyse aussi. Le dossier démarre en 0,4 s. Zip : 418 Mo.
 
 ## Ce qui n'a pas été fait, et pourquoi
 
@@ -93,6 +93,8 @@ secondes, pour le processus d'analyse aussi. Le dossier démarre en 0,4 s. Zip :
   de la forme.
 - **Séparation de sources :** deux modèles lourds de plus, sans gain démontré ; lv-chordia est entraîné sur
   des mélanges complets, et chordotomy documente avoir écarté Demucs pour la basse. Non testé ici.
+- **Cache de compilation numba dans le programme compilé :** il reste vide, d'où environ 6 s de plus à chaque
+  analyse. Non traité : gain modeste pour un chemin fragile.
 - **Accords 9, 11, 13 en sortie moteur :** lv-chordia les reconnaît mais chordotomy les réduit. Rétablir
   cette information demanderait de modifier son vocabulaire et son analyse harmonique.
 - **Changement de mesure en cours de morceau :** une seule longueur de mesure par morceau.
