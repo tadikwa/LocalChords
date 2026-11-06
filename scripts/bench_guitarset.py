@@ -22,8 +22,7 @@ def main():
         )
 
     timeline.analyze = analyze
-    rows = evaluate.evaluate("guitarset", limit=limit, engine="model")
-    print(evaluate.format_table(rows) if hasattr(evaluate, "format_table") else rows)
+    evaluate.run("guitarset", limit, "model", None, None)
 
 
 if __name__ == "__main__":

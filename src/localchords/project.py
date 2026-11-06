@@ -30,6 +30,7 @@ DEFAULT_VIEW = {
     "min_beats": 1,
     "show_bass": True,
     "show_numerals": False,
+    "transpose_audio": False,
 }
 
 
@@ -388,9 +389,93 @@ class Project:
                 return s
         return None
 
+    def progressions(self, limit: int = 4) -> list[dict]:
+        """What comes back, by how much of the song it covers: {chords, count, start_beats}."""
+        runs: list[Segment] = []
+        for s in self.segments():
+            if s.chord != "N" and (not runs or runs[-1].chord != s.chord):
+                runs.append(s)
+        return [
+            {
+                "chords": [runs[i].chord for i in range(hit["at"][0], hit["at"][0] + hit["size"])],
+                "symbols": [runs[i] for i in range(hit["at"][0], hit["at"][0] + hit["size"])],
+                "count": len(hit["at"]),
+                "start_beats": [runs[i].start_beat for i in hit["at"]],
+            }
+            for hit in find_repeats([r.chord for r in runs], limit)
+        ]
+
+    def agreement_with(self, other: dict) -> dict:
+        """How another analysis of this song compares, beat by beat, as shares of the beats."""
+        from .chords import parse, simplified
+
+        def triad(label):
+            parsed = parse(label)
+            return None if parsed is None else (parsed[0], simplified(parsed[1]))
+
+        them = Project(self.audio, other)
+        grid = them.grid()
+        beats = them.beats()
+        mine = self.beats()
+        if not mine or not grid:
+            return {"exact": 0.0, "triads": 0.0, "differences": []}
+        exact = same_triad = 0
+        differences: list[float] = []
+        for b in mine:
+            at = bisect_right(grid, (b.start + b.end) / 2) - 1
+            label = beats[at].chord if at >= 0 else "N"
+            exact += label == b.chord
+            matches = triad(label) == triad(b.chord)
+            same_triad += matches
+            if not matches:
+                differences.append(b.start)
+        return {
+            "exact": exact / len(mine),
+            "triads": same_triad / len(mine),
+            "differences": differences,
+        }
+
     def sounding_shift(self) -> int:
         """Semitones between what plays and what the chart shows: transposition less capo."""
         return int(self.view["transpose"]) - int(self.view["capo"])
+
+
+def find_repeats(chords: list[str], limit: int = 4, min_size=2, max_size=12) -> list[dict]:
+    """Sequences that recur, greedily by the most chords covered; each chord counted once.
+
+    A pattern doubled (A B A B) counts as its half, and only runs of at least two appearances count.
+    Returns {at: [indexes of the appearances], size}.
+    """
+    used = [False] * len(chords)
+    found = []
+    while len(found) < limit:
+        best = None
+        for size in range(min_size, max_size + 1):
+            places: dict[tuple, list[int]] = {}
+            for i in range(len(chords) - size + 1):
+                if any(used[i : i + size]):
+                    continue
+                piece = tuple(chords[i : i + size])
+                seen = places.setdefault(piece, [])
+                if not seen or i >= seen[-1] + size:
+                    seen.append(i)
+            for piece, at in places.items():
+                half = size // 2
+                doubled = size % 2 == 0 and piece[:half] == piece[half:]
+                if len(at) < 2 or doubled or len(set(piece)) < 2:
+                    continue
+                coverage = len(at) * size
+                # On a tie the longer pattern: it says more about the song's form.
+                if best is None or (coverage, size) > (best[0], best[1]):
+                    best = (coverage, size, at)
+        if best is None:
+            break
+        _, size, at = best
+        for start in at:
+            for i in range(start, start + size):
+                used[i] = True
+        found.append({"at": at, "size": size})
+    return found
 
 
 def _pickup_bars(first: int, per_bar: int) -> list[Bar]:

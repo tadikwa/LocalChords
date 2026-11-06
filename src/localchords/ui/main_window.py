@@ -4,20 +4,24 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import numpy as np
 from PySide6.QtCore import QObject, QPropertyAnimation, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
     QProgressBar,
+    QProgressDialog,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -153,6 +157,7 @@ class GridScroll(QScrollArea):
 
 class HomePage(QWidget):
     openRequested = Signal()
+    linkRequested = Signal()
     projectRequested = Signal(Path)
 
     def __init__(self):
@@ -180,13 +185,29 @@ class HomePage(QWidget):
         self.open_button.clicked.connect(self.openRequested)
         formats = QLabel("MP3, WAV, FLAC, M4A, OGG, OPUS… Tout reste sur votre ordinateur.")
         formats.setObjectName("caption")
+        self.link_button = QPushButton("Importer un lien…")
+        self.link_button.setToolTip(
+            "YouTube et autres sites, pour les contenus que vous avez le droit de télécharger"
+        )
+        self.link_button.clicked.connect(self.linkRequested)
         row = QHBoxLayout()
         row.addWidget(self.open_button)
-        row.addWidget(formats)
+        row.addWidget(self.link_button)
         row.addStretch()
         layout.addWidget(title)
         layout.addWidget(lead)
         layout.addLayout(row)
+        layout.addWidget(formats)
+        self.batch_box = QWidget()
+        batch_row = QHBoxLayout(self.batch_box)
+        batch_row.setContentsMargins(0, 0, 0, 0)
+        self.batch_text = QLabel()
+        self.batch_text.setObjectName("muted")
+        self.batch_cancel = QPushButton("Arrêter")
+        batch_row.addWidget(self.batch_text, 1)
+        batch_row.addWidget(self.batch_cancel)
+        self.batch_box.hide()
+        layout.addWidget(self.batch_box)
         self.recent_title = QLabel("Morceaux récents")
         self.recent_title.setObjectName("h2")
         layout.addSpacing(16)
@@ -511,7 +532,11 @@ class MainWindow(QMainWindow):
         self.loader = AudioLoader()
         self.loader.finished.connect(self._audio_loaded)
         self.loop_marks: list[float | None] = [None, None]
-        self.rhythm_dialog: RhythmDialog | None = None
+        self.pending_source_url: str | None = None
+        self.download_job: worker.Job | None = None
+        self.batch_job: worker.Job | None = None
+        self.batch_queue: list[Path] = []
+        self.compare_engine: str | None = None
 
         self.stack = QStackedWidget()
         self.home = HomePage()
@@ -532,6 +557,12 @@ class MainWindow(QMainWindow):
         self.job_timer = QTimer(self)
         self.job_timer.setInterval(60)
         self.job_timer.timeout.connect(self._poll_job)
+        self.download_timer = QTimer(self)
+        self.download_timer.setInterval(100)
+        self.download_timer.timeout.connect(self._poll_download)
+        self.batch_timer = QTimer(self)
+        self.batch_timer.setInterval(200)
+        self.batch_timer.timeout.connect(self._poll_batch)
         self.save_timer = QTimer(self)
         self.save_timer.setSingleShot(True)
         self.save_timer.setInterval(400)
@@ -547,6 +578,8 @@ class MainWindow(QMainWindow):
         for button in (s.status_button, s.banner_action):
             button.clicked.connect(lambda _=False, b=button: self._button_actions[b]())
         self.home.openRequested.connect(self.choose_file)
+        self.home.linkRequested.connect(self.ask_link)
+        self.home.batch_cancel.clicked.connect(self.cancel_batch)
         self.home.projectRequested.connect(self.open_project_file)
         s.home.clicked.connect(self.go_home)
         s.play.clicked.connect(self.toggle_play)
@@ -562,7 +595,7 @@ class MainWindow(QMainWindow):
         s.loop_b.clicked.connect(lambda: self.set_loop_mark(1))
         s.loop_button.clicked.connect(self.toggle_loop)
         s.speed.changed.connect(lambda i: self.player.set_rate(SPEEDS[i]))
-        s.transpose.changed.connect(lambda v: self._view(transpose=v))
+        s.transpose.changed.connect(self._transpose_changed)
         s.capo.changed.connect(lambda v: self._view(capo=v))
         s.accidental_actions.triggered.connect(lambda a: self._view(accidentals=a.data()))
         s.detail_actions.triggered.connect(self._detail_changed)
@@ -578,6 +611,7 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
         menu.addAction("Ouvrir un morceau…", self.choose_file, QKeySequence.StandardKey.Open)
+        menu.addAction("Importer un lien…", self.ask_link)
         menu.addAction(
             "Enregistrer une copie du projet…", self.save_as, QKeySequence.StandardKey.Save
         )
@@ -587,12 +621,20 @@ class MainWindow(QMainWindow):
             action = analyze.addAction(engine.label, lambda e=engine.name: self.reanalyze(e))
             action.setToolTip(engine.description)
         analyze.setToolTipsVisible(True)
+        compare = menu.addMenu("Comparer avec")
+        for engine in engines.ENGINES.values():
+            compare.addAction(engine.label, lambda e=engine.name: self.compare_with(e))
+        menu.addAction("Progressions répétées…", self.show_progressions)
         self.reset_action = menu.addAction("Effacer toutes les corrections", self.reset_edits)
         menu.addSeparator()
         self.latin_action = QAction("Notes en Do, Ré, Mi", self, checkable=True)
         self.latin_action.setChecked(bool(self.settings.get("latin")))
         self.latin_action.toggled.connect(self._latin_changed)
         menu.addAction(self.latin_action)
+        self.audio_action = QAction("Transposer aussi l'audio", self, checkable=True)
+        self.audio_action.setToolTip("L'audio suit la transposition, à la même vitesse.")
+        self.audio_action.toggled.connect(self._audio_transpose_changed)
+        menu.addAction(self.audio_action)
         self.bass_action = QAction("Afficher les basses (C/E)", self, checkable=True)
         self.bass_action.setChecked(bool(self.settings.get("show_bass", True)))
         self.bass_action.toggled.connect(self._bass_changed)
@@ -635,14 +677,20 @@ class MainWindow(QMainWindow):
 
     # Opening -----------------------------------------------------------------------------------
     def choose_file(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
+        paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Ouvrir un morceau",
             "",
             f"{AUDIO_FILTER};;Projets LocalChords (*{EXTENSION});;Tous les fichiers (*)",
         )
-        if path:
-            self.open_path(Path(path))
+        self.open_paths([Path(p) for p in paths])
+
+    def open_paths(self, paths: list[Path]) -> None:
+        """One file opens; several go through analysis in the background, for later."""
+        if len(paths) == 1:
+            self.open_path(paths[0])
+        elif paths:
+            self.start_batch(paths)
 
     def open_path(self, path: Path) -> None:
         """A recording or a project, whichever it is."""
@@ -663,32 +711,144 @@ class MainWindow(QMainWindow):
 
     def dropEvent(self, event):
         self.drop_hint.hide()
-        urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
-        if urls:
-            self.open_path(Path(urls[0].toLocalFile()))
+        self.open_paths([Path(u.toLocalFile()) for u in event.mimeData().urls() if u.isLocalFile()])
 
-    def open_audio(self, path: Path) -> None:
-        """A song already analyzed comes back as it was left; a new one gets analyzed."""
-        try:
-            fingerprint = audio.fingerprint(path)
-            saved = library.project_path(fingerprint)
-            if saved.exists():
+    def ask_link(self) -> None:
+        url, ok = QInputDialog.getText(
+            self,
+            "Importer un lien",
+            "Adresse de la vidéo ou du morceau.\n"
+            "N'importez que des contenus que vous avez le droit de télécharger.",
+        )
+        if ok and url.strip():
+            self.import_link(url.strip())
+
+    def import_link(self, url: str) -> None:
+        parts = urlsplit(url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            self._alert("Ce n'est pas une adresse web valide (http:// ou https://).")
+            return
+        folder = library.data_dir() / "downloads"
+        folder.mkdir(exist_ok=True)
+        self.download_job = worker.start_download(url, folder)
+        dialog = QProgressDialog("Connexion au site…", "Annuler", 0, 1000, self)
+        dialog.setWindowTitle("Importer un lien")
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        dialog.setMinimumDuration(0)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        self.download_dialog = dialog
+        dialog.canceled.connect(self._cancel_download)
+        self.download_timer.start()
+
+    def _cancel_download(self) -> None:
+        self.download_timer.stop()
+        if self.download_job:
+            self.download_job.cancel()
+            self.download_job = None
+
+    def _poll_download(self) -> None:
+        if not self.download_job:
+            self.download_timer.stop()
+            return
+        for message in self.download_job.poll():
+            if message[0] == "progress":
+                self.download_dialog.setValue(int(message[1] * 1000))
+                self.download_dialog.setLabelText(message[2])
+            elif message[0] in ("downloaded", "error"):
+                self.download_timer.stop()
+                self.download_job.cancel()
+                self.download_job = None
+                self.download_dialog.close()
+                if message[0] == "error":
+                    self._alert(message[1])
+                else:
+                    self.pending_source_url = message[2]
+                    self.open_audio(Path(message[1]))
+                return
+
+    # Batch -------------------------------------------------------------------------------------
+    def start_batch(self, paths: list[Path]) -> None:
+        self.batch_queue = list(paths)
+        self.batch_total = len(paths)
+        self.batch_done = 0
+        self.batch_errors: list[str] = []
+        self.home.batch_box.show()
+        self.batch_timer.start()
+        self._next_batch()
+
+    def _next_batch(self) -> None:
+        engine = self.settings.get("engine", engines.DEFAULT_ENGINE)
+        while self.batch_queue:
+            path = self.batch_queue.pop(0)
+            try:
+                project, saved, known = self._project_for(path)
+            except (audio.AudioError, OSError, ProjectError) as exc:
+                self.batch_errors.append(f"{path.name} : {exc}")
+                self.batch_done += 1
+                continue
+            if known:
+                self.batch_done += 1
+                continue
+            self.batch_current = (project, saved)
+            self.batch_job = worker.start(path, engine)
+            self.home.batch_text.setText(
+                f"Analyse par lots : {self.batch_done + 1} sur {self.batch_total}, « {path.name} »"
+            )
+            return
+        self.batch_job = None
+        self.batch_timer.stop()
+        text = f"Analyse par lots terminée : {self.batch_total} morceaux."
+        if self.batch_errors:
+            text += " Problèmes : " + " ; ".join(self.batch_errors)
+        self.home.batch_text.setText(text)
+        self.home.batch_cancel.hide()
+        self.home.refresh()
+
+    def _poll_batch(self) -> None:
+        if not self.batch_job:
+            return
+        for message in self.batch_job.poll():
+            if message[0] == "waveform":
+                self.batch_current[0].audio["waveform"] = message[1]
+                self.batch_current[0].audio["duration"] = message[2]
+            elif message[0] in ("done", "error"):
+                project, saved = self.batch_current
+                if message[0] == "done":
+                    project.replace_analysis(message[1])
+                    try:
+                        project.save(saved)
+                    except OSError as exc:
+                        self.batch_errors.append(str(exc))
+                else:
+                    self.batch_errors.append(f"{project.audio['title']} : {message[1]}")
+                self.batch_job.cancel()
+                self.batch_done += 1
+                self.home.refresh()
+                self._next_batch()
+                return
+
+    def cancel_batch(self) -> None:
+        self.batch_queue = []
+        self.batch_timer.stop()
+        if self.batch_job:
+            self.batch_job.cancel()
+            self.batch_job = None
+        self.home.batch_box.hide()
+        self.home.refresh()
+
+    def _project_for(self, path: Path) -> tuple[Project, Path, bool]:
+        """(project, its file, whether it was already analyzed) for a recording."""
+        fingerprint = audio.fingerprint(path)
+        saved = library.project_path(fingerprint)
+        if saved.exists():
+            try:
                 project = Project.load(saved)
                 project.audio["path"] = str(path)
-                self._show_project(project, saved)
-                self.save()
-                return
-            info = audio.metadata(path)
-        except audio.AudioError as exc:
-            self._alert(str(exc))
-            return
-        except OSError as exc:
-            self._alert(f"Impossible d'ouvrir « {path.name} » : {exc.strerror or exc}")
-            return
-        except ProjectError:
-            info = audio.metadata(path)
-            fingerprint = audio.fingerprint(path)
-            saved = library.project_path(fingerprint)
+                return project, saved, True
+            except ProjectError:
+                pass  # a damaged save doesn't stop a new analysis, which replaces it
+        info = audio.metadata(path)
         project = Project(
             {
                 "path": str(path),
@@ -697,11 +857,28 @@ class MainWindow(QMainWindow):
                 "duration": float(info["duration"] or 0.0),
                 "fingerprint": fingerprint,
                 "waveform": None,
+                "source_url": self.pending_source_url,
             },
             {"beats": [], "segments": []},
         )
+        self.pending_source_url = None
+        return project, saved, False
+
+    def open_audio(self, path: Path) -> None:
+        """A song already analyzed comes back as it was left; a new one gets analyzed."""
+        try:
+            project, saved, known = self._project_for(path)
+        except audio.AudioError as exc:
+            self._alert(str(exc))
+            return
+        except OSError as exc:
+            self._alert(f"Impossible d'ouvrir « {path.name} » : {exc.strerror or exc}")
+            return
         self._show_project(project, saved)
-        self.start_analysis(path, self.settings.get("engine", engines.DEFAULT_ENGINE))
+        if known:
+            self.save()
+        else:
+            self.start_analysis(path, self.settings.get("engine", engines.DEFAULT_ENGINE))
 
     def open_project_file(self, path: Path) -> None:
         try:
@@ -742,6 +919,10 @@ class MainWindow(QMainWindow):
                 action.setChecked(action.data() == value)
         s.speed.set_value(SPEEDS.index(1.0))
         self.player.set_rate(1.0)
+        self.audio_action.blockSignals(True)
+        self.audio_action.setChecked(bool(project.view.get("transpose_audio")))
+        self.audio_action.blockSignals(False)
+        self._apply_pitch()
         s.scroll.verticalScrollBar().setValue(0)
         self.stack.setCurrentWidget(s)
         self.setWindowTitle(f"{project.audio.get('title') or ''} : LocalChords")
@@ -817,6 +998,7 @@ class MainWindow(QMainWindow):
     def start_analysis(self, path: Path, engine: str) -> None:
         self._stop_job()
         self.job = worker.start(path, engine)
+        self.job_stage = 0
         self.job_path, self.job_engine = path, engine
         self.job_timer.start()
         s = self.song
@@ -866,11 +1048,20 @@ class MainWindow(QMainWindow):
         if not self.job:
             self.job_timer.stop()
             return
-        for message in self.job.poll():
+        messages = self.job.poll()
+        if not messages:
+            # A stage gives no news until it ends: creep on, so a long one doesn't look stuck.
+            bar = self.song.progress_bar
+            ceiling = min(self.job_stage + 200, 970)
+            bar.setValue(bar.value() + max((ceiling - bar.value()) // 90, 0))
+        for message in messages:
             kind = message[0]
             if kind == "progress":
-                self.song.progress_bar.setValue(int(message[1] * 1000))
+                self.job_stage = int(message[1] * 1000)
+                self.song.progress_bar.setValue(max(self.job_stage, self.song.progress_bar.value()))
                 self.song.status_detail.setText(message[2])
+            elif kind == "waveform" and self.project and self.project.analysis["segments"]:
+                pass  # a further analysis of a song already drawn
             elif kind == "waveform" and self.project:
                 self.project.audio["waveform"] = message[1]
                 self.project.audio["duration"] = message[2]
@@ -890,6 +1081,10 @@ class MainWindow(QMainWindow):
         if self.project is None:
             return
         analysis["engine"]["requested"] = engine
+        if self.compare_engine:
+            self.compare_engine = None
+            if not self._keep_compared(engine, analysis):
+                return
         self.project.replace_analysis(analysis)
         self.song.middle.setCurrentWidget(self.song.scroll)
         self._content_changed()
@@ -909,6 +1104,43 @@ class MainWindow(QMainWindow):
             )
         else:
             self._alert(text)
+
+    def compare_with(self, engine: str) -> None:
+        """Run another engine beside the current grid, then let the user choose."""
+        if not self.project or not self.project.analysis["segments"]:
+            return
+        path = Path(self.project.audio.get("path", ""))
+        if not path.is_file():
+            self._alert("Le fichier audio est introuvable : localisez-le d'abord.")
+            return
+        self.compare_engine = engine
+        self.start_analysis(path, engine)
+
+    def _keep_compared(self, engine: str, analysis: dict) -> bool:
+        """Show how the two grids differ; True to adopt the new one."""
+        a = self.project.agreement_with(analysis)
+        label = engines.ENGINES[engine].label
+        spots = [fmt_time(t) for t in _spaced(a["differences"])][:12]
+        text = (
+            f"Le moteur « {label} » est d'accord avec la grille actuelle sur "
+            f"{a['exact']:.0%} des temps, et sur {a['triads']:.0%} si l'on ne regarde "
+            "que les accords de base."
+        )
+        if spots:
+            text += "\n\nPassages à écouter : " + ", ".join(spots) + "."
+        text += "\n\nVos corrections sont conservées dans les deux cas."
+        box = QMessageBox(self)
+        box.setWindowTitle("Comparer deux moteurs")
+        box.setText(text)
+        keep = box.addButton("Garder la grille actuelle", QMessageBox.ButtonRole.RejectRole)
+        box.addButton(f"Utiliser « {label} »", QMessageBox.ButtonRole.AcceptRole)
+        box.exec()
+        return box.clickedButton() is not keep
+
+    def show_progressions(self) -> None:
+        if not self.project:
+            return
+        ProgressionsDialog(self.project, self.seek, self).exec()
 
     def reanalyze(self, engine: str) -> None:
         if not self.project:
@@ -1026,6 +1258,18 @@ class MainWindow(QMainWindow):
     def _detail_changed(self, action) -> None:
         value = action.data()
         self._view(simplify=value == "simple", show_numerals=value == "analysis")
+
+    def _transpose_changed(self, value: int) -> None:
+        self._view(transpose=value)
+        self._apply_pitch()
+
+    def _audio_transpose_changed(self, on: bool) -> None:
+        self._view(transpose_audio=on)
+        self._apply_pitch()
+
+    def _apply_pitch(self) -> None:
+        view = self.project.view if self.project else {}
+        self.player.set_pitch(int(view.get("transpose", 0)) if view.get("transpose_audio") else 0)
 
     def _latin_changed(self, on: bool) -> None:
         self.settings["latin"] = on
@@ -1409,7 +1653,7 @@ class MainWindow(QMainWindow):
             f"<b>LocalChords {__version__}</b><br>Grille d'accords locale et synchronisée.<br><br>"
             "Reconnaissance : chordotomy, lv-chordia, Beat This!, librosa.<br>"
             "Interface : Qt (PySide6). Audio : PyAV (FFmpeg), PortAudio.<br>"
-            "Le détail des licences est dans LICENCES-TIERS.md, à côté du programme.<br><br>"
+            "Le détail des licences est dans LICENCES-TIERS.md, dans le dossier _internal.<br><br>"
             "L'audio n'est jamais envoyé nulle part. Les accords sont extraits automatiquement : "
             "vérifiez-les à l'oreille.",
         )
@@ -1417,10 +1661,48 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.flush()
         self._stop_job()
+        self._cancel_download()
+        self.cancel_batch()
         self.player.pause()
         self.player.close_device()
         library.save_settings(self.settings)
         super().closeEvent(event)
+
+
+def _spaced(times: list[float], gap: float = 8.0) -> list[float]:
+    """The start of each passage in a list of times: one mention per stretch."""
+    out: list[float] = []
+    for t in times:
+        if not out or t - out[-1] >= gap:
+            out.append(t)
+    return out
+
+
+class ProgressionsDialog(QDialog):
+    """What comes back in the song. A click goes to its first appearance."""
+
+    def __init__(self, project: Project, seek, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Progressions répétées")
+        self.setMinimumWidth(460)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(8)
+        found = project.progressions()
+        if not found:
+            layout.addWidget(QLabel("Aucune suite d'accords ne se répète dans ce morceau."))
+        grid = project.grid()
+        for item in found:
+            chords = "  ".join(export.chord_text(project, s) for s in item["symbols"])
+            b = QPushButton(f"{chords}     × {item['count']}")
+            b.setObjectName("recent")
+            b.setToolTip("Aller à sa première apparition")
+            at = grid[item["start_beats"][0]]
+            b.clicked.connect(lambda _=False, t=at: (seek(t), self.accept()))
+            layout.addWidget(b)
+        note = QLabel("Repérées d'après les accords affichés : à vérifier à l'oreille.")
+        note.setObjectName("caption")
+        layout.addWidget(note)
 
 
 def _log(text: str) -> None:

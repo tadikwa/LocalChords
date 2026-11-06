@@ -36,6 +36,28 @@ class Wsola:
         self.tail = np.zeros((self.hop, self.channels), dtype=np.float32)
         self.continuation: np.ndarray | None = None
         self.pending = np.zeros((0, self.channels), dtype=np.float32)
+        self.last = np.zeros((1, self.channels), dtype=np.float32)
+        self.phase = 0.0
+
+    def resample(self, block: np.ndarray, ratio: float) -> np.ndarray:
+        """Play a block `ratio` times faster, which raises its pitch; continuous across blocks.
+
+        shortcut: linear interpolation dulls the top end a little and aliases slightly when going
+        up, acceptable for practice; a polyphase filter would do better if it ever matters.
+        """
+        if ratio == 1.0:
+            return block
+        points = np.arange(self.phase, len(block), ratio)
+        joined = np.concatenate((self.last, block))
+        grid = np.arange(len(joined))
+        out = np.stack(
+            [np.interp(points, grid, joined[:, c]) for c in range(self.channels)], axis=1
+        ).astype(np.float32)
+        self.last = block[-1:]
+        self.phase = (
+            float(points[-1] + ratio - len(block)) if len(points) else self.phase - len(block)
+        )
+        return out
 
     def next_hop(self, y: np.ndarray, position: float) -> np.ndarray:
         """Write one hop from around `position`; the caller advances position by hop × rate."""
@@ -78,6 +100,7 @@ class Player:
         self.lock = threading.RLock()
         self.cursor = 0.0  # next frame to read, in frames of the recording
         self.rate = 1.0
+        self.pitch = 1.0  # as a frequency ratio
         self.volume = 1.0
         self.playing = False
         self.loop: tuple[float, float] | None = None  # in frames
@@ -147,6 +170,14 @@ class Player:
             self.stretch.reset()
             self._mark()
 
+    def set_pitch(self, semitones: int) -> None:
+        """Move what is heard by whole semitones, without changing the speed."""
+        with self.lock:
+            self.cursor = self.position * self.sr
+            self.pitch = 2.0 ** (semitones / 12)
+            self.stretch.reset()
+            self._mark()
+
     def set_loop(self, start: float | None, end: float | None = None) -> None:
         """Loop [start, end) in seconds; None removes the loop."""
         with self.lock:
@@ -181,7 +212,7 @@ class Player:
                 return out
             done = 0
             while done < frames:
-                if self.rate == 1.0:
+                if self.rate == 1.0 and self.pitch == 1.0:
                     done += self._copy_plain(out[done:])
                 else:
                     done += self._copy_stretched(out[done:])
@@ -215,9 +246,11 @@ class Player:
     def _copy_stretched(self, out: np.ndarray) -> int:
         stretch = self.stretch
         if len(stretch.pending) == 0:
-            stretch.pending = stretch.next_hop(self.y, self.cursor)
+            # Resampling shortens the block by `pitch`, so the stretcher makes up for it.
+            block = stretch.next_hop(self.y, self.cursor)
+            stretch.pending = stretch.resample(block, self.pitch)
             before = self.cursor
-            self.cursor += stretch.hop * self.rate
+            self.cursor += stretch.hop * self.rate / self.pitch
             self._wrap(before)
         count = min(len(out), len(stretch.pending))
         out[:count] = stretch.pending[:count]

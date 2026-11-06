@@ -87,7 +87,9 @@ def infer_meter(downbeat, changes) -> dict:
     }
 
 
-def place_bar_lines(downbeat, changes, beats_per_bar: int, jump_cost: float = JUMP_COST) -> list[int]:
+def place_bar_lines(
+    downbeat, changes, beats_per_bar: int, jump_cost: float = JUMP_COST
+) -> list[int]:
     """The beats that open a bar, for a song whose count can slip.
 
     A beat grid that follows the tempo can miss or add a beat, and then one count from the first

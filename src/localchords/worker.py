@@ -65,10 +65,57 @@ class Job:
         self.conn.close()
 
 
-def start(path: Path, engine: str) -> Job:
+def _download_job(url: str, folder: str, conn) -> None:
+    """Fetch one recording's audio, as it is on the site: decoding needs no conversion."""
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115
+    try:
+        import yt_dlp
+
+        def hook(status):
+            total = status.get("total_bytes") or status.get("total_bytes_estimate")
+            if status.get("status") == "downloading" and total:
+                done = status.get("downloaded_bytes", 0) / total
+                conn.send(("progress", done, "Téléchargement de l'audio…"))
+
+        options = {
+            "format": "bestaudio/best",
+            "outtmpl": str(Path(folder) / "%(title).100B [%(id)s].%(ext)s"),
+            "noplaylist": True,
+            "playlist_items": "1",
+            "quiet": True,
+            "no_warnings": True,
+            "noprogress": True,
+            "windowsfilenames": True,
+            "progress_hooks": [hook],
+            "js_runtimes": {"deno": {}, "node": {}},
+        }
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info.get("entries"):
+                info = info["entries"][0]
+            path = ydl.prepare_filename(info)
+        conn.send(("downloaded", path, info.get("webpage_url") or url))
+    except Exception as exc:  # noqa: BLE001 - whatever the site says goes to the user as it is
+        text = str(exc).replace("ERROR: ", "")
+        conn.send(("error", f"Le téléchargement a échoué : {text}", ""))
+    finally:
+        conn.close()
+
+
+def _start(target, *args) -> Job:
     ctx = mp.get_context("spawn")
     ours, theirs = ctx.Pipe(duplex=False)
-    process = ctx.Process(target=_job, args=(str(path), engine, theirs), daemon=True)
+    process = ctx.Process(target=target, args=(*args, theirs), daemon=True)
     process.start()
     theirs.close()
     return Job(process, ours)
+
+
+def start(path: Path, engine: str) -> Job:
+    return _start(_job, str(path), engine)
+
+
+def start_download(url: str, folder: Path) -> Job:
+    return _start(_download_job, url, str(folder))

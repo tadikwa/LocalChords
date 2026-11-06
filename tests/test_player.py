@@ -191,3 +191,27 @@ def test_real_device_plays_and_position_follows():
         assert p.position == stopped
     finally:
         p.close_device()
+
+
+@pytest.mark.parametrize("semitones,hz", [(12, 880.0), (-12, 220.0), (7, 659.3), (2, 493.9)])
+def test_pitch_moves_the_note_and_not_the_time(semitones, hz):
+    p = Player(SR)
+    p.test_mode = True
+    p.load(sine(440.0, seconds=8.0))
+    p.set_pitch(semitones)
+    p.play()
+    out = render_seconds(p, 2.0)
+    assert peak_hz(out[SR // 4 :]) == pytest.approx(hz, abs=4)
+    assert p.cursor / SR == pytest.approx(2.0, abs=0.08)
+
+
+def test_pitch_and_slowdown_combine():
+    p = Player(SR)
+    p.test_mode = True
+    p.load(sine(440.0, seconds=8.0))
+    p.set_pitch(12)
+    p.set_rate(0.5)
+    p.play()
+    out = render_seconds(p, 2.0)
+    assert peak_hz(out[SR // 4 :]) == pytest.approx(880.0, abs=4)
+    assert p.cursor / SR == pytest.approx(1.0, abs=0.08)

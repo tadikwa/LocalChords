@@ -398,3 +398,76 @@ def test_held_chord_is_named_again_at_each_bar(app, wav, tmp_path):
     assert window.song.grid.continued[4] == "C"
     assert window.song.grid.continued[8] == "C"
     window.close()
+
+
+def test_import_link_refuses_nonsense(app, monkeypatch):
+    alerts = []
+    monkeypatch.setattr(MainWindow, "_alert", lambda self, text: alerts.append(text))
+    window = MainWindow(muted=True)
+    window.import_link("pas une adresse")
+    window.import_link("file:///C:/Windows/system.ini")
+    assert len(alerts) == 2 and window.download_job is None
+    window.close()
+
+
+def test_audio_follows_transposition_only_when_asked(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.song.transpose.step(12 - 1)
+    assert window.player.pitch == 1.0
+    window.audio_action.setChecked(True)
+    assert window.player.pitch == pytest.approx(2 ** (11 / 12))
+    window.audio_action.setChecked(False)
+    assert window.player.pitch == 1.0
+    window.close()
+
+
+def test_progressions_dialog_seeks(app, wav, tmp_path):
+    from localchords.ui.main_window import ProgressionsDialog
+
+    a = make_analysis(chords=("C:maj", "A:min", "F:maj", "G:7") * 3)
+    audio = {"path": str(wav), "title": "x", "duration": 24.0}
+    p = Project(audio, a)
+    seen = []
+    dialog = ProgressionsDialog(p, seen.append)
+    buttons = dialog.findChildren(
+        type(dialog.findChild(__import__("PySide6.QtWidgets").QtWidgets.QPushButton))
+    )
+    assert buttons and "× 3" in buttons[0].text()
+    buttons[0].click()
+    assert seen == [0.0]
+
+
+@pytest.mark.slow
+def test_batch_analyzes_several_files_in_the_background(app, tmp_path):
+    y, _ = synth.render([("C:maj", 4), ("F:maj", 4), ("G:maj", 4), ("C:maj", 4)] * 3, 100)
+    z, _ = synth.render([("D:min", 4), ("G:maj", 4), ("C:maj", 4), ("A:min", 4)] * 3, 120)
+    files = [synth.write_wav(tmp_path / "un.wav", y), synth.write_wav(tmp_path / "deux.wav", z)]
+    bad = tmp_path / "abîmé.mp3"
+    bad.write_bytes(b"not audio" * 100)
+    window = MainWindow(muted=True)
+    window.show()
+    window.open_paths([files[0], bad, files[1]])
+    assert window.stack.currentWidget() is window.home
+    assert wait_for(app, lambda: not window.batch_timer.isActive(), 240)
+    assert "terminée" in window.home.batch_text.text() and "abîmé" in window.home.batch_text.text()
+    assert len(library.recent()) == 2
+    window.open_path(files[1])
+    assert window.job is None and window.project.segments()
+    window.close()
+
+
+@pytest.mark.slow
+def test_compare_engines_keeps_the_current_grid_on_request(app, tmp_path, monkeypatch):
+    y, _ = synth.render([("C:maj", 4), ("F:maj", 4), ("G:maj", 4), ("C:maj", 4)] * 3, 100)
+    wav = synth.write_wav(tmp_path / "c.wav", y)
+    window = MainWindow(muted=True)
+    window.show()
+    window.open_path(wav)
+    assert wait_for(app, lambda: window.job is None, 120)
+    before = window.project.analysis
+    seen = []
+    monkeypatch.setattr(window, "_keep_compared", lambda e, a: seen.append(e) or False)
+    window.compare_with("dsp")
+    assert wait_for(app, lambda: window.job is None, 120)
+    assert seen == ["dsp"] and window.project.analysis is before
+    window.close()

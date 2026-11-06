@@ -21,12 +21,14 @@ datas += collect_data_files("lv_chordia")
 nets = next(Path(sys.prefix).rglob("*.sdict")).parent
 datas += [(str(f), "cache_data") for f in nets.glob("*.sdict")]
 datas += collect_data_files("librosa")
+datas += collect_data_files("yt_dlp_ejs")
 
 hidden = (
     collect_submodules("chordotomy")
     + collect_submodules("lv_chordia")
     + collect_submodules("beat_this")
     + collect_submodules("librosa")
+    + collect_submodules("yt_dlp")
     + ["localchords.selftest"]
     + ["sklearn.utils._typedefs", "scipy.special.cython_special"]
 )

@@ -45,7 +45,7 @@ class Engine:
 
 
 # The share of an analysis each stage takes, measured on a 4-minute song (docs/BENCHMARKS.md).
-STAGE_SHARE = {"activation": (0.05, 0.25), "beat_features": (0.25, 0.60), "recognize": (0.60, 0.97)}
+STAGE_SHARE = {"activation": (0.05, 0.30), "beat_features": (0.30, 0.75), "recognize": (0.75, 0.97)}
 STAGE_TEXT = {
     "activation": "Recherche des temps et des mesures…",
     "beat_features": "Lecture de la structure harmonique…",

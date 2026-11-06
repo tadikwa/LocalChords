@@ -400,3 +400,36 @@ def test_user_meter_overrides_the_bar_lines():
     p.analysis["meter"]["bar_lines"] = [1, 5, 8, 12]
     p.set_meter(3, 0)
     assert p.bars()[0].beats == [0, 1, 2] and p.bars()[1].number == 2
+
+
+def test_find_repeats_names_the_main_progression():
+    from localchords.project import find_repeats
+
+    verse = ["C", "G", "Am", "F"]
+    chorus = ["F", "G", "C"]
+    song = verse * 4 + chorus * 3 + verse * 2
+    found = find_repeats(song)
+    first = song[found[0]["at"][0] : found[0]["at"][0] + found[0]["size"]]
+    assert sorted(first) == sorted(verse)
+    assert len(found[0]["at"]) >= 6
+
+
+def test_find_repeats_on_nothing_repeated():
+    from localchords.project import find_repeats
+
+    assert find_repeats(["C", "D", "E", "F"]) == []
+    assert find_repeats([]) == []
+
+
+def test_project_progressions_and_agreement():
+    p = project(chords=("C:maj", "A:min", "F:maj", "G:7") * 3)
+    found = p.progressions()
+    assert found[0]["count"] == 3 and len(found[0]["chords"]) == 4
+    same = p.agreement_with(p.analysis)
+    assert same["exact"] == 1.0 and same["triads"] == 1.0 and same["differences"] == []
+    other = analysis(chords=("C:maj7", "A:min", "F:maj", "G:maj") * 3)
+    other["segments"][1]["chord"] = "E:min"
+    compared = p.agreement_with(other)
+    assert compared["exact"] < 1.0
+    assert compared["triads"] == pytest.approx((48 - 4) / 48)
+    assert len(compared["differences"]) == 4

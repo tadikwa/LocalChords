@@ -1,4 +1,4 @@
-"""`LocalChords.exe --self-test <audio> <report folder>`: the whole scenario, run inside the packaged
+"""`LocalChords.exe --self-test <audio> <report folder>`: the whole scenario, inside the packaged
 program, for the proof that the build works: open, analyze, play, correct, transpose, save, export,
 reopen. Writes report.json, silently: playback goes through the real device at zero volume."""
 
