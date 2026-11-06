@@ -8,7 +8,7 @@ from localchords import audio, worker
 
 
 def main():
-    folder = Path("work/downloads")
+    folder = Path("work/downloads3")
     folder.mkdir(parents=True, exist_ok=True)
     job = worker.start_download(sys.argv[1], folder)
     end = time.time() + 240

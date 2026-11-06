@@ -12,9 +12,9 @@ exactes de la distribution sont dans `requirements-lock.txt`.
 | [librosa](https://github.com/librosa/librosa) | Analyse audio | ISC | |
 | [NumPy](https://numpy.org), [SciPy](https://scipy.org), [scikit-learn](https://scikit-learn.org) | Calcul | BSD-3-Clause | |
 | [PySide6 / Qt](https://www.qt.io/qt-for-python) | Interface | LGPL-3.0 | Les bibliothèques Qt restent des DLL séparées et remplaçables dans le dossier du programme. |
-| [PyAV](https://github.com/PyAV-Org/PyAV) | Décodage audio | BSD-3-Clause | Embarque FFmpeg (LGPL-2.1+), en DLL séparées. |
+| [PyAV](https://github.com/PyAV-Org/PyAV) | Décodage audio | BSD-3-Clause | Embarque FFmpeg, LGPL-3.0+ selon `avcodec_license()` de la DLL livrée, en DLL séparées. |
 | [sounddevice](https://github.com/spatialaudio/python-sounddevice) / PortAudio | Sortie audio | MIT | |
-| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Import YouTube, si présent | Unlicense | |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Import de liens | Unlicense | L'usage qui en est fait reste sous la responsabilité de l'utilisateur et des conditions de chaque site. |
 
 Le texte de chaque licence est dans le dossier `_internal` du programme, avec le paquet concerné
 (`*.dist-info`), ou à l'adresse du projet.

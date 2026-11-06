@@ -124,3 +124,16 @@ def test_worker_reports_a_corrupt_file(tmp_path):
         time.sleep(0.05)
     error = next(m for m in messages if m[0] == "error")
     assert "abîmé" in error[1]
+
+
+def test_a_worker_that_dies_is_reported_once(tmp_path):
+    job = worker.Job.__new__(worker.Job)
+    job.ended = job.answered = False
+
+    class Dead:
+        def poll(self):
+            raise EOFError
+
+    job.conn = Dead()
+    first, second = job.poll(), job.poll()
+    assert first[0][0] == "error" and second == []

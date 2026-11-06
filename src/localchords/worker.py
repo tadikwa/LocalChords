@@ -42,10 +42,15 @@ def _job(path: str, engine: str, conn) -> None:
         conn.close()
 
 
+FINAL = ("done", "downloaded", "error")
+
+
 @dataclass
 class Job:
     process: mp.process.BaseProcess
     conn: object
+    ended: bool = False
+    answered: bool = False
 
     def poll(self) -> list[tuple]:
         """Messages that have arrived; ("error", …) is added if the process dies without a word."""
@@ -54,8 +59,11 @@ class Job:
             while self.conn.poll():
                 messages.append(self.conn.recv())
         except (EOFError, OSError):
-            if not any(m[0] in ("done", "error") for m in messages):
-                messages.append(("error", "Le processus d'analyse s'est arrêté brutalement.", ""))
+            self.ended = True
+        self.answered = self.answered or any(m[0] in FINAL for m in messages)
+        if self.ended and not self.answered:
+            self.answered = True
+            messages.append(("error", "Le processus s'est arrêté brutalement.", ""))
         return messages
 
     def cancel(self) -> None:
@@ -80,7 +88,8 @@ def _download_job(url: str, folder: str, conn) -> None:
                 conn.send(("progress", done, "Téléchargement de l'audio…"))
 
         options = {
-            "format": "bestaudio/best",
+            # AAC or Opus first: some sites' "best" is a surround codec the decoder doesn't know.
+            "format": "bestaudio[acodec^=mp4a]/bestaudio[acodec=opus]/bestaudio/best",
             "outtmpl": str(Path(folder) / "%(title).100B [%(id)s].%(ext)s"),
             "noplaylist": True,
             "playlist_items": "1",
