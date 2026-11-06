@@ -153,3 +153,70 @@ def symbol(
             bass_name = spell_root(bass_pc + semitones, moved_key, accidentals)
             text += "/" + pretty_note(bass_name, ascii_only=ascii_only, latin=latin)
     return text
+
+
+# What a musician types after the root, to the engine's quality. Longest first when matching.
+TYPED_QUALITIES = {
+    "": "maj", "maj": "maj", "M": "maj",
+    "m": "min", "min": "min", "-": "min",
+    "7": "7", "dom7": "7",
+    "maj7": "maj7", "M7": "maj7", "Δ": "maj7", "Δ7": "maj7", "7M": "maj7",
+    "m7": "min7", "min7": "min7", "-7": "min7",
+    "m6": "min6", "min6": "min6", "-6": "min6",
+    "m7b5": "hdim7", "m7♭5": "hdim7", "ø": "hdim7", "ø7": "hdim7", "-7b5": "hdim7",
+    "dim7": "dim7", "°7": "dim7", "o7": "dim7",
+    "dim": "dim", "°": "dim", "o": "dim",
+    "aug": "aug", "+": "aug", "5+": "aug",
+    "sus4": "sus4", "sus": "sus4",
+    "sus2": "sus2",
+    "7sus4": "sus4(b7)", "7sus": "sus4(b7)",
+    "add9": "maj(9)", "madd9": "min(9)", "m(add9)": "min(9)",
+}  # fmt: skip
+_LATIN_ROOTS = {
+    "do": "C",
+    "ré": "D",
+    "re": "D",
+    "mi": "E",
+    "fa": "F",
+    "sol": "G",
+    "la": "A",
+    "si": "B",
+}
+
+
+def _take_root(text: str) -> tuple[str, str] | None:
+    """(note name, rest of the text) from the start of what was typed."""
+    lowered = text.lower()
+    for latin in ("sol", "do", "ré", "re", "mi", "fa", "la", "si"):
+        if lowered.startswith(latin):
+            letter, rest = _LATIN_ROOTS[latin], text[len(latin) :]
+            break
+    else:
+        if not text or text[0].upper() not in NATURAL:
+            return None
+        letter, rest = text[0].upper(), text[1:]
+    if rest[:1] and rest[0] in "#♯b♭":
+        # "Bb" is B flat; "Bbm" too. A lone lowercase b never starts a quality here.
+        letter += "#" if rest[0] in "#♯" else "b"
+        rest = rest[1:]
+    return letter, rest
+
+
+def parse_symbol(text: str) -> tuple[str, str | None] | None:
+    """(label, bass) for a typed chord such as `F#m7b5/A`, `Bb`, `Rém7` or `N.C.`; None if unread."""
+    text = text.strip()
+    if not text:
+        return None
+    if text.upper().replace(".", "") in ("N", "NC"):
+        return "N", None
+    chord, _, bass_text = text.partition("/")
+    taken = _take_root(chord)
+    if taken is None or taken[1] not in TYPED_QUALITIES:
+        return None
+    label = make(name_to_pc(taken[0]), TYPED_QUALITIES[taken[1]])
+    if not bass_text:
+        return label, None
+    bass = _take_root(bass_text)
+    if bass is None or bass[1]:
+        return None
+    return label, SHARP_NAMES[name_to_pc(bass[0])]

@@ -5,6 +5,7 @@ import time
 import numpy as np
 import pytest
 import synth
+
 from localchords import audio, engines, worker
 
 pytestmark = pytest.mark.slow

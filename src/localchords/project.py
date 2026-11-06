@@ -286,7 +286,9 @@ class Project:
                 runs[-1].end_beat, runs[-1].end = b.index + 1, b.end
                 runs[-1].edited |= b.edited
             else:
-                runs.append(Segment(b.index, b.index + 1, b.start, b.end, b.chord, b.bass, b.edited))
+                runs.append(
+                    Segment(b.index, b.index + 1, b.start, b.end, b.chord, b.bass, b.edited)
+                )
         runs = _absorb_short(runs, int(self.view.get("min_beats") or 1))
         self._annotate(runs)
         self._cache["segments"] = runs

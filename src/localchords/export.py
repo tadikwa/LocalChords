@@ -41,7 +41,9 @@ def bar_symbols(project: Project, *, ascii_only: bool = True) -> list[list[str]]
                 cells.append("")
                 continue
             seg, starts = by_beat[beat]
-            cells.append(chord_text(project, seg, ascii_only=ascii_only) if starts or not opened else "")
+            cells.append(
+                chord_text(project, seg, ascii_only=ascii_only) if starts or not opened else ""
+            )
             opened = True
         out.append(cells)
     return out

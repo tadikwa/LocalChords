@@ -75,7 +75,9 @@ def write_wav(path: Path, y: np.ndarray) -> Path:
     return path
 
 
-def agreement(segments: list[dict], truth: list[tuple[float, float, str]], *, triads=False) -> float:
+def agreement(
+    segments: list[dict], truth: list[tuple[float, float, str]], *, triads=False
+) -> float:
     """Share of the duration where the engine's chord equals the reference, sampled every 50 ms."""
 
     def at(t, items):

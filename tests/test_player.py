@@ -2,6 +2,7 @@ import time
 
 import numpy as np
 import pytest
+
 from localchords.player import BLOCK, Player, device_sample_rate
 
 SR = 44100
@@ -115,7 +116,7 @@ def test_stretch_of_a_pure_tone_has_no_gaps_or_jumps(rate):
     p.set_rate(rate)
     p.play()
     out = render_seconds(p, 2.0)[SR // 4 :, 0]
-    envelope = np.abs(out[:len(out) // 512 * 512]).reshape(-1, 512).max(axis=1)
+    envelope = np.abs(out[: len(out) // 512 * 512]).reshape(-1, 512).max(axis=1)
     # The overlap keeps the level steady: no block falls near silence, none overshoots.
     assert envelope.min() > 0.3 and envelope.max() < 0.75
 

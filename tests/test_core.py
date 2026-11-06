@@ -3,6 +3,7 @@ import wave
 
 import numpy as np
 import pytest
+
 from localchords import audio, export, rhythm
 from localchords.chords import key_name, make, parse, spell_root, symbol
 from localchords.project import Project, ProjectError, decode_waveform, encode_waveform
@@ -37,7 +38,9 @@ def analysis(chords=("C:maj", "A:min", "F:maj", "G:7"), beats_each=4, bpm=120.0)
 
 def project(**kw):
     a = analysis(**kw)
-    return Project({"path": "x.mp3", "title": "Été à Noël", "duration": a["segments"][-1]["end_time"]}, a)
+    return Project(
+        {"path": "x.mp3", "title": "Été à Noël", "duration": a["segments"][-1]["end_time"]}, a
+    )
 
 
 @pytest.mark.parametrize(
@@ -130,7 +133,9 @@ def test_save_and_reload_unicode_keeps_everything(tmp_path):
     assert q.meter()["beats_per_bar"] == 3 and q.bars()[0].number == 0
 
 
-@pytest.mark.parametrize("content", ["", "not json", "[]", '{"format": "other"}', '{"format": "localchords"}'])
+@pytest.mark.parametrize(
+    "content", ["", "not json", "[]", '{"format": "other"}', '{"format": "localchords"}']
+)
 def test_bad_project_file_is_refused(tmp_path, content):
     path = tmp_path / "x.lchords"
     path.write_text(content, encoding="utf-8")
@@ -184,8 +189,24 @@ def test_edits_survive_a_new_grid():
 def test_min_beats_absorbs_short_runs_but_not_corrections():
     p = project(chords=("C:maj", "D:min"), beats_each=8)
     p.analysis["segments"][0]["end_time"] = p.grid()[1]
-    p.analysis["segments"].insert(1, {**p.analysis["segments"][0], "start_time": p.grid()[1], "end_time": p.grid()[2], "chord": "E:min"})
-    p.analysis["segments"].insert(2, {**p.analysis["segments"][0], "start_time": p.grid()[2], "end_time": p.grid()[8], "chord": "C:maj"})
+    p.analysis["segments"].insert(
+        1,
+        {
+            **p.analysis["segments"][0],
+            "start_time": p.grid()[1],
+            "end_time": p.grid()[2],
+            "chord": "E:min",
+        },
+    )
+    p.analysis["segments"].insert(
+        2,
+        {
+            **p.analysis["segments"][0],
+            "start_time": p.grid()[2],
+            "end_time": p.grid()[8],
+            "chord": "C:maj",
+        },
+    )
     assert [s.chord for s in p.segments()] == ["C:maj", "E:min", "C:maj", "D:min"]
     p.set_view(min_beats=2)
     assert [s.chord for s in p.segments()] == ["C:maj", "D:min"]
@@ -298,3 +319,33 @@ def test_fingerprint_changes_with_content(tmp_path):
     first = audio.fingerprint(a)
     a.write_bytes(b"x" * 2_999_999 + b"y")
     assert audio.fingerprint(a) != first
+
+
+@pytest.mark.parametrize(
+    "typed,expected",
+    [
+        ("Am7", ("A:min7", None)),
+        ("F#m7b5/A", ("F#:hdim7", "A")),
+        ("Bb", ("A#:maj", None)),
+        ("Bbm", ("A#:min", None)),
+        ("c", ("C:maj", None)),
+        ("D/F#", ("D:maj", "F#")),
+        ("G7sus4", ("G:sus4(b7)", None)),
+        ("Rém7", ("D:min7", None)),
+        ("Sol", ("G:maj", None)),
+        ("Sib", ("A#:maj", None)),
+        ("N.C.", ("N", None)),
+        ("Cmaj7", ("C:maj7", None)),
+        ("C°7", ("C:dim7", None)),
+        ("Cadd9", ("C:maj(9)", None)),
+        ("H", None),
+        ("Cxyz", None),
+        ("", None),
+        ("C/", ("C:maj", None)),
+        ("C/xyz", None),
+    ],
+)
+def test_parse_symbol(typed, expected):
+    from localchords.chords import parse_symbol
+
+    assert parse_symbol(typed) == expected
