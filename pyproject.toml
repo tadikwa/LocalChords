@@ -1,0 +1,39 @@
+[project]
+name = "localchords"
+version = "0.1.0"
+description = "Grille d'accords locale et synchronisée pour Windows."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  # Private functions of 0.3.1 are used (engines.py), hence the exact pin.
+  "chordotomy[model]==0.3.1",
+  "PySide6-Essentials>=6.8,<7",
+  "av>=14",
+  "sounddevice>=0.5",
+  "numpy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5", "pyinstaller>=6", "mir_eval>=0.8", "pooch>=1.8"]
+
+[project.gui-scripts]
+localchords = "localchords.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/localchords"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src", "tests"]
+markers = ["slow: runs the real engines (seconds per test)", "device: needs a real audio output"]
