@@ -32,12 +32,13 @@ def _job(path: str, engine: str, conn) -> None:
         result = engines.analyze(y, engine, lambda f, text: conn.send(("progress", f, text)))
         conn.send(("progress", 1.0, "Terminé"))
         conn.send(("done", result))
-    except (audio.AudioError, engines.AnalysisError) as exc:
-        conn.send(("error", str(exc), ""))
     except MemoryError:
         conn.send(("error", "Mémoire insuffisante pour analyser ce morceau.", ""))
     except Exception as exc:  # noqa: BLE001 - the interface must hear of any failure
-        conn.send(("error", f"L'analyse a échoué : {exc}", traceback.format_exc()))
+        # Failures written for the user pass as they are; anything else also goes to the log.
+        expected = type(exc).__name__ in ("AudioError", "AnalysisError")
+        text = str(exc) if expected else f"L'analyse a échoué : {exc}"
+        conn.send(("error", text, "" if expected else traceback.format_exc()))
     finally:
         conn.close()
 

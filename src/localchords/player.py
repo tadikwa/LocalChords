@@ -184,7 +184,8 @@ class Player:
             if start is None or end is None or end <= start:
                 self.loop = None
             else:
-                self.loop = (start * self.sr, end * self.sr)
+                # The header's duration can exceed what decoded by a few frames.
+                self.loop = (start * self.sr, min(end * self.sr, float(len(self.y))))
 
     @property
     def position(self) -> float:
@@ -228,6 +229,7 @@ class Player:
         """Back to the loop's start on crossing its end; a cursor past it just plays on."""
         if self.loop and before < self.loop[1] <= self.cursor:
             self.cursor = self.loop[0] + (self.cursor - self.loop[1])
+            self._floor = 0.0  # or the display would stick where playback last started
 
     def _copy_plain(self, out: np.ndarray) -> int:
         before = self.cursor

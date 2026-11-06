@@ -48,6 +48,7 @@ class ChordEditor(QDialog):
         self.setWindowTitle("Corriger l'accord")
         self.setMinimumWidth(560)
         self.shift = project.sounding_shift()
+        self.latin = bool(project.view.get("latin"))
         key = project.key()
         self.key_label = key["label"] if key else None
         segment = project.segment_at_beat(first)
@@ -83,7 +84,9 @@ class ChordEditor(QDialog):
             root.addWidget(title)
             row = QHBoxLayout()
             for label_text in candidates:
-                text = symbol(label_text, key=self.key_label, semitones=self.shift)
+                text = symbol(
+                    label_text, key=self.key_label, semitones=self.shift, latin=self.latin
+                )
                 b = QPushButton(text)
                 b.clicked.connect(lambda _=False, t=text: self.input.setText(t))
                 row.addWidget(b)
@@ -99,7 +102,11 @@ class ChordEditor(QDialog):
         self.root_buttons.setExclusive(True)
         moved_key = transpose_key(self.key_label, self.shift)
         for pc in range(12):
-            b = QPushButton(pretty_note(spell_root(pc, moved_key, project.view["accidentals"])))
+            b = QPushButton(
+                pretty_note(
+                    spell_root(pc, moved_key, project.view["accidentals"]), latin=self.latin
+                )
+            )
             b.setCheckable(True)
             self.root_buttons.addButton(b, pc)
             grid.addWidget(b, 0, pc)
@@ -128,7 +135,7 @@ class ChordEditor(QDialog):
         self.bass.addItem("Fondamentale", None)
         for pc in range(12):
             name = spell_root(pc, moved_key, project.view["accidentals"])
-            self.bass.addItem(pretty_note(name), pc)
+            self.bass.addItem(pretty_note(name, latin=self.latin), pc)
         self.bass.currentIndexChanged.connect(self._pick_bass)
         row.addWidget(self.bass)
         none = QPushButton("Pas d'accord (N.C.)")
@@ -166,7 +173,13 @@ class ChordEditor(QDialog):
 
         if segment:
             self.input.setText(
-                symbol(segment.chord, segment.bass, key=self.key_label, semitones=self.shift)
+                symbol(
+                    segment.chord,
+                    segment.bass,
+                    key=self.key_label,
+                    semitones=self.shift,
+                    latin=self.latin,
+                )
             )
         self.input.selectAll()
         self.input.setFocus()
@@ -208,7 +221,13 @@ class ChordEditor(QDialog):
         shown_key = f"{SHARP_NAMES[moved[0]]}:{moved[1]}" if moved else None
         accidentals = self.project.view["accidentals"]
         self.input.setText(
-            symbol(make(self.pc, self.quality), bass, key=shown_key, accidentals=accidentals)
+            symbol(
+                make(self.pc, self.quality),
+                bass,
+                key=shown_key,
+                accidentals=accidentals,
+                latin=self.latin,
+            )
         )
 
     def _pick_root(self, pc: int) -> None:

@@ -65,7 +65,9 @@ compilé). `multiprocessing` plutôt qu'un exécutable séparé : PyInstaller le
 ## PyAV pour décoder, pas FFmpeg en ligne de commande
 
 Tous les formats, chemins Unicode, pas de sous-processus ni de fichier à rendre présent. Licence vérifiée
-dans la DLL embarquée : `avcodec_license()` renvoie « LGPL version 3 or later ».
+dans la DLL embarquée : `avcodec_license()` renvoie « LGPL version 3 or later », mais les wheels livrent aussi
+libx264 et libx265 (GPL-2.0+), jamais appelés : sans effet pour un usage personnel, à régler avant toute
+diffusion (`LICENCES-TIERS.md`).
 
 ## GPU : non
 

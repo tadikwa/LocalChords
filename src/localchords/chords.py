@@ -91,10 +91,12 @@ def spell_root(pc: int, key: tuple[int, str] | None, accidentals: str = "auto") 
     diff = (pc - NATURAL[letter] + 6) % 12 - 6
     if diff == 0:
         return letter
-    if abs(diff) > 1:
+    name = letter + ("#" if diff > 0 else "b")
+    # Cb, Fb, E# and B# are right in theory, but no chart writes a chord's root that way.
+    if abs(diff) > 1 or name in ("Cb", "Fb", "E#", "B#"):
         flat_side = tonic == "F" or "b" in tonic
         return (FLAT_NAMES if flat_side else SHARP_NAMES)[pc]
-    return letter + ("#" if diff > 0 else "b")
+    return name
 
 
 def pretty_note(name: str, *, ascii_only: bool = False, latin: bool = False) -> str:
@@ -184,39 +186,43 @@ _LATIN_ROOTS = {
 }
 
 
-def _take_root(text: str) -> tuple[str, str] | None:
-    """(note name, rest of the text) from the start of what was typed."""
+def _roots(text: str) -> list[tuple[str, str]]:
+    """Every way to read a root at the start of what was typed: (note, rest of the text)."""
     lowered = text.lower()
+    out = []
     for latin in ("sol", "do", "ré", "re", "mi", "fa", "la", "si"):
         if lowered.startswith(latin):
-            letter, rest = _LATIN_ROOTS[latin], text[len(latin) :]
+            out.append((_LATIN_ROOTS[latin], text[len(latin) :]))
             break
-    else:
-        if not text or text[0].upper() not in NATURAL:
-            return None
-        letter, rest = text[0].upper(), text[1:]
-    if rest[:1] and rest[0] in "#♯b♭":
+    if text and text[0].upper() in NATURAL:
+        out.append((text[0].upper(), text[1:]))
+    read = []
+    for letter, rest in out:
         # "Bb" is B flat; "Bbm" too. A lone lowercase b never starts a quality here.
-        letter += "#" if rest[0] in "#♯" else "b"
-        rest = rest[1:]
-    return letter, rest
+        if rest[:1] and rest[0] in "#♯b♭":
+            read.append((letter + ("#" if rest[0] in "#♯" else "b"), rest[1:]))
+        read.append((letter, rest))
+    return read
 
 
 def parse_symbol(text: str) -> tuple[str, str | None] | None:
-    """(label, bass) for a typed chord such as `F#m7b5/A`, `Bb`, `Rém7`, `N.C.`; None if unread."""
+    """(label, bass) for a typed chord such as `F#m7b5/A`, `Bb`, `Rém7`, `N.C.`; None if unread.
+
+    The Latin name wins an ambiguity (`Do7` is C7), but no reading is lost to it: `Fadd9` is F add9.
+    """
     text = text.strip()
     if not text:
         return None
     if text.upper().replace(".", "") in ("N", "NC"):
         return "N", None
     chord, _, bass_text = text.partition("/")
-    taken = _take_root(chord)
-    if taken is None or taken[1] not in TYPED_QUALITIES:
+    root = next(((n, r) for n, r in _roots(chord) if r in TYPED_QUALITIES), None)
+    if root is None:
         return None
-    label = make(name_to_pc(taken[0]), TYPED_QUALITIES[taken[1]])
+    label = make(name_to_pc(root[0]), TYPED_QUALITIES[root[1]])
     if not bass_text:
         return label, None
-    bass = _take_root(bass_text)
-    if bass is None or bass[1]:
+    bass = next((n for n, r in _roots(bass_text) if not r), None)
+    if bass is None:
         return None
-    return label, SHARP_NAMES[name_to_pc(bass[0])]
+    return label, SHARP_NAMES[name_to_pc(bass)]

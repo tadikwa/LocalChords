@@ -471,3 +471,60 @@ def test_compare_engines_keeps_the_current_grid_on_request(app, tmp_path, monkey
     assert wait_for(app, lambda: window.job is None, 120)
     assert seen == ["dsp"] and window.project.analysis is before
     window.close()
+
+
+def test_flat_key_from_the_menu_does_not_break_the_window(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window._set_key("Db:maj")
+    assert "D♭ majeur" in window.song.key_button.text()
+    window.flush()
+    window.close()
+    window = MainWindow(muted=True)
+    window.show()
+    window.open_project_file(tmp_path / "song.lchords")
+    assert "D♭ majeur" in window.song.key_button.text()
+    window.close()
+
+
+def test_selection_is_dropped_when_the_grid_shrinks(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    last = len(window.project.grid()) - 1
+    window.song.grid.set_selection(last, last)
+    window.project.set_grid(scale=0.5)
+    window._content_changed()
+    assert window.song.grid.selection is None
+    window.toggle_loop_key()
+    window.close()
+
+
+def test_a_failed_comparison_does_not_disturb_the_next_analysis(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.compare_with("dsp")
+    assert window.compare_engine == "dsp"
+    window.cancel_analysis()
+    assert window.compare_engine is None
+    window.close()
+
+
+def test_a_link_url_does_not_stick_to_the_next_file(app, wav, tmp_path):
+    window = MainWindow(muted=True)
+    window.pending_source_url = "https://example.org/x"
+    project, _, known = window._project_for(wav)
+    assert project.audio["source_url"] == "https://example.org/x" and not known
+    assert window._project_for(wav)[0].audio["source_url"] is None
+    window.close()
+
+
+def test_editor_uses_latin_names_when_asked(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window._view(latin=True)
+    editor = dialogs.ChordEditor(window.project, 0, 0, window)
+    assert editor.input.text() == "Do"
+    editor.root_buttons.button(5).click()
+    assert editor.input.text() == "Fa"
+    editor.quality_buttons.button(editor.qualities.index("maj(9)")).click()
+    assert editor.input.text() == "Faadd9"
+    assert editor.apply_button.isEnabled()
+    editor._accept()
+    assert editor.result_label == "F:maj(9)"
+    window.close()

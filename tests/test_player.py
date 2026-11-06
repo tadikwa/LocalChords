@@ -215,3 +215,30 @@ def test_pitch_and_slowdown_combine():
     out = render_seconds(p, 2.0)
     assert peak_hz(out[SR // 4 :]) == pytest.approx(880.0, abs=4)
     assert p.cursor / SR == pytest.approx(1.0, abs=0.08)
+
+
+@pytest.mark.parametrize("rate", [1.0, 0.75])
+def test_loop_past_the_end_of_the_audio_is_cut_to_it(rate):
+    p = Player(SR)
+    p.test_mode = True
+    p.load(ramp(2.0))
+    p.set_loop(1.0, 2.5)
+    assert p.loop[1] == len(p.y)
+    p.seek(1.9)
+    p.set_rate(rate)
+    p.play()
+    render_seconds(p, 1.0)
+    assert p.playing, "the loop wraps instead of running off the end"
+
+
+def test_display_keeps_moving_after_a_loop_wraps():
+    p = Player(SR)
+    p.test_mode = True
+    p.load(ramp(4.0))
+    p.set_loop(1.0, 2.0)
+    p.seek(1.8)
+    p.play()
+    render_seconds(p, 0.5)  # past the wrap
+    p._anchor_cursor, p._anchor_time = p.cursor, time.perf_counter()
+    assert p._floor == 0.0
+    assert p.position < 1.8

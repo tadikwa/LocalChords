@@ -306,7 +306,10 @@ class Project:
             else:
                 groups.append([s])
         progression = [(g[0].chord, g[-1].end_beat - g[0].start_beat) for g in groups]
-        key_info, regions, analyses = harmony.analyze(progression, self.edits.get("key"))
+        # Normalized here, so a flat key from anywhere (Db:maj) reaches harmony as it expects it.
+        chosen = self.edits.get("key")
+        chosen = harmony.parse_key(chosen) if chosen else None
+        key_info, regions, analyses = harmony.analyze(progression, chosen)
         self._cache["key"] = key_info
         self._cache["regions"] = regions
         for group, a in zip(groups, analyses, strict=True):
@@ -353,9 +356,16 @@ class Project:
         per_bar = int(meter["beats_per_bar"])
         n = len(self.grid())
         lines = meter.get("bar_lines")
-        # Bar lines count beats of the analysis's grid, so a corrected grid counts afresh.
+        first_line = int(meter["first_downbeat"])
+        # Bar lines count beats of the analysis's grid. A corrected grid counts afresh, from the
+        # beat nearest where the analysis heard a downbeat.
+        if self.edits["grid"] and not meter["edited"] and n:
+            base = self.analysis["beats"]
+            anchor = base[lines[0] if lines else first_line] if base else 0.0
+            times = np.asarray(self.grid())
+            first_line = int(np.argmin(np.abs(times - anchor))) % per_bar
         if lines is None or self.edits["grid"]:
-            lines = list(range(int(meter["first_downbeat"]), n, per_bar))
+            lines = list(range(first_line, n, per_bar))
         lines = [line for line in lines if line < n]
         bars: list[Bar] = []
         first = lines[0] if lines else n
@@ -380,8 +390,12 @@ class Project:
         return None
 
     def beat_at(self, t: float) -> int:
-        """Index of the beat playing at t, -1 before the first one."""
-        return bisect_right(self.grid(), t) - 1
+        """Index of the beat playing at t, -1 before the first one.
+
+        The tolerance is for a seek to a beat, whose time comes back through sample frames and can
+        land a hair under it.
+        """
+        return bisect_right(self.grid(), t + 1e-3) - 1
 
     def segment_at_beat(self, beat: int) -> Segment | None:
         for s in self.segments():
@@ -479,7 +493,7 @@ def find_repeats(chords: list[str], limit: int = 4, min_size=2, max_size=12) -> 
 
 
 def _pickup_bars(first: int, per_bar: int) -> list[Bar]:
-    """Full bars counted back from the first bar line; the short one comes first, padded in front."""
+    """Full bars counted back from the first bar line; the short one first, padded in front."""
     short = first % per_bar
     bars = [Bar(0, [None] * (per_bar - short) + list(range(short)))] if short else []
     for start in range(short, first, per_bar):

@@ -133,3 +133,23 @@ def run(audio_path: Path, out: Path) -> int:
         report["error"] = traceback.format_exc()
     (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     return 0 if report["ok"] else 1
+
+
+def run_link(url: str, out: Path) -> int:
+    """The link import, in the packaged program: its job, then the decoder on what came back."""
+    from . import audio, worker
+
+    out.mkdir(parents=True, exist_ok=True)
+    job = worker.start_download(url, out)
+    end = time.perf_counter() + 300
+    messages: list[tuple] = []
+    while time.perf_counter() < end and not any(m[0] in worker.FINAL for m in messages):
+        messages += job.poll()
+        time.sleep(0.1)
+    job.cancel()
+    final = messages[-1] if messages else ("error", "rien reçu", "")
+    report = {"url": url, "final": final[:2]}
+    if final[0] == "downloaded":
+        report["seconds"] = round(len(audio.decode(Path(final[1]), 22050, channels=1)) / 22050, 1)
+    (out / "link_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
+    return 0 if final[0] == "downloaded" else 1

@@ -769,11 +769,16 @@ class MainWindow(QMainWindow):
 
     # Batch -------------------------------------------------------------------------------------
     def start_batch(self, paths: list[Path]) -> None:
+        if self.batch_job:  # already running: these join the queue
+            self.batch_queue.extend(paths)
+            self.batch_total += len(paths)
+            return
         self.batch_queue = list(paths)
         self.batch_total = len(paths)
         self.batch_done = 0
         self.batch_errors: list[str] = []
         self.home.batch_box.show()
+        self.home.batch_cancel.show()
         self.batch_timer.start()
         self._next_batch()
 
@@ -814,13 +819,14 @@ class MainWindow(QMainWindow):
                 self.batch_current[0].audio["duration"] = message[2]
             elif message[0] in ("done", "error"):
                 project, saved = self.batch_current
-                if message[0] == "done":
+                # A file there now means the song was opened meanwhile: that one has the say.
+                if message[0] == "done" and not saved.exists():
                     project.replace_analysis(message[1])
                     try:
                         project.save(saved)
                     except OSError as exc:
                         self.batch_errors.append(str(exc))
-                else:
+                elif message[0] == "error":
                     self.batch_errors.append(f"{project.audio['title']} : {message[1]}")
                 self.batch_job.cancel()
                 self.batch_done += 1
@@ -839,6 +845,7 @@ class MainWindow(QMainWindow):
 
     def _project_for(self, path: Path) -> tuple[Project, Path, bool]:
         """(project, its file, whether it was already analyzed) for a recording."""
+        source_url, self.pending_source_url = self.pending_source_url, None
         fingerprint = audio.fingerprint(path)
         saved = library.project_path(fingerprint)
         if saved.exists():
@@ -857,15 +864,15 @@ class MainWindow(QMainWindow):
                 "duration": float(info["duration"] or 0.0),
                 "fingerprint": fingerprint,
                 "waveform": None,
-                "source_url": self.pending_source_url,
+                "source_url": source_url,
             },
             {"beats": [], "segments": []},
         )
-        self.pending_source_url = None
         return project, saved, False
 
     def open_audio(self, path: Path) -> None:
         """A song already analyzed comes back as it was left; a new one gets analyzed."""
+        self.flush()
         try:
             project, saved, known = self._project_for(path)
         except audio.AudioError as exc:
@@ -881,6 +888,7 @@ class MainWindow(QMainWindow):
             self.start_analysis(path, self.settings.get("engine", engines.DEFAULT_ENGINE))
 
     def open_project_file(self, path: Path) -> None:
+        self.flush()
         try:
             project = Project.load(path)
         except ProjectError as exc:
@@ -1022,6 +1030,7 @@ class MainWindow(QMainWindow):
         if self.job:
             self.job.cancel()
             self.job = None
+        self.compare_engine = None
         self.song.progress_bar.hide()
 
     def cancel_analysis(self) -> None:
@@ -1075,16 +1084,14 @@ class MainWindow(QMainWindow):
                 return
 
     def _analysis_done(self, analysis: dict) -> None:
-        engine = self.job_engine
+        engine, comparing = self.job_engine, self.compare_engine
         self._stop_job()
         self.song.banner.hide()
         if self.project is None:
             return
         analysis["engine"]["requested"] = engine
-        if self.compare_engine:
-            self.compare_engine = None
-            if not self._keep_compared(engine, analysis):
-                return
+        if comparing and not self._keep_compared(engine, analysis):
+            return
         self.project.replace_analysis(analysis)
         self.song.middle.setCurrentWidget(self.song.scroll)
         self._content_changed()
@@ -1113,8 +1120,8 @@ class MainWindow(QMainWindow):
         if not path.is_file():
             self._alert("Le fichier audio est introuvable : localisez-le d'abord.")
             return
-        self.compare_engine = engine
         self.start_analysis(path, engine)
+        self.compare_engine = engine
 
     def _keep_compared(self, engine: str, analysis: dict) -> bool:
         """Show how the two grids differ; True to adopt the new one."""
@@ -1481,7 +1488,7 @@ class MainWindow(QMainWindow):
         beats = None
         if seconds and self.project and self.project.grid():
             first = max(self.project.beat_at(seconds[0] + 1e-3), 0)
-            last = max(self.project.beat_at(seconds[1] - 1e-3), first)
+            last = max(self.project.beat_at(seconds[1] - 0.01), first)
             beats = (first, last)
         s.grid.set_loop(beats)
 

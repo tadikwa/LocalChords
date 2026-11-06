@@ -101,6 +101,12 @@ class ChordGrid(QWidget):
         if not project or not project.grid():
             self.setMinimumHeight(0)
             return
+        # A new grid can have fewer beats than the selection remembers.
+        n_beats = len(project.grid())
+        if self.selection and self.selection[1] >= n_beats:
+            self.selection = None
+        if self.anchor is not None and self.anchor >= n_beats:
+            self.anchor = None
         bars = project.bars()
         per_bar = max(len(bars[0].beats), 1)
         avail = max(self.width() - 2 * MARGIN, 200)

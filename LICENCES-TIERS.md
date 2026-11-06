@@ -12,11 +12,22 @@ exactes de la distribution sont dans `requirements-lock.txt`.
 | [librosa](https://github.com/librosa/librosa) | Analyse audio | ISC | |
 | [NumPy](https://numpy.org), [SciPy](https://scipy.org), [scikit-learn](https://scikit-learn.org) | Calcul | BSD-3-Clause | |
 | [PySide6 / Qt](https://www.qt.io/qt-for-python) | Interface | LGPL-3.0 | Les bibliothèques Qt restent des DLL séparées et remplaçables dans le dossier du programme. |
-| [PyAV](https://github.com/PyAV-Org/PyAV) | Décodage audio | BSD-3-Clause | Embarque FFmpeg, LGPL-3.0+ selon `avcodec_license()` de la DLL livrée, en DLL séparées. |
+| [PyAV](https://github.com/PyAV-Org/PyAV) | Décodage audio | BSD-3-Clause | Embarque FFmpeg (`avcodec_license()` de la DLL livrée : « LGPL version 3 or later ») et, en DLL séparées, ses codecs, dont **libx264 et libx265 (GPL-2.0+)**, jamais appelés : LocalChords ne fait que décoder de l'audio. Voir plus bas. |
+| [python-soxr](https://github.com/dofuuz/python-soxr) / libsoxr | Rééchantillonnage | LGPL-2.1+ | Via librosa. |
+| [soundfile](https://github.com/bastibe/python-soundfile) / libsndfile | Lecture de fichiers son | BSD-3-Clause / LGPL-2.1+ | Via librosa. |
+| [numba](https://numba.pydata.org), [llvmlite](https://github.com/numba/llvmlite) | Compilation à la volée pour librosa | BSD ; BSD-2-Clause et Apache-2.0 avec exception LLVM | |
+| [h5py](https://www.h5py.org), [pooch](https://github.com/fatiando/pooch) | Dépendances | BSD-3-Clause | |
+| [einops](https://github.com/arogozhnikov/einops), [rotary-embedding-torch](https://github.com/lucidrains/rotary-embedding-torch), [pretty_midi](https://github.com/craffel/pretty-midi), [pydub](https://github.com/jiaaro/pydub) | Dépendances des modèles | MIT | |
 | [sounddevice](https://github.com/spatialaudio/python-sounddevice) / PortAudio | Sortie audio | MIT | |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Import de liens | Unlicense | L'usage qui en est fait reste sous la responsabilité de l'utilisateur et des conditions de chaque site. |
 
 Le texte de chaque licence est dans le dossier `_internal` du programme, avec le paquet concerné
 (`*.dist-info`), ou à l'adresse du projet.
+
+## Avant de redistribuer le programme
+
+Pour votre usage personnel, rien à faire. **Avant de le diffuser** à d'autres, sachez que le paquet contient
+libx264 et libx265 (GPL-2.0+), présents dans les wheels PyAV bien que non utilisés. Il faudrait alors respecter
+la GPL pour l'ensemble, ou remplacer ces DLL en construisant FFmpeg sans eux. Ce n'est pas un avis juridique.
 
 Le code de LocalChords ne reprend aucun code de Chordify et n'utilise aucun de ses services.

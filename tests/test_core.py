@@ -433,3 +433,50 @@ def test_project_progressions_and_agreement():
     assert compared["exact"] < 1.0
     assert compared["triads"] == pytest.approx((48 - 4) / 48)
     assert len(compared["differences"]) == 4
+
+
+@pytest.mark.parametrize("key", ["Db:maj", "Eb:maj", "Ab:maj", "Bb:maj", "Eb:min", "Bb:min"])
+def test_flat_key_chosen_by_hand_keeps_the_project_working(key, tmp_path):
+    p = project()
+    p.set_key(key)
+    assert p.key()["source"] == "given"
+    assert p.segments()
+    p.save(tmp_path / "k.lchords")
+    assert Project.load(tmp_path / "k.lchords").segments()
+
+
+def test_fadd9_can_be_typed_and_latin_still_works():
+    from localchords.chords import parse_symbol
+
+    assert parse_symbol("Fadd9") == ("F:maj(9)", None)
+    assert parse_symbol("Fa") == ("F:maj", None)
+    assert parse_symbol("Fam") == ("F:min", None)
+    assert parse_symbol("Do7") == ("C:7", None)
+    assert parse_symbol("Dom7") == ("C:min7", None)
+    assert parse_symbol("Dm7") == ("D:min7", None)
+    assert parse_symbol("La/Do#") == ("A:maj", "C#")
+    assert parse_symbol("Sib7") == ("A#:7", None)
+
+
+@pytest.mark.parametrize("key", ["D#:maj", "G#:maj", "C#:min", "G#:min"])
+def test_no_chart_root_is_spelled_cb_fb_es_or_bs(key):
+    from localchords.chords import parse_key
+
+    for pc in range(12):
+        assert spell_root(pc, parse_key(key)) not in ("Cb", "Fb", "E#", "B#")
+
+
+def test_a_seek_to_a_beat_lands_in_that_beat():
+    p = project()
+    sr = 44100
+    for i, t in enumerate(p.grid()):
+        assert p.beat_at(float(int(t * sr)) / sr) == i
+
+
+def test_a_halved_grid_keeps_the_downbeat_where_it_was():
+    p = project()
+    p.analysis["meter"].update({"first_downbeat": 2, "bar_lines": list(range(2, 16, 4))})
+    p.set_grid(scale=0.5)
+    grid = p.grid()
+    first_full = next(b for b in p.bars() if b.number == 1)
+    assert grid[first_full.beats[0]] == p.analysis["beats"][2]

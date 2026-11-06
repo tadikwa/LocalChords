@@ -16,6 +16,11 @@ def main() -> int:
 
         return run(Path(sys.argv[2]), Path(sys.argv[3]))
 
+    if len(sys.argv) >= 4 and sys.argv[1] == "--self-test-link":
+        from .selftest import run_link
+
+        return run_link(sys.argv[2], Path(sys.argv[3]))
+
     from PySide6.QtWidgets import QMessageBox
 
     from . import library
