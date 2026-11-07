@@ -6,7 +6,7 @@ Mis à jour le 2026-11-07 (v1.2, branche `feature/chord-diagrams`).
 
 **v1.2 :** diagrammes d'accords de guitare et de piano à côté (ou sous) la grille, qui suivent la lecture. Détail
 dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans [NOTES-v1.2.md](NOTES-v1.2.md).
-595 tests passent (dont 410 sur les positions, vérifiées note par note). Mêmes livrables que la v1.1, renommés
+595 tests passent (dont 411 sur les positions, vérifiées note par note). Mêmes livrables que la v1.1, renommés
 `v1.2`.
 
 **Livrables v1.1 :** `LocalChords-v1.1-windows-x64.zip` (dossier) et `LocalChords-v1.1-portable.exe`

@@ -24,7 +24,7 @@
 ## Justesse
 
 Aucune position n'est dessinée parce qu'elle « a l'air juste » : chaque position de guitare et chaque
-disposition de piano est recalculée note par note et comparée à l'accord demandé (410 tests sur toutes les
+disposition de piano est recalculée note par note et comparée à l'accord demandé (411 tests sur toutes les
 qualités, toutes les fondamentales, renversements et capos). Les diagrammes sont dessinés par le programme ;
 aucune police, image ni base de doigtés extérieure n'a été ajoutée.
 
