@@ -15,9 +15,20 @@ torch_build = bool(os.environ.get("LOCALCHORDS_TORCH_BUILD"))
 if not torch_build and len(onnx_models) != 6:
     raise SystemExit("Run scripts/export_onnx.py first: the ONNX models ship with the program.")
 
+# The distributed program must carry an LGPL FFmpeg: scripts/build_av_lgpl.py, LICENCES-TIERS.md.
+if not os.environ.get("LOCALCHORDS_ALLOW_GPL_AV"):
+    import subprocess
+
+    sys.path.insert(0, "scripts")
+    import build_av_lgpl
+
+    subprocess.run([sys.executable, "-c", build_av_lgpl.CHECK, *build_av_lgpl.NOT_LGPL], check=True)
+
 datas = [
     ("assets/localchords.ico", "."),
+    ("LICENSE", "."),
     ("LICENCES-TIERS.md", "."),
+    ("licences/*.txt", "licences"),
 ]
 # The engines read their own version, weights and tables at run time.
 for package in ("chordotomy", "lv-chordia", "beat-this", "librosa", "soundfile", "numpy"):
@@ -70,6 +81,17 @@ a = Analysis(
 # Qt translations, unused Qt modules' DLLs and C headers carry no behaviour.
 drop = ("Qt6Quick", "Qt6Qml", "Qt6Network", "Qt6OpenGL", "opengl32sw", "Qt6Pdf", "Qt6VirtualKeyboard")
 a.binaries = [b for b in a.binaries if not Path(b[0]).name.startswith(drop)]
+# sounddevice loads libportaudio64bit.dll alone; the ASIO builds carry Steinberg's SDK.
+portaudio = "_sounddevice_data/portaudio-binaries/"
+
+
+def unused_portaudio(entry):
+    name = entry[0].replace("\\", "/")
+    return name.startswith(portaudio) and not name.endswith(("libportaudio64bit.dll", "README.md"))
+
+
+a.binaries = [b for b in a.binaries if not unused_portaudio(b)]
+a.datas = [d for d in a.datas if not unused_portaudio(d)]
 a.datas = [
     d
     for d in a.datas

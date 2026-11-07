@@ -34,11 +34,12 @@ Mis à jour le 2026-11-07 (v1.1, branche `v1.1`).
   À l'appui : 20 analyses sur 20 sans erreur par le vrai processus d'analyse (`scripts/soak_worker.py`), et
   environ 260 analyses de mesure sans plantage. Si le processus d'analyse tombe, l'interface propose de réessayer.
 - L'import YouTube dépend d'un site qui change, et parfois de Node.js ou Deno.
-- 510 Mo sur disque (dossier), 247 Mo en exécutable unique. Programme non signé : SmartScreen avertit.
-- Exécutable unique : 3 s de démarrage et 485 Mo décompressés dans `%TEMP%` à chaque lancement, laissés
+- 592 Mo sur disque (dossier), 283 Mo en exécutable unique ou en zip. Programme non signé : SmartScreen avertit.
+- Exécutable unique : 3,4 s de démarrage et 567 Mo décompressés dans `%TEMP%` à chaque lancement, laissés
   sur place si le programme est tué.
 - Les réseaux passent par des fonctions privées de chordotomy 0.3.1 (`onnx_engine.py`).
-- Diffusion publique : libx264 et libx265 (GPL) sont dans le paquet, voir LICENCES-TIERS.md.
+- Diffusion publique : FFmpeg LGPL recompilé, sans libx264 ni libx265 (LICENCES-TIERS.md) ; publié sur
+  <https://github.com/tadikwa/LocalChords/releases>.
 
 ## Revue indépendante
 

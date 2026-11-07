@@ -149,9 +149,25 @@ en développement.
 
 Mo au sens de l'Explorateur Windows (1 048 576 octets).
 
-Postes restants du dossier : llvmlite 115 Mo (numba, requis par librosa), modèles ONNX 89 Mo, FFmpeg 65 Mo,
-Qt 51 Mo, SciPy 68 Mo, ONNX Runtime 38 Mo, NumPy 21 Mo. Pistes non retenues : retirer libx264, libx265 et
-l'encodeur AV1 de FFmpeg (environ 23 Mo, non mesuré dans le programme) ; compresser par UPX (casse souvent
+**Version publiée (FFmpeg LGPL).** Pour la diffusion, PyAV est recompilé contre la construction LGPL de
+FFmpeg de BtbN (LICENCES-TIERS.md), qui compile en plus de nombreux encodeurs vidéo : FFmpeg passe de
+65 à 148 Mo.
+
+| | ONNX, FFmpeg de PyAV (GPL) | ONNX, FFmpeg LGPL (publié) |
+|---|---|---|
+| Dossier décompressé | 510 Mo | 592 Mo |
+| Zip du dossier | 247 Mo | 283 Mo (296 440 243 octets) |
+| Exécutable unique | 247 Mo | 283 Mo (296 617 847 octets) |
+| Fenêtre visible, exécutable unique | 2,95 à 3,23 s | 3,42 à 3,45 s |
+| Fenêtre visible, dossier | 0,67 à 0,71 s | 0,67 à 0,73 s |
+| Décompressé dans `%TEMP%`, exécutable unique | 485 Mo | 567 Mo |
+
+Décodage identique entre les deux FFmpeg (écart nul en MP3, WAV, FLAC, ALAC ; au plus 1,2e-7 en AAC, Opus,
+WebM), `--self-test` identique (grille et ChordPro octet pour octet) dans les deux formes.
+
+Postes restants du dossier : FFmpeg 148 Mo, llvmlite 115 Mo (numba, requis par librosa), modèles ONNX 89 Mo,
+Qt 51 Mo, SciPy 68 Mo, ONNX Runtime 38 Mo, NumPy 21 Mo. Pistes non retenues : un FFmpeg réduit au décodage
+audio, compilé ici (environ 140 Mo de moins, non fait) ; compresser par UPX (casse souvent
 les DLL Qt et déclenche les antivirus, non essayé). Un exécutable de 100 Mo n'est pas atteignable sans
 retirer librosa/numba ou FFmpeg, donc sans réécrire l'analyse.
 

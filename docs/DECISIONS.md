@@ -91,9 +91,18 @@ dépend de fonctions privées de chordotomy 0.3.1, version figée dans `requirem
 
 ## Deux formes : dossier et exécutable unique (v1.1)
 
-L'exécutable unique se copie en un fichier, mais se décompresse (485 Mo) dans `%TEMP%` à chaque lancement :
-3 s au lieu de 0,7 s, et le dossier reste si le programme est tué. Les deux sont livrés, le dossier reste la
+L'exécutable unique se copie en un fichier, mais se décompresse (567 Mo) dans `%TEMP%` à chaque lancement :
+3,4 s au lieu de 0,7 s, et le dossier reste si le programme est tué. Les deux sont livrés, le dossier reste la
 forme recommandée pour un usage quotidien. Détails dans [PORTABLE.md](PORTABLE.md).
+
+## FFmpeg LGPL recompilé pour la diffusion publique (v1.1)
+
+La wheel PyAV officielle se dit LGPL, mais son avcodec importe libx264 et libx265 (GPL) : diffusé tel quel,
+le programme entier tomberait sous la GPL. PyAV 19.0.2 est donc recompilé (`scripts/build_av_lgpl.py`)
+contre la construction LGPL partagée de FFmpeg n9.0.2 de BtbN, à empreinte figée. Même décodage, 83 Mo de
+plus, à cause des encodeurs vidéo que BtbN y compile. Compiler soi-même un FFmpeg réduit à l'audio serait
+plus léger, mais demande une chaîne MinGW et sa maintenance : pas fait. La construction s'arrête si
+FFmpeg n'est pas LGPL (`localchords.spec`). LocalChords est sous licence MIT.
 
 ## Mode portable sur demande, sans migration
 

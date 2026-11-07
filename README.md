@@ -4,24 +4,31 @@ Une grille d'accords lisible et synchronisée avec la lecture, sur votre PC Wind
 morceau, les accords apparaissent par mesures et défilent pendant l'écoute. Tout se passe sur votre
 ordinateur : l'audio n'est envoyé nulle part, aucun compte, aucun abonnement.
 
-## Installer
+## Télécharger LocalChords
 
-Deux formes, même programme, mêmes résultats :
+**[Télécharger la dernière version](https://github.com/tadikwa/LocalChords/releases/latest)**, pour
+Windows 10 ou 11 en 64 bits. Rien d'autre à installer : ni Python, ni carte graphique particulière, ni
+connexion Internet (sauf pour importer un lien).
 
-- **Dossier** (`LocalChords-v1.1-windows-x64.zip`, recommandé) : décompressez le dossier `LocalChords` où vous
-  voulez (environ 510 Mo), puis lancez `LocalChords.exe`. Démarre en moins d'une seconde.
-- **Exécutable unique** (`LocalChords-v1.1-portable.exe`, environ 250 Mo) : un seul fichier à copier. Il se
-  décompresse à chaque lancement (environ 3 s, 485 Mo dans le dossier temporaire de Windows, effacés à la
-  fermeture).
+Sur la page de la version, dans « Assets », prenez **l'un des deux** fichiers :
+
+| Fichier | Pour qui | Comment |
+|---|---|---|
+| `LocalChords-v1.1-portable.exe` (environ 285 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.1-windows-x64.zip` (environ 285 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+
+Même programme, mêmes résultats. Le dossier démarre en moins d'une seconde. L'exécutable unique se
+décompresse à chaque lancement : environ 3,5 s, et 570 Mo dans le dossier temporaire de Windows, effacés
+à la fermeture.
+
+**Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
+programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
+Pour vérifier le fichier, son empreinte SHA-256 figure sur la page de la version (PowerShell :
+`Get-FileHash .\LocalChords-v1.1-portable.exe`).
 
 Pour tout garder à côté du programme (clé USB), créez un fichier vide `LocalChords.portable` à côté de
-l'exécutable : voir [docs/PORTABLE.md](docs/PORTABLE.md).
-
-Rien d'autre à installer : ni Python, ni carte graphique particulière, ni connexion Internet
-(sauf pour importer un lien). Windows 10 ou 11 en 64 bits.
-
-Si Windows SmartScreen affiche un avertissement au premier lancement, c'est que le programme n'est
-pas signé : « Informations complémentaires », puis « Exécuter quand même ».
+l'exécutable : voir [docs/PORTABLE.md](docs/PORTABLE.md). Pour désinstaller, supprimez le fichier ou le
+dossier ; vos analyses restent dans `%LOCALAPPDATA%\LocalChords` tant que vous ne les effacez pas.
 
 ## Utiliser
 
@@ -96,4 +103,5 @@ par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. En mode portable,
 ## Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md). Licences : [LICENCES-TIERS.md](LICENCES-TIERS.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md). Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
+[LICENCES-TIERS.md](LICENCES-TIERS.md).
