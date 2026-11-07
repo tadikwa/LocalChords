@@ -688,6 +688,7 @@ def test_diagrams_follow_transposition_capo_and_notation(app, wav, tmp_path):
     assert panel.title.text() == "C" and panel.guitar_positions[0].text == "x32010"
     assert "son réel D" in panel.capo_note.text() and panel.capo_note.isVisible()
     assert panel.shown.sound.title == "D" and panel.piano_voicings[0].notes[0] % 12 == 2
+    assert panel.piano.kind.text().startswith("son réel D")
     window._view(latin=True)
     assert panel.title.text() == "Do"
     window._view(latin=False, capo=0, transpose=1, accidentals="flats")

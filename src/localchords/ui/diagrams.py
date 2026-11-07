@@ -668,7 +668,9 @@ class ChordPanel(QFrame):
             self.guitar.diagram.setToolTip("")
         v = self.piano_voicings[self.piano_index]
         self.piano.diagram.set_voicing(v, shown.sound, animate=animate)
-        self.piano.set_place(self.piano_index, len(self.piano_voicings), v.name)
+        # With a capo the title is the guitar shape; the keyboard plays what is heard.
+        kind = f"son réel {shown.sound.title} · {v.name}" if shown.capo else v.name
+        self.piano.set_place(self.piano_index, len(self.piano_voicings), kind)
         self.piano.diagram.setToolTip(describe_voicing(v, shown.sound))
 
 
