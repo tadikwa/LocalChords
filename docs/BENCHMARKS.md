@@ -105,7 +105,78 @@ est dans un autre processus.
 Pas de mesure de synchronisation à l'oreille : le test vérifie que la case allumée suit l'horloge audio, pas ce
 qu'entend un musicien.
 
-## Programme compilé
+## Transposition de l'audio, mesurée (v1.1)
+
+Mesure objective (`scripts/measure_pitch.py`) : le programme compilé joue un la 440 Hz et des gammes
+(`--self-test-pitch`), la sortie est enregistrée en boucle par la carte son, puis la fréquence et la durée de
+chaque note sont mesurées. Même résultat dans le dossier et dans l'exécutable unique :
+
+| Condition | Mesuré | Attendu |
+|---|---|---|
+| +12, −12 | 880,00 Hz, 220,00 Hz | 880, 220 |
+| +1, −1, +5, −5 | 466,2, 415,31, 587,33, 329,63 Hz | à 0,1 cent près |
+| +12 à 50 %, −12 à 150 %, +5 à 75 % | hauteur juste, défilement 0,49, 1,48, 0,74 | 0,5, 1,5, 0,75 |
+| Gammes ±12, ±5, +1, avec ralenti | durée des notes à 1 % près, hauteur à 0 cent | |
+| Boucle A/B transposée, changement de transposition dans la boucle, son d'origine | jointure juste, notes attendues | |
+| « Son d'origine », grille à +5 | 440,2 Hz | 440 |
+
+La hauteur changeait déjà en v1.0 : le défaut signalé venait de l'option, cachée dans un menu et
+désactivée par défaut. En v1.1, le bouton « Son transposé / Son d'origine » est à côté de `Transposer`.
+
+## Moteur : ONNX Runtime à la place de torch (v1.1)
+
+Les six réseaux (Beat This!, cinq lv-chordia) sont exportés en ONNX (`scripts/export_onnx.py`) et exécutés par
+ONNX Runtime ; le reste de chordotomy (CQT, décodage, harmonie) ne change pas. Comparaison par l'analyse du
+programme, torch puis ONNX (`scripts/compare_backends.py`) :
+
+| Jeu | Fichiers | Accords et basses identiques | Temps identiques | Tonalité, mesure | Durée torch → ONNX |
+|---|---|---|---|---|---|
+| Tiny AAM | 20 | 20 | 20, écart max 0 s | 20, 20 | 198,8 → 184,4 s |
+| GuitarSet | 180 | 180 | 180, écart max 0 s | 180, 180 | 338,9 → 326,9 s |
+| Morceaux entiers (2 min 03 en deux copies, 10 min 35, 20 min 28) | 4 | 4 | 4, écart max 0 s | 4, 4 | 120,9 → 119,8 s |
+
+Sorties identiques à la précision enregistrée : les scores de qualité ci-dessus restent valables tels quels.
+L'export lui-même est contrôlé contre torch sur un enregistrement (log-mel et sorties de chaque réseau). `LOCALCHORDS_BACKEND=torch` revient à torch
+en développement.
+
+## Programme compilé, v1.1
+
+| | v1.0 (torch) | v1.1 (ONNX) | Gain |
+|---|---|---|---|
+| Dossier décompressé | 928 Mo | 510 Mo | −418 Mo |
+| Zip du dossier | 398 Mo (418 millions d'octets) | 247 Mo | −151 Mo |
+| Exécutable unique | 397 Mo (essai) | 247 Mo | −150 Mo |
+
+Mo au sens de l'Explorateur Windows (1 048 576 octets).
+
+Postes restants du dossier : llvmlite 115 Mo (numba, requis par librosa), modèles ONNX 89 Mo, FFmpeg 65 Mo,
+Qt 51 Mo, SciPy 68 Mo, ONNX Runtime 38 Mo, NumPy 21 Mo. Pistes non retenues : retirer libx264, libx265 et
+l'encodeur AV1 de FFmpeg (environ 23 Mo, non mesuré dans le programme) ; compresser par UPX (casse souvent
+les DLL Qt et déclenche les antivirus, non essayé). Un exécutable de 100 Mo n'est pas atteignable sans
+retirer librosa/numba ou FFmpeg, donc sans réécrire l'analyse.
+
+| Mesure | Dossier | Exécutable unique |
+|---|---|---|
+| Fenêtre visible après le lancement (`scripts/launch_time.ps1`) | 0,67 à 0,71 s | 2,95 à 3,23 s |
+| Analyse du morceau de 2 min 03 (`--self-test`, deux lancements) | 16,6 et 17,5 s | 16,9 et 19,6 s |
+| Écrit dans `%TEMP%` à chaque lancement | rien | 484,9 Mo dans `_MEIxxxxxx` |
+| Après fermeture normale | | dossier effacé |
+| Après arrêt forcé (Gestionnaire des tâches) | | **484,9 Mo restent** dans `%TEMP%` |
+| Processus | interface + analyse | lanceur + interface + analyse, un seul dossier décompressé |
+
+Le processus d'analyse de l'exécutable unique réutilise le dossier décompressé par le lanceur : un seul
+`_MEI` pendant une analyse, aucun après la fermeture.
+
+Scénario complet (`--self-test`) **réussi dans les deux formes**, moteur `onnx`, depuis des dossiers aux noms
+accentués et japonais (`Été 音楽 one`, `Clé USB 音楽`). Mode portable dans l'exécutable unique : `Data` créé à
+côté, analyse et réglages dedans. `Data` impossible à écrire : la fenêtre d'avertissement s'affiche, « Quitter »
+ferme le programme (code 1) sans rien écrire.
+
+**Non testé en v1.1 :** une vraie clé USB (un dossier local a servi), un support réellement protégé en
+écriture (simulé par un fichier `Data`), un PC hors ligne (aucun accès réseau n'est fait hors import de lien,
+mais la carte réseau n'a pas été coupée), un autre PC.
+
+## Programme compilé, v1.0 (avec torch)
 
 `dist/LocalChords` : 928 Mo, zip 418 Mo. Postes principaux : `torch_cpu.dll` 295 Mo, `llvmlite` 115 Mo (requis par
 librosa), poids Beat This! 79 Mo, FFmpeg 64 Mo, Qt 51 Mo, poids lv-chordia 27 Mo.

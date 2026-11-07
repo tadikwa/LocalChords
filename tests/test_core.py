@@ -480,3 +480,37 @@ def test_a_halved_grid_keeps_the_downbeat_where_it_was():
     grid = p.grid()
     first_full = next(b for b in p.bars() if b.number == 1)
     assert grid[first_full.beats[0]] == p.analysis["beats"][2]
+
+
+def test_portable_mode_keeps_data_next_to_the_program_only_when_asked(tmp_path, monkeypatch):
+    from localchords import app, library
+
+    exe = tmp_path / "Clé USB" / "LocalChords.exe"
+    exe.parent.mkdir()
+    exe.write_bytes(b"")
+    monkeypatch.setattr("sys.frozen", True, raising=False)
+    monkeypatch.setattr("sys.executable", str(exe))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "pc"))
+    # setenv first so monkeypatch restores the original value: _data_location() sets it itself.
+    monkeypatch.setenv("LOCALCHORDS_DATA", "")
+    monkeypatch.delenv("LOCALCHORDS_DATA")
+
+    assert library.portable_dir() is None  # no marker: the classic folder
+    assert app._data_location() is None
+    assert library.data_dir() == tmp_path / "pc" / "LocalChords"
+
+    (exe.parent / library.PORTABLE_MARKER).write_text("")
+    assert app._data_location() is None
+    assert library.data_dir() == exe.parent / "Data"
+    assert library.save_settings({"volume": 0.5})
+    assert library.load_settings()["volume"] == 0.5
+
+    # Data cannot be created (a file is in the way, as a read-only medium would refuse it):
+    # the PC's folder for this run, with the reason, and nothing touched in either place.
+    monkeypatch.delenv("LOCALCHORDS_DATA")
+    (exe.parent / "Data" / "settings.json").unlink()
+    (exe.parent / "Data").rmdir()
+    (exe.parent / "Data").write_text("in the way")
+    assert app._data_location()
+    assert library.data_dir() == tmp_path / "pc" / "LocalChords"
+    assert (exe.parent / "Data").read_text() == "in the way"

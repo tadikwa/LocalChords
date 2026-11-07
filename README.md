@@ -6,8 +6,16 @@ ordinateur : l'audio n'est envoyé nulle part, aucun compte, aucun abonnement.
 
 ## Installer
 
-1. Décompressez le dossier `LocalChords` où vous voulez (environ 900 Mo une fois décompressé).
-2. Lancez `LocalChords.exe`.
+Deux formes, même programme, mêmes résultats :
+
+- **Dossier** (`LocalChords-v1.1-windows-x64.zip`, recommandé) : décompressez le dossier `LocalChords` où vous
+  voulez (environ 510 Mo), puis lancez `LocalChords.exe`. Démarre en moins d'une seconde.
+- **Exécutable unique** (`LocalChords-v1.1-portable.exe`, environ 250 Mo) : un seul fichier à copier. Il se
+  décompresse à chaque lancement (environ 3 s, 485 Mo dans le dossier temporaire de Windows, effacés à la
+  fermeture).
+
+Pour tout garder à côté du programme (clé USB), créez un fichier vide `LocalChords.portable` à côté de
+l'exécutable : voir [docs/PORTABLE.md](docs/PORTABLE.md).
 
 Rien d'autre à installer : ni Python, ni carte graphique particulière, ni connexion Internet
 (sauf pour importer un lien). Windows 10 ou 11 en 64 bits.
@@ -31,7 +39,7 @@ pas signé : « Informations complémentaires », puis « Exécuter quand même 
 
 | Quoi | Comment |
 |---|---|
-| Transposer | `Transposer − +` ou Ctrl + ↑ ↓. « Transposer aussi l'audio » dans le menu ☰ fait suivre le son. |
+| Transposer | `Transposer − +` ou Ctrl + ↑ ↓, jusqu'à ± 12 demi-tons. Le bouton juste à côté choisit si le son suit : « Son transposé » (allumé) ou « Son d'origine » (seule la grille change). La vitesse ne change pas. |
 | Capodastre | `Capo − +` : la grille montre les formes à jouer. |
 | Ralentir sans changer la hauteur | `Vitesse − +`, de 50 % à 150 %, ou les touches `-` et `+`. |
 | Boucler un passage | Sélectionnez des cases (glisser, ou Maj + clic), puis `L`. Ou `A` et `B` pendant l'écoute. Sans sélection, `L` boucle la mesure en cours. |
@@ -78,11 +86,12 @@ Les accords sont extraits automatiquement : **vérifiez à l'oreille**. Mesures 
 - **« Sortie audio indisponible »** : vérifiez la sortie son de Windows, puis relancez la lecture.
 - **« Mémoire insuffisante »** ou arrêt brutal : l'analyse demande environ 1 Go pour une chanson, 4 Go pour 20 minutes,
   11 Go pour une heure.
-- **Autre erreur :** le détail est dans `%LOCALAPPDATA%\LocalChords\log.txt`.
+- **Autre erreur :** le détail est dans `%LOCALAPPDATA%\LocalChords\log.txt` (en mode portable : `Data\log.txt`).
 
 Vos morceaux analysés sont dans `%LOCALAPPDATA%\LocalChords\projects` : effacer un fichier n'oublie que
 son analyse et vos corrections. Les fichiers audio ne sont ni copiés ni modifiés, sauf ceux importés
-par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`.
+par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. En mode portable, tout cela est dans le dossier
+`Data` à côté du programme.
 
 ## Pour les développeurs
 

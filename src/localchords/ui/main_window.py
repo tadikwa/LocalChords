@@ -7,7 +7,15 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import numpy as np
-from PySide6.QtCore import QObject, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtCore import (
+    QLibraryInfo,
+    QObject,
+    QPropertyAnimation,
+    Qt,
+    QTimer,
+    QTranslator,
+    Signal,
+)
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -183,7 +191,10 @@ class HomePage(QWidget):
         self.open_button.setObjectName("primary")
         self.open_button.setToolTip("Ctrl + O")
         self.open_button.clicked.connect(self.openRequested)
-        formats = QLabel("MP3, WAV, FLAC, M4A, OGG, OPUS… Tout reste sur votre ordinateur.")
+        place = "Tout reste sur votre ordinateur."
+        if library.portable_dir() == library.data_dir():
+            place = "Mode portable : tout reste dans le dossier Data, à côté du programme."
+        formats = QLabel(f"MP3, WAV, FLAC, M4A, OGG, OPUS… {place}")
         formats.setObjectName("caption")
         self.link_button = QPushButton("Importer un lien…")
         self.link_button.setToolTip(
@@ -242,9 +253,17 @@ class HomePage(QWidget):
             title = info.get("title") or Path(info.get("path", "")).stem
             artist = info.get("artist")
             duration = fmt_time(float(info.get("duration") or 0))
-            text = f"{title}    —    {artist}    {duration}" if artist else f"{title}    {duration}"
-            b = QPushButton(text)
+            text = f"{title}    —    {artist}" if artist else title
+            source = info.get("path", "")
+            tail = f"    {duration}"
+            if not Path(source).exists():
+                tail += "    · audio introuvable"
+            b = QPushButton()
             b.setObjectName("recent")
+            # A long title is shortened rather than widening the window; the tooltip has it whole.
+            b.setText(b.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, 520) + tail)
+            b.setToolTip(f"{text}\n{source}")
+            b.setMinimumWidth(1)
             b.clicked.connect(lambda _=False, p=path: self.projectRequested.emit(p))
             self.recent_box.addWidget(b)
         self.recent_box.addStretch()
@@ -446,13 +465,23 @@ class SongPage(QWidget):
         controls.addWidget(self.speed)
         self.transpose = Stepper(
             "Transposer",
-            -11,
-            11,
+            -12,
+            12,
             0,
             lambda v: f"{v:+d}" if v else "0",
-            "Transposer la grille, en demi-tons (Ctrl + ↑ / ↓). L'audio ne change pas.",
+            "Transposer la grille, en demi-tons (Ctrl + ↑ / ↓).",
         )
         controls.addWidget(self.transpose)
+        # Right next to the transposition, so whether the sound follows is never a guess.
+        self.audio_button = QPushButton()
+        self.audio_button.setIcon(theme.icon("volume", size=16))
+        self.audio_button.setCheckable(True)
+        self.audio_button.setAccessibleName("Transposer également l'audio")
+        self.audio_button.toggled.connect(self._show_audio_state)
+        # Its label must not set the window's minimum width: it gives way first (adapt_to_width).
+        self.audio_button.setMinimumWidth(36)
+        self._show_audio_state(False)
+        controls.addWidget(self.audio_button)
         self.capo = Stepper(
             "Capo", 0, 11, 0, str, "Case du capodastre : la grille montre les formes à jouer."
         )
@@ -499,9 +528,23 @@ class SongPage(QWidget):
         layout.addWidget(bottom)
         self.adapt_to_width(1360)
 
+    def _show_audio_state(self, on: bool) -> None:
+        self._audio_text = " Son transposé" if on else " Son d'origine"
+        self.audio_button.setText(self._audio_text if self._audio_wide else "")
+        self.audio_button.setToolTip(
+            "Transposer également l'audio : activé. Cliquer pour n'entendre que l'original."
+            if on
+            else "Transposer également l'audio : désactivé, seule la grille change. "
+            "Cliquer pour que le son suive la transposition, à la même vitesse."
+        )
+
+    _audio_wide = True
+
     def adapt_to_width(self, width: int) -> None:
         """A tiling window manager can make the window narrower than its minimum, so what is
         rarely needed gives way first; all of it stays on the keyboard."""
+        self._audio_wide = width >= 1240  # narrower, the icon and its highlight say it
+        self.audio_button.setText(self._audio_text if self._audio_wide else "")
         for widget in (self.volume, self.volume_icon):
             widget.setVisible(width >= 1120)
         for widget in (self.loop_a, self.loop_b):
@@ -610,6 +653,7 @@ class MainWindow(QMainWindow):
         s.loop_button.clicked.connect(self.toggle_loop)
         s.speed.changed.connect(lambda i: self.player.set_rate(SPEEDS[i]))
         s.transpose.changed.connect(self._transpose_changed)
+        s.audio_button.toggled.connect(self._audio_transpose_changed)
         s.capo.changed.connect(lambda v: self._view(capo=v))
         s.accidental_actions.triggered.connect(lambda a: self._view(accidentals=a.data()))
         s.detail_actions.triggered.connect(self._detail_changed)
@@ -645,10 +689,6 @@ class MainWindow(QMainWindow):
         self.latin_action.setChecked(bool(self.settings.get("latin")))
         self.latin_action.toggled.connect(self._latin_changed)
         menu.addAction(self.latin_action)
-        self.audio_action = QAction("Transposer aussi l'audio", self, checkable=True)
-        self.audio_action.setToolTip("L'audio suit la transposition, à la même vitesse.")
-        self.audio_action.toggled.connect(self._audio_transpose_changed)
-        menu.addAction(self.audio_action)
         self.bass_action = QAction("Afficher les basses (C/E)", self, checkable=True)
         self.bass_action.setChecked(bool(self.settings.get("show_bass", True)))
         self.bass_action.toggled.connect(self._bass_changed)
@@ -941,9 +981,10 @@ class MainWindow(QMainWindow):
                 action.setChecked(action.data() == value)
         s.speed.set_value(SPEEDS.index(1.0))
         self.player.set_rate(1.0)
-        self.audio_action.blockSignals(True)
-        self.audio_action.setChecked(bool(project.view.get("transpose_audio")))
-        self.audio_action.blockSignals(False)
+        s.audio_button.blockSignals(True)
+        s.audio_button.setChecked(bool(project.view.get("transpose_audio")))
+        s.audio_button.blockSignals(False)
+        s._show_audio_state(s.audio_button.isChecked())
         self._apply_pitch()
         s.scroll.verticalScrollBar().setValue(0)
         self.stack.setCurrentWidget(s)
@@ -1742,4 +1783,10 @@ def app_instance() -> QApplication:
     app.setStyleSheet(theme.QSS)
     app.setApplicationName("LocalChords")
     app.setFont(theme.app_font(13))
+    # Qt's own buttons (Yes/No, Cancel) in French, like the rest of the program.
+    if not hasattr(app, "_french"):
+        app._french = QTranslator(app)
+        folder = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+        if app._french.load("qtbase_fr", folder):
+            app.installTranslator(app._french)
     return app
