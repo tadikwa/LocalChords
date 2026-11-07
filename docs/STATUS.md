@@ -1,8 +1,8 @@
 # État du projet
 
-Mis à jour le 2026-11-07 : v1.2.1 prête sur la branche `feature/v1.2.1` (code, tests, docs) ; reste la
-construction, la fusion, l'étiquette et la publication. v1.2 publiée et inchangée :
-<https://github.com/tadikwa/LocalChords/releases/tag/v1.2>.
+Mis à jour le 2026-11-07 : v1.2.1 publiée (<https://github.com/tadikwa/LocalChords/releases/tag/v1.2.1>,
+binaires de la CI vérifiés par empreinte SHA-256, FFmpeg LGPL v3 sans libx264 ni libx265, auto-test complet
+réussi sur ce PC avec le zip et l'exécutable unique). La v1.2 reste en ligne, inchangée.
 
 ## Où on en est
 
