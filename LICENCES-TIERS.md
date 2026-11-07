@@ -49,7 +49,7 @@ compatibles avec la LGPL-3.0 ; leur liste exacte est la ligne `configuration` af
   scripts de construction, avec le commit de chaque bibliothèque externe, au commit
   [`c63bb30`](https://github.com/BtbN/FFmpeg-Builds/tree/c63bb308a1de656b425c132a8102f8fd5389afc5) de
   FFmpeg-Builds. Une copie des deux, avec la source de PyAV 19.0.2, est jointe à chaque publication
-  (`LocalChords-v1.1-sources-tierces.zip`).
+  (`LocalChords-vX.Y-sources-tierces.zip`).
 - **Qt 6.12.0** : <https://download.qt.io/official_releases/qt/6.12/> ; PySide6 :
   <https://code.qt.io/cgit/pyside/pyside-setup.git/>.
 - **libsoxr**, **libsndfile** : dans les dépôts de python-soxr et de soundfile, aux versions ci-dessus.
@@ -59,3 +59,8 @@ regroupe, `scripts/build.ps1` reconstruit le programme à partir de ce dépôt a
 Ce n'est pas un avis juridique.
 
 Le code de LocalChords ne reprend aucun code de Chordify et n'utilise aucun de ses services.
+
+Les diagrammes de guitare et de piano (v1.2) n'ajoutent aucune dépendance, police ni base de doigtés :
+les positions sont calculées par `voicings.py` à partir des notes de l'accord et dessinées par Qt. Les
+quelques formes usuelles écrites à la main (Bm en x24432, D/F♯ en 2x0232…) sont des connaissances musicales
+courantes, vérifiées par le programme comme les autres.

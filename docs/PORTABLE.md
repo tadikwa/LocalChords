@@ -4,8 +4,8 @@
 
 | Forme | Fichier | Démarrage | Quand la choisir |
 |---|---|---|---|
-| **Exécutable unique** | `LocalChords-v1.1-portable.exe` | se décompresse à chaque lancement dans `%TEMP%\_MEIxxxxxx`, effacé à la fermeture | un seul fichier à copier |
-| **Dossier** | `LocalChords-v1.1-windows-x64.zip` → `LocalChords\LocalChords.exe` + `_internal\` | immédiat, rien n'est décompressé | lancement plus rapide, aucune écriture dans `%TEMP%` |
+| **Exécutable unique** | `LocalChords-v1.2-portable.exe` | se décompresse à chaque lancement dans `%TEMP%\_MEIxxxxxx`, effacé à la fermeture | un seul fichier à copier |
+| **Dossier** | `LocalChords-v1.2-windows-x64.zip` → `LocalChords\LocalChords.exe` + `_internal\` | immédiat, rien n'est décompressé | lancement plus rapide, aucune écriture dans `%TEMP%` |
 
 Les deux contiennent exactement le même programme et les mêmes modèles, et donnent les mêmes accords.
 Aucun des deux n'a besoin de Python ni d'une installation. Le temps de démarrage et la place prise
@@ -26,7 +26,7 @@ Exemple sur une clé USB :
 
 ```
 E:\LocalChords\
-    LocalChords-v1.1-portable.exe
+    LocalChords-v1.2-portable.exe
     LocalChords.portable      ← le marqueur (vide, son contenu est ignoré)
     Data\                     ← créé au premier lancement
         projects\             analyses et corrections (.lchords)

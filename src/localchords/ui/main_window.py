@@ -19,6 +19,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
+    QBoxLayout,
     QDialog,
     QFileDialog,
     QFrame,
@@ -40,17 +41,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, audio, engines, export, library, worker
+from .. import __version__, audio, engines, export, library, voicings, worker
 from ..chords import key_name, parse, spell_tonic, symbol
 from ..player import Player, device_sample_rate
 from ..project import EXTENSION, Project, ProjectError, decode_waveform
 from . import theme
+from .diagrams import ChordPanel
 from .dialogs import ChordEditor, RhythmDialog, ShortcutsDialog
 from .grid import ChordGrid
 from .pdf import write_pdf
 from .waveform import Waveform
 
 AUDIO_FILTER = "Audio (" + " ".join(f"*{e}" for e in audio.AUDIO_EXTENSIONS) + ")"
+SIDE_PANEL_WIDTH = 1280
 SPEEDS = [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.25, 1.5]
 
 
@@ -333,6 +336,11 @@ class SongPage(QWidget):
         self.export.setIcon(theme.icon("export"))
         self.export.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.export.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.diagrams_button = QToolButton()
+        self.diagrams_button.setIcon(theme.icon("diagram"))
+        self.diagrams_button.setCheckable(True)
+        self.diagrams_button.setToolTip("Diagrammes de guitare et de piano (D)")
+        self.diagrams_button.setAccessibleName("Diagrammes d'accords")
         self.menu = QToolButton()
         self.menu.setIcon(theme.icon("menu"))
         self.menu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -344,6 +352,7 @@ class SongPage(QWidget):
             self.undo,
             self.redo,
             self.export,
+            self.diagrams_button,
             self.menu,
         ):
             row.addWidget(w)
@@ -406,7 +415,12 @@ class SongPage(QWidget):
         status.addLayout(center)
         status.addStretch()
         self.middle.addWidget(self.status_page)
-        layout.addWidget(self.middle, 1)
+        self.panel = ChordPanel()
+        self.split = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self.split.setSpacing(0)
+        self.split.addWidget(self.middle, 1)
+        self.split.addWidget(self.panel)
+        layout.addLayout(self.split, 1)
 
         # Transport and practice tools, in the order they get used.
         bottom = QWidget()
@@ -550,10 +564,25 @@ class SongPage(QWidget):
         for widget in (self.loop_a, self.loop_b):
             widget.setVisible(width >= 960)
         self.capo.setVisible(width >= 860)
+        # Beside the grid when the grid keeps room for its bars, under it otherwise.
+        side = width >= SIDE_PANEL_WIDTH
+        self.split.setDirection(
+            QBoxLayout.Direction.LeftToRight if side else QBoxLayout.Direction.TopToBottom
+        )
+        self.panel.set_orientation(side, wide=width >= 2400)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.adapt_to_width(event.size().width())
+
+    def sync_panel(self, has_grid: bool) -> None:
+        """No diagrams before there is a grid to follow."""
+        shown = self.panel.state != "hidden"
+        self.diagrams_button.setVisible(has_grid)
+        self.diagrams_button.blockSignals(True)
+        self.diagrams_button.setChecked(shown)
+        self.diagrams_button.blockSignals(False)
+        self.panel.setVisible(has_grid and shown)
 
     def _choices(self, title: str, options) -> QActionGroup:
         """A titled group of exclusive choices in the display menu."""
@@ -594,6 +623,9 @@ class MainWindow(QMainWindow):
         self.batch_job: worker.Job | None = None
         self.batch_queue: list[Path] = []
         self.compare_engine: str | None = None
+        # The diagrams stay on the chord at this time (not a beat: a grid edit renumbers beats).
+        self.pinned_at: float | None = None
+        self._panel_restore = "full"
 
         self.stack = QStackedWidget()
         self.home = HomePage()
@@ -607,6 +639,11 @@ class MainWindow(QMainWindow):
         self.drop_hint.hide()
 
         self._wire()
+        self.song.panel.set_mode(self.settings.get("diagram_mode", "guitar"))
+        self.song.panel.set_state(self.settings.get("diagram_panel", "full"), emit=False)
+        if self.song.panel.state != "hidden":
+            self._panel_restore = self.song.panel.state
+        self.song.sync_panel(False)
         self.tick_timer = QTimer(self)
         self.tick_timer.setInterval(16)
         self.tick_timer.timeout.connect(self._tick)
@@ -660,6 +697,10 @@ class MainWindow(QMainWindow):
         s.smooth_actions.triggered.connect(lambda a: self._view(min_beats=a.data()))
         s.volume.setValue(int(self.settings.get("volume", 1.0) * 100))
         s.volume.valueChanged.connect(self._volume_changed)
+        s.panel.modeChanged.connect(self._diagram_mode_changed)
+        s.panel.stateChanged.connect(self._diagram_state_changed)
+        s.panel.followRequested.connect(self.follow_playback)
+        s.diagrams_button.clicked.connect(self.toggle_diagrams)
 
         export_menu = QMenu(self)
         export_menu.addAction("Texte (.txt)…", lambda: self.export_as("txt"))
@@ -728,6 +769,13 @@ class MainWindow(QMainWindow):
         shortcut("Ctrl+S", self.save_as)
         shortcut("Ctrl+E", lambda: s.export.showMenu())
         shortcut("F1", self.show_shortcuts)
+        shortcut("D", self.toggle_diagrams)
+        shortcut("G", lambda: s.panel.step("guitar", 1))
+        shortcut("Shift+G", lambda: s.panel.step("guitar", -1))
+        shortcut("P", lambda: s.panel.step("piano", 1))
+        shortcut("Shift+P", lambda: s.panel.step("piano", -1))
+        shortcut("Escape", self.follow_playback)
+        shortcut("Shift+D", self.toggle_pin)
 
     # Opening -----------------------------------------------------------------------------------
     def choose_file(self) -> None:
@@ -957,6 +1005,7 @@ class MainWindow(QMainWindow):
         self.audio_ready = False
         self.project = project
         self.project_file = file
+        self.pinned_at = None
         project.view["latin"] = bool(self.settings.get("latin"))
         project.view["show_bass"] = bool(self.settings.get("show_bass", True))
         s = self.song
@@ -1243,6 +1292,7 @@ class MainWindow(QMainWindow):
         # Nothing to say about the song's key or tempo before there is an analysis.
         for widget in (s.key_button, s.rhythm_button, s.undo, s.redo, s.export):
             widget.setVisible(has_grid)
+        s.sync_panel(has_grid and self.job is None)
         self._update_facts()
         self._update_loop_display()
         s.undo.setEnabled(project.can_undo)
@@ -1365,6 +1415,8 @@ class MainWindow(QMainWindow):
             self._alert(self.player.last_error)
             self.player.playing = False
         self._update_play_icon()
+        if self.player.playing and self.pinned_at is not None:
+            self.follow_playback()
 
     def _update_play_icon(self) -> None:
         s = self.song
@@ -1378,7 +1430,16 @@ class MainWindow(QMainWindow):
         self._tick()
 
     def _beat_clicked(self, beat: int) -> None:
-        self.seek(self.project.grid()[beat])
+        self.pinned_at = self.project.grid()[beat]
+        self.seek(self.pinned_at)
+        self._update_panel()
+
+    def toggle_pin(self) -> None:
+        """The keyboard's click: pin the chord under the playhead, or follow playback again."""
+        if self.pinned_at is not None:
+            self.follow_playback()
+        elif self.project and self.project.grid():
+            self._beat_clicked(max(0, self.project.beat_at(self.player.position)))
 
     def step_beat(self, delta: int) -> None:
         if not self.project or not self.project.grid():
@@ -1386,6 +1447,8 @@ class MainWindow(QMainWindow):
         grid = self.project.grid()
         here = self.project.beat_at(self.player.position)
         target = max(0, min(len(grid) - 1, here + delta))
+        if self.pinned_at is not None:
+            self.pinned_at = grid[target]
         self.seek(grid[target])
         self.song.grid.anchor = target
         self.song.grid.set_selection(target, target)
@@ -1399,6 +1462,8 @@ class MainWindow(QMainWindow):
         firsts = [f for f in firsts if f is not None]
         now = max((i for i, f in enumerate(firsts) if f <= here), default=0)
         target = firsts[max(0, min(len(firsts) - 1, now + delta))] if firsts else 0
+        if self.pinned_at is not None:
+            self.pinned_at = self.project.grid()[target]
         self.seek(self.project.grid()[target])
         self.song.grid.anchor = target
         self.song.grid.set_selection(target, target)
@@ -1446,6 +1511,74 @@ class MainWindow(QMainWindow):
                     next_ = export.chord_text(project, segments[index + 1])
         s.now.setText(now or "—")
         s.next.setText(f"→ {next_}" if next_ else "")
+        self._update_panel(beat)
+
+    # Diagrams ----------------------------------------------------------------------------------
+    def _update_panel(self, beat: int | None = None) -> None:
+        """The diagrams show the chord playing, or the pinned one, exactly as the grid writes it."""
+        project = self.project
+        s = self.song
+        if project is None or s.panel.state == "hidden" or not project.analysis["segments"]:
+            return
+        segments = project.segments()
+        pinned = self.pinned_at is not None
+        if pinned:
+            beat = project.beat_at(self.pinned_at)
+        elif beat is None:
+            beat = project.beat_at(self.player.position)
+        segment = next((x for x in segments if x.start_beat <= beat < x.end_beat), None)
+        if pinned and segment is None:  # the grid changed under it
+            self.pinned_at, pinned = None, False
+            beat = project.beat_at(self.player.position)
+            segment = next((x for x in segments if x.start_beat <= beat < x.end_beat), None)
+        status = "Suit la lecture"
+        if pinned:
+            place = project.bar_position(beat)
+            status = f"Épinglé : mesure {place[0]}" if place and place[0] else "Épinglé"
+        elif segment is None and beat < 0 and segments:
+            segment, status = segments[0], "Premier accord du morceau"
+        shown = None
+        if segment is not None:
+            view = project.view
+            key = project.key()
+            shown = voicings.describe(
+                segment.chord,
+                segment.bass,
+                key=key["label"] if key else None,
+                transpose=int(view["transpose"]),
+                capo=int(view["capo"]),
+                accidentals=view["accidentals"],
+                simplify=bool(view["simplify"]),
+                show_bass=bool(view["show_bass"]),
+                latin=bool(view.get("latin")),
+            )
+        empty = "N.C." if segment is not None else "—"
+        s.panel.show_chord(shown, status, pinned, empty)
+
+    def follow_playback(self) -> None:
+        if self.pinned_at is None:
+            return
+        self.pinned_at = None
+        self._update_panel()
+
+    def toggle_diagrams(self) -> None:
+        s = self.song
+        if not s.diagrams_button.isVisible():
+            return
+        s.panel.set_state(self._panel_restore if s.panel.state == "hidden" else "hidden")
+
+    def _diagram_state_changed(self, state: str) -> None:
+        if state != "hidden":
+            self._panel_restore = state
+        self.settings["diagram_panel"] = state
+        library.save_settings(self.settings)
+        has_grid = bool(self.project and self.project.analysis["segments"])
+        self.song.sync_panel(has_grid and self.job is None)
+        self._update_panel()
+
+    def _diagram_mode_changed(self, mode: str) -> None:
+        self.settings["diagram_mode"] = mode
+        library.save_settings(self.settings)
 
     def _follow(self, beat: int) -> None:
         """Keep the current line, and the one after it, in view."""

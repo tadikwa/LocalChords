@@ -569,3 +569,241 @@ def test_transport_controls_fit_whatever_the_window_manager_imposes(app, wav, tm
     assert needed <= width, f"the transport needs {needed} px"
     assert s.grid.bars_per_row >= 4, "a narrow window still reads four bars to a line"
     window.close()
+
+
+# Diagrams ----------------------------------------------------------------------------------------
+def panel_at(app, window, beat):
+    window.seek(window.project.grid()[beat])
+    app.processEvents()
+    return window.song.panel
+
+
+def test_diagrams_follow_the_chord_played(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = panel_at(app, window, 5)
+    assert panel.isVisible() and window.song.diagrams_button.isVisible()
+    assert panel.title.text() == "Am" and panel.status.text() == "Suit la lecture"
+    assert panel.guitar_positions[0].text == "x02210"
+    panel = panel_at(app, window, 13)
+    assert panel.title.text() == "G7" and panel.guitar_positions[0].text == "320001"
+    assert panel.guitar.count.text().startswith("1 / ")
+    panel.step("guitar", 1)
+    assert panel.guitar.count.text().startswith("2 / ")
+    assert panel.guitar.diagram.fingering is panel.guitar_positions[1]
+    window.close()
+
+
+def test_a_click_pins_the_diagrams_and_a_double_click_still_edits(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    edits = []
+    window.song.grid.editRequested.disconnect()
+    window.song.grid.editRequested.connect(lambda *span: edits.append(span))
+    panel = window.song.panel
+    click_beat(app, window, 9)
+    assert panel.title.text() == "F" and panel.follow.isVisible()
+    assert panel.status.text() == "Épinglé : mesure 3"
+    window.seek(window.project.grid()[1])  # playback moves on, the pin stays
+    app.processEvents()
+    assert panel.title.text() == "F"
+    QTest.keyClick(window, Qt.Key.Key_Escape)
+    assert window.pinned_at is None and not panel.follow.isVisible()
+    assert panel.title.text() == "C"
+    click_beat(app, window, 9)  # a click also moves the playhead there
+    window.seek(window.project.grid()[5])
+    panel.follow.click()
+    assert panel.title.text() == "Am"
+    click_beat(app, window, 13, double=True)
+    assert edits, "a double click opens the chord editor"
+    window.close()
+
+
+def test_starting_playback_follows_again(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    if window.player.stream is None and not window.player.open_device():
+        pytest.skip(window.player.last_error)
+    click_beat(app, window, 9)
+    window.seek(0)
+    window.toggle_play()
+    assert window.pinned_at is None
+    assert wait_for(app, lambda: window.song.panel.title.text() == "Am", 6)
+    window.toggle_play()
+    window.close()
+
+
+def test_diagram_mode_and_size_are_remembered(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = window.song.panel
+    panel.mode_buttons["both"].click()
+    assert panel.guitar.isVisible() and panel.piano.isVisible()
+    panel.resize_button.click()
+    assert panel.state == "reduced" and not panel.modes.isVisible()
+    window.close()
+    window = seeded(app, wav, tmp_path)
+    panel = window.song.panel
+    assert (panel.mode, panel.state) == ("both", "reduced")
+    QTest.keyClick(window, Qt.Key.Key_D)
+    assert panel.state == "hidden" and not panel.isVisible()
+    assert not window.song.diagrams_button.isChecked()
+    window.close()
+    window = seeded(app, wav, tmp_path)
+    assert not window.song.panel.isVisible()
+    window.song.diagrams_button.click()
+    assert window.song.panel.isVisible() and window.song.panel.state == "full"
+    window.close()
+
+
+def window_rect(widget, window):
+    return widget.rect().translated(widget.mapTo(window, widget.rect().topLeft()))
+
+
+@pytest.mark.parametrize(
+    ("size", "side"),
+    [((1000, 760), False), ((1920, 1080), True), ((3440, 1440), True), ((5120, 1440), True)],
+)
+def test_the_panel_fits_beside_or_under_the_grid(app, wav, tmp_path, size, side):
+    window = seeded(app, wav, tmp_path)
+    window.song.panel.set_mode("both")
+    window.resize(*size)
+    app.processEvents()
+    s = window.song
+    s.adapt_to_width(size[0])  # as a tiling window manager imposes it
+    app.processEvents()
+    assert s.panel.side is side
+    panel = window_rect(s.panel, window)
+    assert not window_rect(s.scroll, window).intersects(panel)
+    assert panel.right() <= window.width() and panel.bottom() <= window.height()
+    assert s.grid.cell_w >= 56
+    for diagram in (s.panel.guitar.diagram, s.panel.piano.diagram):
+        assert diagram.width() >= 120 and diagram.height() >= 90
+    window.grab()
+    window.close()
+
+
+def test_diagrams_follow_transposition_capo_and_notation(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = panel_at(app, window, 1)
+    window._view(transpose=2)  # C heard as D
+    assert panel.title.text() == "D" and panel.guitar_positions[0].text == "xx0232"
+    window._view(capo=2)  # D with a capo on 2: a C shape
+    assert panel.title.text() == "C" and panel.guitar_positions[0].text == "x32010"
+    assert "son réel D" in panel.capo_note.text() and panel.capo_note.isVisible()
+    assert panel.shown.sound.title == "D" and panel.piano_voicings[0].notes[0] % 12 == 2
+    assert panel.piano.kind.text().startswith("son réel D")
+    window._view(latin=True)
+    assert panel.title.text() == "Do"
+    window._view(latin=False, capo=0, transpose=1, accidentals="flats")
+    panel = panel_at(app, window, 5)
+    assert panel.title.text() == "B♭m"
+    window._view(accidentals="sharps")
+    assert panel.title.text() == "A♯m"
+    window.close()
+
+
+def test_diagrams_follow_corrections_and_come_back_with_the_project(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.apply_chord(0, 3, "B:min", None)
+    panel = panel_at(app, window, 1)
+    assert panel.title.text() == "Bm" and panel.guitar_positions[0].text == "x24432"
+    window.apply_chord(4, 7, "D:maj", "F#")
+    panel = panel_at(app, window, 5)
+    assert panel.title.text() == "D/F♯" and panel.guitar_positions[0].text == "2x0232"
+    window.song.capo.set_value(2)
+    window.song.capo.changed.emit(2)
+    assert panel.title.text() == "C/E"
+    window.flush()
+    window.close()
+    window = MainWindow(muted=True)
+    window.show()
+    window.open_project_file(tmp_path / "song.lchords")
+    assert wait_for(app, lambda: window.audio_ready)
+    panel = panel_at(app, window, 5)
+    assert panel.title.text() == "C/E" and panel.guitar_positions[0].text == "032010"
+    window.close()
+
+
+def test_no_chord_and_unplayable_chords_say_so(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.apply_chord(4, 7, "N", None)
+    panel = panel_at(app, window, 5)
+    assert panel.title.text() == "N.C." and panel.shown is None
+    assert "Pas d'accord ici" in panel.guitar.diagram.message
+    # B minor over C sharp with a capo on 11: no verified position, and the panel says why.
+    window.apply_chord(0, 3, "B:min", "C#")
+    window._view(capo=11)
+    panel = panel_at(app, window, 1)
+    assert panel.guitar_positions == () and panel.guitar.diagram.fingering is None
+    assert "Aucune position vérifiée" in panel.guitar.diagram.message
+    assert panel.guitar.kind.text() == "Aucune position"
+    assert panel.piano_voicings, "the piano still plays it"
+    window.close()
+
+
+def test_following_the_playhead_stays_fast(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.song.panel.set_mode("both")
+    window.resize(1920, 1080)
+    app.processEvents()
+    beats = len(window.project.grid())
+    start = time.perf_counter()
+    for i in range(200):
+        window._update_now((i * 3) % beats)
+        window.song.panel.guitar.diagram.grab()
+        window.song.panel.piano.diagram.grab()
+    per_beat = (time.perf_counter() - start) / 200
+    assert per_beat < 0.02, f"{per_beat * 1000:.1f} ms per beat"
+    window.close()
+
+
+def test_a_pin_holds_through_a_grid_edit_and_follows_the_arrows(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = window.song.panel
+    click_beat(app, window, 9)
+    assert panel.title.text() == "F"
+    window.project.set_grid(scale=2)  # the ×2 button: every beat is renumbered
+    window._content_changed()
+    assert panel.title.text() == "F" and panel.follow.isVisible()
+    window.project.set_grid(scale=1)
+    window._content_changed()
+    window.step_beat(4)  # a bar later, the pin moves with the selection
+    assert panel.title.text() == "G7" and panel.follow.isVisible()
+    window.step_bar(-2)
+    assert panel.title.text() == "Am" and panel.status.text() == "Épinglé : mesure 2"
+    window.close()
+
+
+def test_the_keyboard_pins_and_unpins(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = panel_at(app, window, 5)
+    QTest.keyClick(window, Qt.Key.Key_D, Qt.KeyboardModifier.ShiftModifier)
+    assert window.pinned_at is not None and panel.title.text() == "Am"
+    assert panel.status.text().startswith("Épinglé")
+    QTest.keyClick(window, Qt.Key.Key_D, Qt.KeyboardModifier.ShiftModifier)
+    assert window.pinned_at is None and panel.status.text() == "Suit la lecture"
+    window.close()
+
+
+def test_with_a_capo_the_title_names_what_is_on_show(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = panel_at(app, window, 1)
+    window._view(capo=2)  # C heard, a B♭ shape on the guitar
+    assert panel.title.text() == "B♭"
+    panel.set_mode("piano")
+    assert panel.title.text() == "C" and "forme de B♭" in panel.capo_note.text()
+    panel.set_mode("both")
+    panel.set_state("reduced")
+    assert panel.capo_note.isVisible() and panel.capo_note.text() == "Capo 2 · son réel C"
+    window._view(capo=0)
+    assert not panel.capo_note.isVisible()
+    panel.set_state("full")
+    window.close()
+
+
+def test_the_no_position_message_counts_the_frets_left_above_the_capo(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.apply_chord(0, 3, "B:min", "C#")
+    window._view(capo=11)
+    panel = panel_at(app, window, 1)
+    message = panel.guitar.diagram.message
+    assert "dans les 4 cases au-dessus du capo" in message and message.count(" avec ") == 0
+    assert "Afficher les basses" in message and "capo" in message
+    window.close()

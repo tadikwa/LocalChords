@@ -11,6 +11,8 @@ from pathlib import Path
 
 
 def run(audio_path: Path, out: Path) -> int:
+    import os
+
     from . import library
     from .ui.main_window import MainWindow, app_instance
     from .ui.pdf import write_pdf
@@ -39,8 +41,12 @@ def run(audio_path: Path, out: Path) -> int:
         window = MainWindow(muted=True)
         window.show()
         app.processEvents()
-        step("démarrage", True, seconds=round(time.perf_counter() - started, 2),
-             data=str(library.data_dir()))
+        step(
+            "démarrage",
+            True,
+            seconds=round(time.perf_counter() - started, 2),
+            data=str(library.data_dir()),
+        )
         window.grab().save(str(out / "1_accueil.png"))
 
         started = time.perf_counter()
@@ -66,14 +72,26 @@ def run(audio_path: Path, out: Path) -> int:
         wait(lambda: False, 0.2)
         window.grab().save(str(out / "2_grille.png"))
 
+        panel = window.song.panel
+        mode, state = panel.mode, panel.state
+        panel.set_state("full")
+        panel.set_mode("both")
         window.seek(0)
         window.toggle_play()
+        started = time.monotonic()
         beat_before = window.song.grid.current
-        wait(lambda: False, 3.0)
-        position = window.player.position
+        frames = out / "frames" if os.environ.get("LOCALCHORDS_SELFTEST_FRAMES") else None
+        if frames:  # for the README animation: the real window, while it plays
+            frames.mkdir(exist_ok=True)
+            for i in range(90):
+                wait(lambda: False, 0.1)
+                window.grab().save(str(frames / f"{i:03}.png"))
+        else:
+            wait(lambda: False, 3.0)
+        position, elapsed = window.player.position, time.monotonic() - started
         step(
             "lecture",
-            window.player.playing and 2.0 < position < 4.0,
+            window.player.playing and position > 2.0 and abs(position - elapsed) < 1.0,
             position=round(position, 3),
             device=window.player.stream is not None,
             latency=window.player.latency,
@@ -81,6 +99,26 @@ def run(audio_path: Path, out: Path) -> int:
         )
         expected = project.beat_at(window.player.position)
         step("synchronisation", abs(window.song.grid.current - expected) <= 1)
+        step(
+            "diagrammes pendant la lecture",
+            panel.isVisible() and panel.title.text() == window.song.now.text(),
+            chord=panel.title.text(),
+            guitar=[f.text for f in panel.guitar_positions],
+            piano=[list(v.notes) for v in panel.piano_voicings][:2],
+        )
+        times = []
+        for beat in range(len(project.grid())):
+            started = time.perf_counter()
+            window._update_now(beat)
+            panel.guitar.diagram.grab()
+            panel.piano.diagram.grab()
+            times.append(time.perf_counter() - started)
+        step(
+            "diagrammes : rapidité",
+            max(times) < 0.05,
+            mean_ms=round(1000 * sum(times) / len(times), 2),
+            max_ms=round(1000 * max(times), 2),
+        )
         grid = project.grid()
         window.seek(grid[len(grid) // 2])
         window.song.speed.step(-3)
@@ -102,6 +140,22 @@ def run(audio_path: Path, out: Path) -> int:
         window.song.transpose.step(2)
         step("transposition", "F" in window.song.grid.symbols[first.start_beat][0])
         window.grab().save(str(out / "3_corrigee_transposee.png"))
+        window.seek(project.grid()[first.start_beat])
+        app.processEvents()
+        step(
+            "diagrammes transposés",
+            panel.title.text() == window.song.now.text()
+            and bool(panel.guitar_positions)
+            and {n % 12 for n in panel.piano_voicings[0].notes} == {6, 9, 1, 4},
+            chord=panel.title.text(),
+            guitar=panel.guitar_positions[0].text if panel.guitar_positions else None,
+        )
+        for name, shown in (("4_guitare", "guitar"), ("5_piano", "piano"), ("6_les_deux", "both")):
+            panel.set_mode(shown)
+            wait(lambda: False, 0.3)
+            window.grab().save(str(out / f"{name}.png"))
+        panel.set_mode(mode)
+        panel.set_state(state)
         before = [s.chord for s in project.segments()]
 
         window.export_to(out / "grille.txt", "txt")
@@ -171,8 +225,17 @@ def run_pitch(audio_path: Path, out: Path) -> int:
         t0, p0 = time.time(), window.player.position
         wait(seconds)
         schedule["conditions"].append(
-            dict(name=name, semitones=semitones, audio=audio, rate=rate, region=region,
-                 t0=t0, t1=time.time(), position=(p0, window.player.position), **extra)
+            dict(
+                name=name,
+                semitones=semitones,
+                audio=audio,
+                rate=rate,
+                region=region,
+                t0=t0,
+                t1=time.time(),
+                position=(p0, window.player.position),
+                **extra,
+            )
         )
         (out / "schedule.json").write_text(json.dumps(schedule, indent=1), "utf-8")
 
@@ -195,8 +258,17 @@ def run_pitch(audio_path: Path, out: Path) -> int:
         play("boucle A/B +5 à 75 %", 8, 5, True, 0.75, "ladder", 22.0, (22.0, 24.0), **cycle)
         play("boucle, passage à -12", 6, -12, True, 0.75, "ladder", **cycle)
         play("boucle, son d'origine", 5, -12, False, 0.75, "ladder", **cycle)
-        play("boucle +12 à 100 %", 5, 12, True, 1.0, "ladder", 26.0, (26.0, 27.5),
-             expect_notes=[0, 1, 2])
+        play(
+            "boucle +12 à 100 %",
+            5,
+            12,
+            True,
+            1.0,
+            "ladder",
+            26.0,
+            (26.0, 27.5),
+            expect_notes=[0, 1, 2],
+        )
         window.toggle_play()
         schedule["ok"] = True
     except Exception:  # noqa: BLE001 - the schedule must say what broke

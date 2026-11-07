@@ -125,6 +125,35 @@ def simplified(quality: str) -> str:
     return QUALITIES[quality][3]
 
 
+# Interval in semitones → letters above the root (a minor third is two letters up).
+_LETTER_STEPS = {0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 4, 8: 4, 9: 5, 10: 6, 11: 6}
+
+
+def spell(root: str, quality: str, accidentals: str = "auto") -> dict[int, str]:
+    """Pitch class → name for each note of the chord: by interval from a spelled root, so that
+    B minor is B, D, F♯ and E♭ is E♭, G, B♭. A name needing a double accidental, or one that the
+    program never writes (C♭, F♭, E♯, B♯), falls back to the plain name; forced sharps or flats
+    are applied to every note."""
+    root_pc = name_to_pc(root)
+    out = {}
+    for t in QUALITIES[quality][2]:
+        pc = (root_pc + t) % 12
+        if accidentals == "sharps":
+            out[pc] = SHARP_NAMES[pc]
+            continue
+        if accidentals == "flats":
+            out[pc] = FLAT_NAMES[pc]
+            continue
+        letter = LETTERS[(LETTERS.index(root[0]) + _LETTER_STEPS[t]) % 7]
+        diff = (pc - NATURAL[letter] + 6) % 12 - 6
+        name = letter + ("#" if diff > 0 else "b" if diff < 0 else "")
+        if abs(diff) > 1 or name in ("Cb", "Fb", "E#", "B#"):
+            flat_side = "b" in root or root == "F"
+            name = (FLAT_NAMES if flat_side else SHARP_NAMES)[pc]
+        out[pc] = name
+    return out
+
+
 def symbol(
     label: str | None,
     bass: str | None = None,
@@ -152,7 +181,10 @@ def symbol(
     if show_bass and bass and not simplify:
         bass_pc = name_to_pc(bass)
         if bass_pc != pc:
-            bass_name = spell_root(bass_pc + semitones, moved_key, accidentals)
+            # A chord note keeps its name in the chord (E/G♯, not E/A♭); another, its degree.
+            moved_bass = (bass_pc + semitones) % 12
+            in_chord = spell(root, quality, accidentals).get(moved_bass)
+            bass_name = in_chord or spell_root(moved_bass, moved_key, accidentals)
             text += "/" + pretty_note(bass_name, ascii_only=ascii_only, latin=latin)
     return text
 
