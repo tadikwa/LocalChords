@@ -39,7 +39,8 @@ def run(audio_path: Path, out: Path) -> int:
         window = MainWindow(muted=True)
         window.show()
         app.processEvents()
-        step("démarrage", True, seconds=round(time.perf_counter() - started, 2))
+        step("démarrage", True, seconds=round(time.perf_counter() - started, 2),
+             data=str(library.data_dir()))
         window.grab().save(str(out / "1_accueil.png"))
 
         started = time.perf_counter()
@@ -133,6 +134,77 @@ def run(audio_path: Path, out: Path) -> int:
         report["error"] = traceback.format_exc()
     (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
     return 0 if report["ok"] else 1
+
+
+def run_pitch(audio_path: Path, out: Path) -> int:
+    """Play scripts/measure_pitch.py's reference through the real window and the speakers, at a
+    low volume, under each transposition, speed and loop; the recorder outside judges the sound.
+    Writes schedule.json: when each condition played, by the wall clock both sides share."""
+    from .ui.main_window import SPEEDS, MainWindow, app_instance
+
+    out.mkdir(parents=True, exist_ok=True)
+    app = app_instance()
+    window = MainWindow()
+    window.show()
+    window.open_path(audio_path)
+    s = window.song
+    schedule: dict = {"audio": str(audio_path), "conditions": []}
+
+    def wait(seconds, condition=lambda: False):
+        end = time.perf_counter() + seconds
+        while time.perf_counter() < end and not condition():
+            app.processEvents()
+            time.sleep(0.003)
+        return condition()
+
+    def play(name, seconds, semitones, audio, rate, region, start=None, loop=None, **extra):
+        s.transpose.step(semitones - s.transpose.value)
+        if s.audio_button.isChecked() != audio:
+            s.audio_button.click()
+        s.speed.step(SPEEDS.index(rate) - s.speed.value)
+        if loop:
+            window._set_loop(loop)
+        if start is not None:
+            window.seek(start)
+        if not window.player.playing:
+            window.toggle_play()
+        t0, p0 = time.time(), window.player.position
+        wait(seconds)
+        schedule["conditions"].append(
+            dict(name=name, semitones=semitones, audio=audio, rate=rate, region=region,
+                 t0=t0, t1=time.time(), position=(p0, window.player.position), **extra)
+        )
+        (out / "schedule.json").write_text(json.dumps(schedule, indent=1), "utf-8")
+
+    try:
+        if not wait(60, lambda: window.audio_ready):
+            raise AssertionError("audio not loaded")
+        s.volume.setValue(15)
+        play("son d'origine, grille +5", 3, 5, False, 1.0, "sine", start=0.5)
+        for n in (0, 1, -1, 5, -5, 12, -12):
+            play(f"{n:+d}", 3, n, True, 1.0, "sine", start=0.5)
+        play("+12 à 50 %", 3.5, 12, True, 0.5, "sine", start=1)
+        play("-12 à 150 %", 3, -12, True, 1.5, "sine", start=1)
+        play("+5 à 75 %", 3, 5, True, 0.75, "sine", start=1)
+        play("échelle +12", 4, 12, True, 1.0, "ladder", start=20.0)
+        play("échelle -12", 4, -12, True, 1.0, "ladder", start=20.0)
+        play("échelle +5 à 75 %", 5, 5, True, 0.75, "ladder", start=20.0)
+        play("échelle -5 à 50 %", 6, -5, True, 0.5, "ladder", start=20.0)
+        play("échelle +1 à 150 %", 4, 1, True, 1.5, "ladder", start=20.0)
+        cycle = dict(expect_notes=[4, 5, 6, 7])
+        play("boucle A/B +5 à 75 %", 8, 5, True, 0.75, "ladder", 22.0, (22.0, 24.0), **cycle)
+        play("boucle, passage à -12", 6, -12, True, 0.75, "ladder", **cycle)
+        play("boucle, son d'origine", 5, -12, False, 0.75, "ladder", **cycle)
+        play("boucle +12 à 100 %", 5, 12, True, 1.0, "ladder", 26.0, (26.0, 27.5),
+             expect_notes=[0, 1, 2])
+        window.toggle_play()
+        schedule["ok"] = True
+    except Exception:  # noqa: BLE001 - the schedule must say what broke
+        schedule["error"] = traceback.format_exc()
+    (out / "schedule.json").write_text(json.dumps(schedule, indent=1), "utf-8")
+    window._stop_job()
+    window.close()
+    return 0 if schedule.get("ok") else 1
 
 
 def run_link(url: str, out: Path) -> int:

@@ -1,11 +1,12 @@
 # État du projet
 
-Mis à jour le 2026-11-06.
+Mis à jour le 2026-11-07 (v1.1, branche `v1.1`).
 
 ## Où on en est
 
-**Livrable :** `dist/LocalChords/LocalChords.exe`, construit et vérifié sur ce PC (voir
-[BENCHMARKS.md](BENCHMARKS.md), section « Programme compilé »).
+**Livrables v1.1 :** `LocalChords-v1.1-windows-x64.zip` (dossier) et `LocalChords-v1.1-portable.exe`
+(exécutable unique), construits et vérifiés sur ce PC : voir [BENCHMARKS.md](BENCHMARKS.md), sections v1.1, et
+[RAPPORT-v1.1.md](RAPPORT-v1.1.md). La v1.0 (`dist/LocalChords`, avec torch) reste à sa place.
 
 | Phase | État |
 |---|---|
@@ -15,6 +16,7 @@ Mis à jour le 2026-11-06.
 | D. MVP (P0) | Fait, tests réels |
 | E. Application aboutie (P1) | Fait |
 | F. Distribution | Fait, exécutable testé ; revue indépendante faite, voir plus bas |
+| H. v1.1 | Bouton « Son transposé » visible, ONNX à la place de torch, exécutable unique, mode portable |
 | G. P2 | Liens, lots, comparaison de moteurs, progressions, transposition de l'audio. Non faits : sections, séparation de sources, GPU, avec leurs raisons dans DECISIONS.md |
 
 ## Limites connues
@@ -27,12 +29,17 @@ Mis à jour le 2026-11-06.
 - **Instabilité non élucidée dans les tests :** 2 exécutions complètes de pytest sur 8 se sont arrêtées vers le
   100e test, sur une erreur interne (`SystemError` dans `compile`, ou pile d'appels fatale) ; les 6 autres sont
   passées, dont les 4 dernières à la suite (165 tests). Pas reproduit en isolant les fichiers. Hypothèse non
-  vérifiée : Qt et torch dans le même processus, ce qui n'arrive que sous pytest, le programme les séparant.
+  vérifiée : Qt et torch dans le même processus, ce qui n'arrive que sous pytest, le programme les séparant En v1.1, torch n'est plus chargé
+  quand les modèles ONNX sont présents : à revoir si l'instabilité disparaît.
   À l'appui : 20 analyses sur 20 sans erreur par le vrai processus d'analyse (`scripts/soak_worker.py`), et
   environ 260 analyses de mesure sans plantage. Si le processus d'analyse tombe, l'interface propose de réessayer.
 - L'import YouTube dépend d'un site qui change, et parfois de Node.js ou Deno.
-- 928 Mo sur disque, 418 Mo en zip (`dist/LocalChords-windows-x64.zip`). Programme non signé : SmartScreen avertit.
-- Diffusion publique : libx264 et libx265 (GPL) sont dans le paquet, voir LICENCES-TIERS.md.
+- 592 Mo sur disque (dossier), 283 Mo en exécutable unique ou en zip. Programme non signé : SmartScreen avertit.
+- Exécutable unique : 3,4 s de démarrage et 567 Mo décompressés dans `%TEMP%` à chaque lancement, laissés
+  sur place si le programme est tué.
+- Les réseaux passent par des fonctions privées de chordotomy 0.3.1 (`onnx_engine.py`).
+- Diffusion publique : FFmpeg LGPL recompilé, sans libx264 ni libx265 (LICENCES-TIERS.md) ; publié sur
+  <https://github.com/tadikwa/LocalChords/releases>.
 
 ## Revue indépendante
 
@@ -56,4 +63,4 @@ télécharge. `work/` contient les essais et n'est pas suivi par Git.
 
 1. Écouter de vrais morceaux et corriger : c'est ce qui manque aux mesures.
 2. Tester sur un PC sans NVIDIA ni outils de développement.
-3. Si la taille gêne : convertir les modèles en ONNX pour retirer torch.
+3. Si la taille gêne encore : FFmpeg sans encodeurs vidéo (environ 23 Mo, et plus de GPL).

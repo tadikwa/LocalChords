@@ -12,6 +12,7 @@ import synth
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QPushButton
 from test_core import analysis as make_analysis
 
 from localchords import library
@@ -355,6 +356,23 @@ def test_long_title_does_not_widen_the_window(app, wav, tmp_path):
     window.close()
 
 
+def test_recent_songs_stay_within_the_window_and_say_when_audio_is_gone(app, wav, tmp_path):
+    long = {"path": str(wav), "title": "très long titre " * 30, "duration": 8.0}
+    gone = {"path": str(tmp_path / "parti.wav"), "title": "Parti", "duration": 8.0}
+    Project(long, make_analysis()).save(library.project_path("a" * 16))
+    Project(gone, make_analysis()).save(library.project_path("b" * 16))
+    window = MainWindow(muted=True)
+    window.resize(1100, 700)
+    window.show()
+    app.processEvents()
+    assert window.width() == 1100
+    texts = {b.text(): b.toolTip() for b in window.home.findChildren(QPushButton, "recent")}
+    assert any("Parti" in t and "audio introuvable" in t for t in texts)
+    shortened = next(t for t in texts if t.startswith("très"))
+    assert "…" in shortened and "très long titre " * 30 in texts[shortened]
+    window.close()
+
+
 def test_view_settings_come_back_with_the_project(app, wav, tmp_path):
     window = seeded(app, wav, tmp_path)
     window.song.capo.set_value(3)
@@ -412,11 +430,15 @@ def test_import_link_refuses_nonsense(app, monkeypatch):
 
 def test_audio_follows_transposition_only_when_asked(app, wav, tmp_path):
     window = seeded(app, wav, tmp_path)
-    window.song.transpose.step(12 - 1)
+    window.song.transpose.step(12)
     assert window.player.pitch == 1.0
-    window.audio_action.setChecked(True)
-    assert window.player.pitch == pytest.approx(2 ** (11 / 12))
-    window.audio_action.setChecked(False)
+    assert "désactivé" in window.song.audio_button.toolTip()
+    window.song.audio_button.click()
+    assert window.player.pitch == pytest.approx(2.0)  # an octave: ±12 is reachable
+    assert window.song.audio_button.text().strip() == "Son transposé"
+    window.song.transpose.step(-24)
+    assert window.player.pitch == pytest.approx(0.5)
+    window.song.audio_button.click()
     assert window.player.pitch == 1.0
     window.close()
 
@@ -530,7 +552,7 @@ def test_editor_uses_latin_names_when_asked(app, wav, tmp_path):
     window.close()
 
 
-@pytest.mark.parametrize("width", [1000, 1120, 2560])
+@pytest.mark.parametrize("width", [1000, 1120, 1240, 2560])
 def test_transport_controls_fit_whatever_the_window_manager_imposes(app, wav, tmp_path, width):
     a = make_analysis(chords=("C:maj", "A:min", "F:maj", "G:7") * 12)
     audio = {"path": str(wav), "title": "Long", "duration": a["segments"][-1]["end_time"]}

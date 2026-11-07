@@ -4,16 +4,31 @@ Une grille d'accords lisible et synchronisée avec la lecture, sur votre PC Wind
 morceau, les accords apparaissent par mesures et défilent pendant l'écoute. Tout se passe sur votre
 ordinateur : l'audio n'est envoyé nulle part, aucun compte, aucun abonnement.
 
-## Installer
+## Télécharger LocalChords
 
-1. Décompressez le dossier `LocalChords` où vous voulez (environ 900 Mo une fois décompressé).
-2. Lancez `LocalChords.exe`.
+**[Télécharger la dernière version](https://github.com/tadikwa/LocalChords/releases/latest)**, pour
+Windows 10 ou 11 en 64 bits. Rien d'autre à installer : ni Python, ni carte graphique particulière, ni
+connexion Internet (sauf pour importer un lien).
 
-Rien d'autre à installer : ni Python, ni carte graphique particulière, ni connexion Internet
-(sauf pour importer un lien). Windows 10 ou 11 en 64 bits.
+Sur la page de la version, dans « Assets », prenez **l'un des deux** fichiers :
 
-Si Windows SmartScreen affiche un avertissement au premier lancement, c'est que le programme n'est
-pas signé : « Informations complémentaires », puis « Exécuter quand même ».
+| Fichier | Pour qui | Comment |
+|---|---|---|
+| `LocalChords-v1.1-portable.exe` (environ 285 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.1-windows-x64.zip` (environ 285 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+
+Même programme, mêmes résultats. Le dossier démarre en moins d'une seconde. L'exécutable unique se
+décompresse à chaque lancement : environ 3,5 s, et 570 Mo dans le dossier temporaire de Windows, effacés
+à la fermeture.
+
+**Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
+programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
+Pour vérifier le fichier, son empreinte SHA-256 figure sur la page de la version (PowerShell :
+`Get-FileHash .\LocalChords-v1.1-portable.exe`).
+
+Pour tout garder à côté du programme (clé USB), créez un fichier vide `LocalChords.portable` à côté de
+l'exécutable : voir [docs/PORTABLE.md](docs/PORTABLE.md). Pour désinstaller, supprimez le fichier ou le
+dossier ; vos analyses restent dans `%LOCALAPPDATA%\LocalChords` tant que vous ne les effacez pas.
 
 ## Utiliser
 
@@ -31,7 +46,7 @@ pas signé : « Informations complémentaires », puis « Exécuter quand même 
 
 | Quoi | Comment |
 |---|---|
-| Transposer | `Transposer − +` ou Ctrl + ↑ ↓. « Transposer aussi l'audio » dans le menu ☰ fait suivre le son. |
+| Transposer | `Transposer − +` ou Ctrl + ↑ ↓, jusqu'à ± 12 demi-tons. Le bouton juste à côté choisit si le son suit : « Son transposé » (allumé) ou « Son d'origine » (seule la grille change). La vitesse ne change pas. |
 | Capodastre | `Capo − +` : la grille montre les formes à jouer. |
 | Ralentir sans changer la hauteur | `Vitesse − +`, de 50 % à 150 %, ou les touches `-` et `+`. |
 | Boucler un passage | Sélectionnez des cases (glisser, ou Maj + clic), puis `L`. Ou `A` et `B` pendant l'écoute. Sans sélection, `L` boucle la mesure en cours. |
@@ -78,13 +93,15 @@ Les accords sont extraits automatiquement : **vérifiez à l'oreille**. Mesures 
 - **« Sortie audio indisponible »** : vérifiez la sortie son de Windows, puis relancez la lecture.
 - **« Mémoire insuffisante »** ou arrêt brutal : l'analyse demande environ 1 Go pour une chanson, 4 Go pour 20 minutes,
   11 Go pour une heure.
-- **Autre erreur :** le détail est dans `%LOCALAPPDATA%\LocalChords\log.txt`.
+- **Autre erreur :** le détail est dans `%LOCALAPPDATA%\LocalChords\log.txt` (en mode portable : `Data\log.txt`).
 
 Vos morceaux analysés sont dans `%LOCALAPPDATA%\LocalChords\projects` : effacer un fichier n'oublie que
 son analyse et vos corrections. Les fichiers audio ne sont ni copiés ni modifiés, sauf ceux importés
-par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`.
+par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. En mode portable, tout cela est dans le dossier
+`Data` à côté du programme.
 
 ## Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md). Licences : [LICENCES-TIERS.md](LICENCES-TIERS.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md). Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
+[LICENCES-TIERS.md](LICENCES-TIERS.md).

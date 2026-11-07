@@ -1,6 +1,6 @@
 [project]
 name = "localchords"
-version = "0.1.0"
+version = "1.1.0"
 description = "Grille d'accords locale et synchronisée pour Windows."
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -12,10 +12,12 @@ dependencies = [
   "yt-dlp",
   "yt-dlp-ejs",
   "numpy",
+  # Runs the nets in the packaged program, without torch (onnx_engine.py).
+  "onnxruntime>=1.20",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5", "pyinstaller>=6", "mir_eval>=0.8", "pooch>=1.8"]
+dev = ["pytest>=8", "ruff>=0.5", "pyinstaller>=6", "mir_eval>=0.8", "pooch>=1.8", "onnx>=1.17", "onnxscript"]
 
 [project.gui-scripts]
 localchords = "localchords.app:main"

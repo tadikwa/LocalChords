@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import rhythm
+from . import onnx_engine, rhythm
 
 Progress = Callable[[float, str], None]
 ANALYSIS_SR = 22050
@@ -54,9 +54,13 @@ STAGE_TEXT = {
 
 
 def _configure_weights() -> None:
-    """Use the Beat This! weights shipped with the program, when it is the packaged build."""
+    """Run the nets on ONNX Runtime when their exports are there (onnx_engine), else use the
+    Beat This! weights shipped with the program, when it is the packaged build."""
     from chordotomy import beats
 
+    if onnx_engine.available():
+        onnx_engine.install()
+        return
     root = getattr(sys, "_MEIPASS", None)
     if root and (Path(root) / "models" / "beat_this-final0.ckpt").exists():
         beats.CACHE_DIR = Path(root) / "models"
@@ -64,6 +68,8 @@ def _configure_weights() -> None:
 
 def _both_heads(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Beat This!'s beat and downbeat logits per frame, from one pass of the net."""
+    if onnx_engine.available():
+        return onnx_engine.both_heads(y)
     import torch
     from chordotomy import beats
 
@@ -202,6 +208,7 @@ def _chordotomy(engine: str, y: np.ndarray, progress: Progress) -> dict:
     from chordotomy.model import EngineError
 
     _configure_weights()
+    backend = "onnx" if onnx_engine.available() else "torch"
     stages = _Stages(progress)
     # chordotomy reads a path; the audio has already gone through our decoder and resampler, which
     # also handles what its own reader cannot (m4a, for one).
@@ -223,6 +230,7 @@ def _chordotomy(engine: str, y: np.ndarray, progress: Progress) -> dict:
         "engine": {
             "name": engine,
             "generator": result["generator"],
+            "backend": backend,
         },
         "followed_tempo": stages.followed_tempo,
         "beats": result["beats"],

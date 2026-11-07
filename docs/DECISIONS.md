@@ -78,13 +78,38 @@ modifier, d'embarquer torch CUDA (environ 2,5 Go de plus) pour un gain plafonné
 
 ## Poids embarqués plutôt que téléchargés au premier lancement
 
-108 Mo sur 900 : le programme marche hors ligne dès le départ, sans consentement à demander ni
+89 Mo sur 510 (108 Mo sur 900 avec torch) : le programme marche hors ligne dès le départ, sans consentement à demander ni
 téléchargement à vérifier. Licences MIT, redistribution permise.
 
-## Distribution en dossier (`--onedir`), pas en fichier unique
+## ONNX Runtime pour exécuter les modèles, sans torch (v1.1)
 
-Un exécutable unique se décompresserait dans un dossier temporaire à chaque lancement : 900 Mo et plusieurs
-secondes, pour le processus d'analyse aussi. Le dossier démarre en 0,4 s. Zip : 418 Mo.
+torch pesait 295 Mo pour faire tourner six petits réseaux. Exportés en ONNX, ils donnent les mêmes accords,
+temps, tonalités et mesures sur les 204 fichiers comparés, un peu plus vite, et le dossier passe de 928 à
+510 Mo. chordotomy reste le moteur : seuls les appels aux réseaux sont redirigés (`onnx_engine.py`), ce qui
+dépend de fonctions privées de chordotomy 0.3.1, version figée dans `requirements-lock.txt`. Les fichiers
+`.onnx` sont produits à la construction depuis les poids MIT d'origine, pas suivis par Git.
+
+## Deux formes : dossier et exécutable unique (v1.1)
+
+L'exécutable unique se copie en un fichier, mais se décompresse (567 Mo) dans `%TEMP%` à chaque lancement :
+3,4 s au lieu de 0,7 s, et le dossier reste si le programme est tué. Les deux sont livrés, le dossier reste la
+forme recommandée pour un usage quotidien. Détails dans [PORTABLE.md](PORTABLE.md).
+
+## FFmpeg LGPL recompilé pour la diffusion publique (v1.1)
+
+La wheel PyAV officielle se dit LGPL, mais son avcodec importe libx264 et libx265 (GPL) : diffusé tel quel,
+le programme entier tomberait sous la GPL. PyAV 19.0.2 est donc recompilé (`scripts/build_av_lgpl.py`)
+contre la construction LGPL partagée de FFmpeg n9.0.2 de BtbN, à empreinte figée. Même décodage, 83 Mo de
+plus, à cause des encodeurs vidéo que BtbN y compile. Compiler soi-même un FFmpeg réduit à l'audio serait
+plus léger, mais demande une chaîne MinGW et sa maintenance : pas fait. La construction s'arrête si
+FFmpeg n'est pas LGPL (`localchords.spec`). LocalChords est sous licence MIT.
+
+## Mode portable sur demande, sans migration
+
+Un marqueur `LocalChords.portable` à côté du programme, plutôt qu'une détection de clé USB : le comportement
+ne change jamais par surprise. Rien n'est copié d'un emplacement à l'autre : une migration automatique
+risquerait d'écraser ou de dédoubler des analyses. Si `Data` ne peut pas être écrit, le programme demande
+avant d'utiliser le dossier du PC.
 
 ## Ce qui n'a pas été fait, et pourquoi
 
@@ -98,6 +123,4 @@ secondes, pour le processus d'analyse aussi. Le dossier démarre en 0,4 s. Zip :
 - **Accords 9, 11, 13 en sortie moteur :** lv-chordia les reconnaît mais chordotomy les réduit. Rétablir
   cette information demanderait de modifier son vocabulaire et son analyse harmonique.
 - **Changement de mesure en cours de morceau :** une seule longueur de mesure par morceau.
-- **ONNX pour retirer torch :** diviserait le paquet par deux, mais réécrirait les modèles, chemin à risque
-  pour un gain de confort. À reconsidérer si la taille gêne.
 - **Signature de code et installateur :** il faut un certificat payant ; le dossier se décompresse.

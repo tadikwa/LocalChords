@@ -42,6 +42,8 @@ def main():
     t = time.time()
     w.seek(w.project.grid()[len(w.project.grid()) // 3])
     for size, name in (
+        ((640, 1400), "song_640_narrow"),
+        ((1000, 1400), "song_1000_narrow"),
         ((1360, 820), "song_1360"),
         ((1920, 1080), "song_1920"),
         ((5120, 1440), "song_5120"),
@@ -56,6 +58,16 @@ def main():
         w.grab().save(str(out / f"{name}.png"))
     w.resize(1360, 820)
     s = w.song
+    s.audio_button.click()  # the audio follows the transposition: the button says so
+    s.transpose.step(3)
+    for _ in range(20):
+        app.processEvents()
+    w.grab().save(str(out / "song_audio_transposed.png"))
+    w.resize(640, 1400)
+    for _ in range(20):
+        app.processEvents()
+    w.grab().save(str(out / "song_audio_transposed_640.png"))
+    w.resize(1360, 820)
     next(a for a in s.detail_actions.actions() if a.data() == "analysis").trigger()
     grid = w.project.grid()
     s.grid.set_selection(len(grid) // 3, len(grid) // 3 + 3)

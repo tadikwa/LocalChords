@@ -7,6 +7,7 @@ src/localchords/
   app.py, __main__.py   démarrage ; freeze_support d'abord, pour le processus d'analyse
   audio.py              décodage (PyAV), empreinte de fichier, forme d'onde
   engines.py            l'interface des moteurs, et chordotomy derrière elle
+  onnx_engine.py        les réseaux de chordotomy exécutés par ONNX Runtime, sans torch
   rhythm.py             tempo, mesure, barres de mesure, fiabilité de la grille
   worker.py             analyse et téléchargement dans un processus à part
   project.py            le projet : analyse brute + corrections, et tout ce qui s'en déduit
@@ -20,7 +21,7 @@ tests/                  test_core (pur), test_player, test_engines (lents), test
 scripts/                compilation, mesures de performance, captures d'écran
 ```
 
-Le processus d'interface n'importe ni torch ni librosa : il démarre en moins d'une seconde. L'analyse
+Le processus d'interface n'importe ni ONNX Runtime ni librosa : il démarre en moins d'une seconde. L'analyse
 est un second lancement du même programme (`multiprocessing` en `spawn`) ; l'annuler revient à le tuer.
 
 ## L'interface des moteurs
@@ -90,4 +91,6 @@ le plus. Une analyse qui change de grille ne perd donc rien.
 sortie 0 et `report.json` détaillent chaque étape. `requirements-lock.txt` fige les versions testées.
 `chordotomy` est épinglé à 0.3.1 car `engines.py` appelle trois de ses fonctions privées
 (`_tracker`, `_log_mel`, `_chunked`), passe par son argument `cache` et remplace le temps d'un appel
-`librosa.beat.beat_track` : à revérifier à toute mise à jour.
+`librosa.beat.beat_track` ; `onnx_engine.py` remplace `model._networks` et reproduit `beats._log_mel` sans
+torch. À revérifier à toute mise à jour : `scripts/compare_backends.py` compare torch et ONNX sur Tiny AAM
+et GuitarSet.

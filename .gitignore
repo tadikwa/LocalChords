@@ -10,3 +10,6 @@ work/
 .ruff_cache/
 *.egg-info/
 numba/
+dist-v1.1/
+build-v1.1/
+models/*.onnx
