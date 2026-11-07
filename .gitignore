@@ -13,3 +13,6 @@ numba/
 dist-v1.1/
 build-v1.1/
 models/*.onnx
+dist-v1.2/
+build-v1.2/
+build-v1.2.log
