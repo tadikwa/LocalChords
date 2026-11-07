@@ -5,14 +5,16 @@
 - **Diagrammes de guitare et de piano** dans un panneau à droite de la grille (sous la grille dans une fenêtre
   étroite). Trois modes : Guitare, Piano, Les deux. Le panneau peut être complet, réduit ou masqué (touche
   `D`), et l'application s'en souvient.
-- **Suit la lecture** : le diagramme change avec l'accord joué. Un clic sur un accord de la grille l'épingle ;
-  « Suivre la lecture », `Échap` ou la reprise de la lecture reviennent au suivi. Le double-clic corrige
-  toujours l'accord.
+- **Suit la lecture** : le diagramme change avec l'accord joué. Un clic sur un accord de la grille (ou
+  `Maj + D`) l'épingle, et `← →` déplacent l'épingle ; « Suivre la lecture », `Échap` ou la reprise de la
+  lecture reviennent au suivi. Le double-clic corrige toujours l'accord.
 - **Guitare** : cordes, cases, doigts 1 à 4, cordes à vide et étouffées, barrés, plusieurs positions à
   parcourir (formes ouvertes classiques en premier, par exemple x24432 pour Si mineur). Accords renversés
   (D/F♯) avec la bonne basse. Quand aucune position jouable n'existe, le panneau le dit au lieu de dessiner
   une forme fausse.
 - **Capo** : le diagramme montre la forme à jouer, et le panneau indique le son réel (« forme de C, son réel D »).
+  En mode Piano, le titre est le son réel et le panneau rappelle la forme de guitare.
+- La basse d'un accord renversé porte le même nom dans la grille et dans les diagrammes (E/G♯, pas E/A♭).
 - **Piano** : touches de l'accord en couleur, noms des notes dans la notation choisie (Do ré mi ou C D E),
   position fondamentale et renversements, basse demandée toujours la plus grave, et une répartition main
   gauche / main droite proposée à titre indicatif.

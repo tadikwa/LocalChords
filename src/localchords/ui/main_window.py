@@ -623,7 +623,8 @@ class MainWindow(QMainWindow):
         self.batch_job: worker.Job | None = None
         self.batch_queue: list[Path] = []
         self.compare_engine: str | None = None
-        self.pinned_beat: int | None = None  # the diagrams stay on this beat's chord
+        # The diagrams stay on the chord at this time (not a beat: a grid edit renumbers beats).
+        self.pinned_at: float | None = None
         self._panel_restore = "full"
 
         self.stack = QStackedWidget()
@@ -774,6 +775,7 @@ class MainWindow(QMainWindow):
         shortcut("P", lambda: s.panel.step("piano", 1))
         shortcut("Shift+P", lambda: s.panel.step("piano", -1))
         shortcut("Escape", self.follow_playback)
+        shortcut("Shift+D", self.toggle_pin)
 
     # Opening -----------------------------------------------------------------------------------
     def choose_file(self) -> None:
@@ -1003,7 +1005,7 @@ class MainWindow(QMainWindow):
         self.audio_ready = False
         self.project = project
         self.project_file = file
-        self.pinned_beat = None
+        self.pinned_at = None
         project.view["latin"] = bool(self.settings.get("latin"))
         project.view["show_bass"] = bool(self.settings.get("show_bass", True))
         s = self.song
@@ -1413,7 +1415,7 @@ class MainWindow(QMainWindow):
             self._alert(self.player.last_error)
             self.player.playing = False
         self._update_play_icon()
-        if self.player.playing and self.pinned_beat is not None:
+        if self.player.playing and self.pinned_at is not None:
             self.follow_playback()
 
     def _update_play_icon(self) -> None:
@@ -1428,9 +1430,16 @@ class MainWindow(QMainWindow):
         self._tick()
 
     def _beat_clicked(self, beat: int) -> None:
-        self.seek(self.project.grid()[beat])
-        self.pinned_beat = beat
+        self.pinned_at = self.project.grid()[beat]
+        self.seek(self.pinned_at)
         self._update_panel()
+
+    def toggle_pin(self) -> None:
+        """The keyboard's click: pin the chord under the playhead, or follow playback again."""
+        if self.pinned_at is not None:
+            self.follow_playback()
+        elif self.project and self.project.grid():
+            self._beat_clicked(max(0, self.project.beat_at(self.player.position)))
 
     def step_beat(self, delta: int) -> None:
         if not self.project or not self.project.grid():
@@ -1438,6 +1447,8 @@ class MainWindow(QMainWindow):
         grid = self.project.grid()
         here = self.project.beat_at(self.player.position)
         target = max(0, min(len(grid) - 1, here + delta))
+        if self.pinned_at is not None:
+            self.pinned_at = grid[target]
         self.seek(grid[target])
         self.song.grid.anchor = target
         self.song.grid.set_selection(target, target)
@@ -1451,6 +1462,8 @@ class MainWindow(QMainWindow):
         firsts = [f for f in firsts if f is not None]
         now = max((i for i, f in enumerate(firsts) if f <= here), default=0)
         target = firsts[max(0, min(len(firsts) - 1, now + delta))] if firsts else 0
+        if self.pinned_at is not None:
+            self.pinned_at = self.project.grid()[target]
         self.seek(self.project.grid()[target])
         self.song.grid.anchor = target
         self.song.grid.set_selection(target, target)
@@ -1508,12 +1521,14 @@ class MainWindow(QMainWindow):
         if project is None or s.panel.state == "hidden" or not project.analysis["segments"]:
             return
         segments = project.segments()
-        pinned = self.pinned_beat is not None
-        if beat is None or pinned:
-            beat = self.pinned_beat if pinned else project.beat_at(self.player.position)
+        pinned = self.pinned_at is not None
+        if pinned:
+            beat = project.beat_at(self.pinned_at)
+        elif beat is None:
+            beat = project.beat_at(self.player.position)
         segment = next((x for x in segments if x.start_beat <= beat < x.end_beat), None)
         if pinned and segment is None:  # the grid changed under it
-            self.pinned_beat, pinned = None, False
+            self.pinned_at, pinned = None, False
             beat = project.beat_at(self.player.position)
             segment = next((x for x in segments if x.start_beat <= beat < x.end_beat), None)
         status = "Suit la lecture"
@@ -1541,9 +1556,9 @@ class MainWindow(QMainWindow):
         s.panel.show_chord(shown, status, pinned, empty)
 
     def follow_playback(self) -> None:
-        if self.pinned_beat is None:
+        if self.pinned_at is None:
             return
-        self.pinned_beat = None
+        self.pinned_at = None
         self._update_panel()
 
     def toggle_diagrams(self) -> None:
@@ -1557,7 +1572,8 @@ class MainWindow(QMainWindow):
             self._panel_restore = state
         self.settings["diagram_panel"] = state
         library.save_settings(self.settings)
-        self.song.sync_panel(bool(self.project and self.project.analysis["segments"]))
+        has_grid = bool(self.project and self.project.analysis["segments"])
+        self.song.sync_panel(has_grid and self.job is None)
         self._update_panel()
 
     def _diagram_mode_changed(self, mode: str) -> None:

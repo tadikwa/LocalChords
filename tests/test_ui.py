@@ -606,7 +606,7 @@ def test_a_click_pins_the_diagrams_and_a_double_click_still_edits(app, wav, tmp_
     app.processEvents()
     assert panel.title.text() == "F"
     QTest.keyClick(window, Qt.Key.Key_Escape)
-    assert window.pinned_beat is None and not panel.follow.isVisible()
+    assert window.pinned_at is None and not panel.follow.isVisible()
     assert panel.title.text() == "C"
     click_beat(app, window, 9)  # a click also moves the playhead there
     window.seek(window.project.grid()[5])
@@ -624,7 +624,7 @@ def test_starting_playback_follows_again(app, wav, tmp_path):
     click_beat(app, window, 9)
     window.seek(0)
     window.toggle_play()
-    assert window.pinned_beat is None
+    assert window.pinned_at is None
     assert wait_for(app, lambda: window.song.panel.title.text() == "Am", 6)
     window.toggle_play()
     window.close()
@@ -751,4 +751,59 @@ def test_following_the_playhead_stays_fast(app, wav, tmp_path):
         window.song.panel.piano.diagram.grab()
     per_beat = (time.perf_counter() - start) / 200
     assert per_beat < 0.02, f"{per_beat * 1000:.1f} ms per beat"
+    window.close()
+
+
+def test_a_pin_holds_through_a_grid_edit_and_follows_the_arrows(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = window.song.panel
+    click_beat(app, window, 9)
+    assert panel.title.text() == "F"
+    window.project.set_grid(scale=2)  # the ×2 button: every beat is renumbered
+    window._content_changed()
+    assert panel.title.text() == "F" and panel.follow.isVisible()
+    window.project.set_grid(scale=1)
+    window._content_changed()
+    window.step_beat(4)  # a bar later, the pin moves with the selection
+    assert panel.title.text() == "G7" and panel.follow.isVisible()
+    window.step_bar(-2)
+    assert panel.title.text() == "Am" and panel.status.text() == "Épinglé : mesure 2"
+    window.close()
+
+
+def test_the_keyboard_pins_and_unpins(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = panel_at(app, window, 5)
+    QTest.keyClick(window, Qt.Key.Key_D, Qt.KeyboardModifier.ShiftModifier)
+    assert window.pinned_at is not None and panel.title.text() == "Am"
+    assert panel.status.text().startswith("Épinglé")
+    QTest.keyClick(window, Qt.Key.Key_D, Qt.KeyboardModifier.ShiftModifier)
+    assert window.pinned_at is None and panel.status.text() == "Suit la lecture"
+    window.close()
+
+
+def test_with_a_capo_the_title_names_what_is_on_show(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    panel = panel_at(app, window, 1)
+    window._view(capo=2)  # C heard, a B♭ shape on the guitar
+    assert panel.title.text() == "B♭"
+    panel.set_mode("piano")
+    assert panel.title.text() == "C" and "forme de B♭" in panel.capo_note.text()
+    panel.set_mode("both")
+    panel.set_state("reduced")
+    assert panel.capo_note.isVisible() and panel.capo_note.text() == "Capo 2 · son réel C"
+    window._view(capo=0)
+    assert not panel.capo_note.isVisible()
+    panel.set_state("full")
+    window.close()
+
+
+def test_the_no_position_message_counts_the_frets_left_above_the_capo(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.apply_chord(0, 3, "B:min", "C#")
+    window._view(capo=11)
+    panel = panel_at(app, window, 1)
+    message = panel.guitar.diagram.message
+    assert "dans les 4 cases au-dessus du capo" in message and message.count(" avec ") == 0
+    assert "Afficher les basses" in message and "capo" in message
     window.close()

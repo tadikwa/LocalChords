@@ -11,14 +11,12 @@ from functools import lru_cache
 from itertools import product
 
 from .chords import (
-    FLAT_NAMES,
-    LETTERS,
-    NATURAL,
     QUALITIES,
     SHARP_NAMES,
     name_to_pc,
     parse,
     pretty_note,
+    spell,
     spell_root,
     symbol,
     transpose_key,
@@ -26,12 +24,11 @@ from .chords import (
 
 # Standard tuning, low string first: E2 A2 D3 G3 B3 E4.
 TUNING = (40, 45, 50, 55, 59, 64)
-MAX_FRET = 15  # above the capo: higher, frets are too narrow to read on a diagram
+MAX_FRET = 15  # on the neck, capo included: higher, frets are too narrow to read
 REACH = 3  # frets between the lowest and the highest finger, a hand's span
 MAX_POSITIONS = 6
 
 # Letters above the root for each interval, for spelling: a minor third is a third (E♭, not D♯).
-_LETTER_STEPS = {0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 4, 8: 4, 9: 5, 10: 6, 11: 6}
 
 # Shapes a guitarist learns first, preferred when they are valid. Low string first, x = muted.
 # They still go through the same checks as the generated ones (tests/test_voicings.py).
@@ -46,7 +43,7 @@ CLASSICS = {
     "C:maj7": ["x32000"], "A:maj7": ["x02120"], "G:maj7": ["320002"], "E:maj7": ["021100"],
     "D:maj7": ["xx0222"], "F:maj7": ["xx3210"],
     "A:min7": ["x02010"], "E:min7": ["020000"], "D:min7": ["xx0211"], "B:min7": ["x20202"],
-    "F#:min7": ["242222"],
+    "F#:min7": ["242222"], "C:min7": ["x35343"],
     "A:sus2": ["x02200"], "D:sus2": ["xx0230"], "C:sus2": ["x30013"],
     "A:sus4": ["x02230"], "D:sus4": ["xx0233"], "E:sus4": ["022200"], "C:sus4": ["x33011"],
     "A:sus4(b7)": ["x02030"], "D:sus4(b7)": ["xx0213"], "E:sus4(b7)": ["020200"],
@@ -66,32 +63,6 @@ CLASSICS = {
 def tones(root: int, quality: str) -> tuple[int, ...]:
     """The chord's pitch classes, root first, in the order of its intervals."""
     return tuple((root + t) % 12 for t in QUALITIES[quality][2])
-
-
-# Spelling ------------------------------------------------------------------------------------
-def spell(root: str, quality: str, accidentals: str = "auto") -> dict[int, str]:
-    """Pitch class → name for each note of the chord: by interval from a spelled root, so that
-    B minor is B, D, F♯ and E♭ is E♭, G, B♭. A name needing a double accidental, or one that the
-    program never writes (C♭, F♭, E♯, B♯), falls back to the plain name; forced sharps or flats
-    are applied to every note."""
-    root_pc = name_to_pc(root)
-    out = {}
-    for t in QUALITIES[quality][2]:
-        pc = (root_pc + t) % 12
-        if accidentals == "sharps":
-            out[pc] = SHARP_NAMES[pc]
-            continue
-        if accidentals == "flats":
-            out[pc] = FLAT_NAMES[pc]
-            continue
-        letter = LETTERS[(LETTERS.index(root[0]) + _LETTER_STEPS[t]) % 7]
-        diff = (pc - NATURAL[letter] + 6) % 12 - 6
-        name = letter + ("#" if diff > 0 else "b" if diff < 0 else "")
-        if abs(diff) > 1 or name in ("Cb", "Fb", "E#", "B#"):
-            flat_side = "b" in root or root == "F"
-            name = (FLAT_NAMES if flat_side else SHARP_NAMES)[pc]
-        out[pc] = name
-    return out
 
 
 @dataclass(frozen=True)
@@ -255,7 +226,7 @@ def _fingers(frets: tuple) -> tuple[tuple, tuple | None] | None:
     return tuple(fingers), barre
 
 
-def check(frets: tuple, chord_tones: tuple, bass: int, capo: int = 0) -> Fingering | None:
+def check(frets: tuple, chord_tones: tuple, bass: int) -> Fingering | None:
     """The fingering, if `frets` really plays this chord over this bass and one hand can hold it."""
     played = [s for s, f in enumerate(frets) if f is not None]
     if len(played) < 4:
@@ -294,6 +265,8 @@ def _cost(f: Fingering, chord_tones: tuple) -> float:
     cost = 2.0 * f.lowest_fret + 3.0 * (6 - len(played)) + 4.0 * inner_mutes
     cost += 3.0 * (5 - last)  # a muted top string is rare
     cost += 3.0 if f.barre else 0.0
+    if f.barre and any(f.frets[i] for i in range(f.barre[1])):
+        cost += 6.0  # a partial barre with a finger on a lower string: the hand twists
     span = f.highest_fret - f.lowest_fret
     cost += 2.0 * span + (6.0 if span >= 3 else 0.0)  # four frets apart is a real stretch
     cost += 1.0 * sum(1 for x in f.fingers if x)
@@ -322,7 +295,7 @@ def guitar(root: int, quality: str, bass: int | None = None, capo: int = 0) -> t
         for frets in product(*options):
             if frets in found or low not in frets:
                 continue
-            fingering = check(frets, chord_tones, bass, capo)
+            fingering = check(frets, chord_tones, bass)
             if fingering:
                 found[frets] = fingering
     ranked = sorted(found.values(), key=lambda f: (_cost(f, chord_tones), f.text))

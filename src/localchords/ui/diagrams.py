@@ -63,8 +63,9 @@ class _Diagram(QWidget):
         self._cache = self._old = None
 
     def paintEvent(self, event):
-        if self._cache is None:
-            ratio = self.devicePixelRatioF()
+        ratio = self.devicePixelRatioF()
+        if self._cache is None or self._cache.devicePixelRatio() != ratio:  # another screen's scale
+            self._old = None
             self._cache = QPixmap(self.size() * ratio)
             self._cache.setDevicePixelRatio(ratio)
             self._cache.fill(Qt.GlobalColor.transparent)
@@ -547,7 +548,6 @@ class ChordPanel(QFrame):
         for diagram in (self.guitar.diagram, self.piano.diagram):
             diagram.compact = not full
         self.modes.setVisible(full)
-        self.capo_note.setVisible(full and bool(self.capo_note.text()))
         self.setVisible(self.state != "hidden")
         self._fit()
         self._refresh(animate=False)
@@ -616,7 +616,6 @@ class ChordPanel(QFrame):
             self.guitar_positions = self.piano_voicings = ()
             self.title.setText(empty)
             self.title.setToolTip("")
-            self.capo_note.setText("")
         else:
             shape, sound = shown.shape, shown.sound
             self.guitar_positions = voicings.guitar(
@@ -625,15 +624,6 @@ class ChordPanel(QFrame):
             self.piano_voicings = voicings.piano(
                 sound.root, sound.quality, sound.bass if sound.inverted else None
             )
-            self.title.setText(shape.title)
-            self.title.setToolTip(f"Notes : {' · '.join(shape.names[pc] for pc in shape.tones)}")
-            self.capo_note.setText(
-                f"Capo en case {shown.capo} : forme de {shape.title}, son réel {sound.title}. "
-                "Les cases se comptent depuis le capo."
-                if shown.capo
-                else ""
-            )
-        self.capo_note.setVisible(self.state == "full" and bool(self.capo_note.text()))
         self._refresh()
 
     def step(self, instrument: str, delta: int) -> None:
@@ -647,6 +637,30 @@ class ChordPanel(QFrame):
 
     def _refresh(self, animate: bool = True) -> None:
         shown = self.shown
+        note = ""
+        if shown is not None:
+            # With a capo the guitar plays a shape and the keyboard the sound: the title names the
+            # one on show, and a line, kept even when reduced, names the other.
+            chord = shown.sound if self.mode == "piano" else shown.shape
+            self.title.setText(chord.title)
+            self.title.setToolTip(f"Notes : {' · '.join(chord.names[pc] for pc in chord.tones)}")
+            capo, full = shown.capo, self.state == "full"
+            if capo and self.mode == "piano":
+                shape = shown.shape.title
+                note = (
+                    f"Capo en case {capo} : à la guitare, forme de {shape}."
+                    if full
+                    else (f"Capo {capo} · forme de {shape}")
+                )
+            elif capo:
+                note = (
+                    f"Capo en case {capo} : forme de {shown.shape.title}, son réel "
+                    f"{shown.sound.title}. Les cases se comptent depuis le capo."
+                    if full
+                    else f"Capo {capo} · son réel {shown.sound.title}"
+                )
+        self.capo_note.setText(note)
+        self.capo_note.setVisible(bool(note))
         if shown is None:
             text = (
                 "Pas d'accord ici : rien à jouer pendant ce passage."
@@ -672,18 +686,20 @@ class ChordPanel(QFrame):
         v = self.piano_voicings[self.piano_index]
         self.piano.diagram.set_voicing(v, shown.sound, animate=animate)
         # With a capo the title is the guitar shape; the keyboard plays what is heard.
-        kind = f"son réel {shown.sound.title} · {v.name}" if shown.capo else v.name
+        both = shown.capo and self.mode != "piano"  # in piano mode the title is already the sound
+        kind = f"son réel {shown.sound.title} · {v.name}" if both else v.name
         self.piano.set_place(self.piano_index, len(self.piano_voicings), kind)
         self.piano.diagram.setToolTip(describe_voicing(v, shown.sound))
 
 
 def _unplayable(shown: voicings.Shown) -> str:
     """Said instead of a diagram that would be wrong."""
-    shape = shown.shape
-    where = f" avec le capo en case {shown.capo}" if shown.capo else ""
+    shape, capo = shown.shape, shown.capo
+    frets = voicings.MAX_FRET - capo
+    where = f"dans les {frets} cases au-dessus du capo" if capo else f"jusqu'à la case {frets}"
+    text = f"Aucune position vérifiée de {shape.title} {where}."
     if shape.inverted:
-        return (
-            f"Aucune position vérifiée de {shape.title} avec {shape.names[shape.bass]} à la basse"
-            f"{where}. Masquer les basses ou retirer le capo propose l'accord sans elle."
-        )
-    return f"Aucune position vérifiée de {shape.title}{where} dans les {voicings.MAX_FRET} cases."
+        text += " Décocher « Afficher les basses » (menu ☰) montre l'accord sans sa basse."
+    if capo:
+        text += " Retirer ou déplacer le capo propose d'autres formes."
+    return text

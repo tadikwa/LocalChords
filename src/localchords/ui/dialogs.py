@@ -382,7 +382,7 @@ SHORTCUTS = [
     ("D", "Afficher / masquer les diagrammes"),
     ("G / Maj + G", "Position de guitare suivante / précédente"),
     ("P / Maj + P", "Disposition de piano suivante / précédente"),
-    ("Clic sur un accord", "Épingler ses diagrammes"),
+    ("Clic sur un accord, Maj + D", "Épingler ses diagrammes (← → le déplacent)"),
     ("Échap", "Diagrammes : revenir à l'accord joué"),
     ("F1", "Cette aide"),
 ]

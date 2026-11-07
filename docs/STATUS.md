@@ -55,7 +55,15 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
 
 ## Revue indépendante
 
-Relecture par un agent séparé : 15 constats, tous traités, avec des tests pour les défauts les plus graves. Parmi eux :
+**v1.2 :** relecture des diagrammes par un agent séparé, qui a recalculé les notes : aucune note fausse.
+8 constats, tous traités, avec des tests : la basse d'un renversement nommée autrement dans la grille et dans
+le titre (E/A♭ contre E/G♯) ; l'épingle perdue après une correction de la grille (elle tient maintenant à un
+instant, pas à un numéro de temps), et sans raccourci clavier (`Maj + D`, flèches) ; avec capo, un titre qui ne
+nommait pas ce que montrait le mode Piano ; le message « aucune position » qui comptait mal les cases au-dessus
+du capo ; un dessin flou en changeant d'écran (échelle) ; une forme à barré partiel trop tordue ; deux détails
+de code.
+
+**v1.0 :** relecture par un agent séparé : 15 constats, tous traités, avec des tests pour les défauts les plus graves. Parmi eux :
 une tonalité bémol choisie à la main cassait le projet ; une boucle jusqu'à la fin du morceau plantait le flux
 audio ; l'affichage se figeait à chaque tour de boucle ; une comparaison annulée pouvait jeter l'analyse suivante.
 

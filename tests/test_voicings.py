@@ -256,3 +256,15 @@ def test_piano_c_over_e():
     assert first.name == "1er renversement" and first.notes == (64, 67, 72)
     assert all(x.left == (52,) for x in two_hands)
     assert two_hands[0].right == (60, 64, 67)
+
+
+def test_the_title_and_the_notes_name_the_bass_alike():
+    assert v.describe("E:maj", "G#", key="C:maj").sound.title == "E/G♯"
+    assert v.describe("D:maj", "F#", key="A#:maj").sound.title == "D/F♯"
+    # Every key, every chord-note bass: the title and the note under the string agree.
+    for key in [f"{n}:{m}" for n in v.SHARP_NAMES for m in ("maj", "min")]:
+        for root, quality in ALL:
+            for bass in v.tones(root, quality)[1:]:
+                s = v.describe(f"{v.SHARP_NAMES[root]}:{quality}", v.SHARP_NAMES[bass], key=key)
+                if s:
+                    assert s.sound.title.endswith("/" + s.sound.names[bass]), (key, s.sound.title)
