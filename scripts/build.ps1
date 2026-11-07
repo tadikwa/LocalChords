@@ -10,6 +10,7 @@ uv pip install --python .venv\Scripts\python.exe --reinstall --no-deps build\av-
 .venv\Scripts\python.exe -c "from chordotomy import beats; beats.fetch()"   # weights ship with the program
 .venv\Scripts\python.exe scripts\export_onnx.py   # models\*.onnx, which the program runs without torch
 .venv\Scripts\python.exe scripts\make_icon.py
+.venv\Scripts\python.exe scripts\fetch_whisper.py   # vendor\whisper: the transcription engine, pinned
 .venv\Scripts\python.exe -m PyInstaller localchords.spec --noconfirm
 # The single LocalChords.exe (docs/PORTABLE.md): the same build, packed into one file.
 $env:LOCALCHORDS_ONEFILE = "1"

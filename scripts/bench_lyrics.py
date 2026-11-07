@@ -116,9 +116,14 @@ def run(cmd: list[str]) -> tuple[float, int, str]:
 
 
 def whisper_cpp(engine: Path, model: Path, wav: Path, lang: str, out: Path, vad: Path | None,
-                threads: int, dtw: str | None):
+                threads: int, dtw: str | None, flags: set[str] = frozenset()):
+    """flags: "fb" keeps the temperature fallback, "mc0" drops the previous text as context."""
     cmd = [str(engine / "whisper-cli.exe"), "-m", str(model), "-f", str(wav), "-l", lang,
-           "-t", str(threads), "-ojf", "-of", str(out), "-np", "-sns", "-nf"]
+           "-t", str(threads), "-ojf", "-of", str(out), "-np", "-sns"]
+    if "fb" not in flags:
+        cmd.append("-nf")
+    if "mc0" in flags:
+        cmd += ["-mc", "0"]
     if vad:
         cmd += ["--vad", "-vm", str(vad)]
     if dtw:
@@ -254,15 +259,15 @@ def main() -> None:
                     continue
                 duration = to_wav(args.data / "mp3" / f"{song}.mp3", wavs / f"{song}.wav")
                 wav = wavs / f"{song}.wav"
-                vad = name.endswith("+vad")
-                base = name.removesuffix("+vad").removesuffix("+dtw")
-                dtw = "large.v3.turbo" if "+dtw" in name else None
+                base, *opts = name.split("+")
+                vad = "vad" in opts
+                dtw = "large.v3.turbo" if "dtw" in opts else None
                 if kind == "cpp":
                     out = args.out / "raw" / config.replace(":", "_").replace("+", "_") / song
                     out.parent.mkdir(parents=True, exist_ok=True)
                     seconds, peak, segments = whisper_cpp(
                         args.engine, args.models / f"ggml-{base}.bin", wav, lang, out,
-                        vad_model if vad else None, args.threads, dtw)
+                        vad_model if vad else None, args.threads, dtw, set(opts))
                 else:
                     seconds, peak, segments = faster_whisper(base, wav, lang, args.threads, vad)
                 r = {"config": config, "song": song, "lang": lang, "duration": duration,
