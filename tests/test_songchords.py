@@ -186,3 +186,20 @@ def test_the_sheet_never_cuts_a_card_in_two(mode):
     assert places[0] == (0, 0, 150.0)
     pages = [p for p, _, _ in places]
     assert pages == sorted(pages) and pages[-1] >= 1
+
+
+def test_a_tall_header_sends_the_first_row_to_the_next_page():
+    h = pdf.card_height("both")
+    assert pdf.sheet_layout(2, "both", 1004.0 - h / 2, 1004.0)[0] == (1, 0, 0.0)
+
+
+def test_opening_a_project_does_not_write_it_again(app, wav, tmp_path):
+    window = seeded(app, wav, tmp_path)
+    window.save()
+    window.close()
+    window = MainWindow(muted=True)
+    window.show()
+    window.open_project_file(tmp_path / "song.lchords")
+    assert wait_for(app, lambda: window.audio_ready)
+    assert not window.save_timer.isActive()
+    window.close()

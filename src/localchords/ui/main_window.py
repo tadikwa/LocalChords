@@ -1330,8 +1330,8 @@ class MainWindow(QMainWindow):
             widget.setVisible(has_grid)
         s.sync_panel(has_grid and self.job is None)
         if self._positions_of is not project:
+            s.positions.load(project.view.get("positions"))  # before: loading is not an edit
             self._positions_of = project
-            s.positions.load(project.view.get("positions"))
         self._update_song_chords()
         self._update_facts()
         self._update_loop_display()

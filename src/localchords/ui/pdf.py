@@ -206,7 +206,7 @@ def sheet_layout(
     places, page, y = [], 0, first_top
     for i in range(count):
         col = i % columns
-        if col == 0 and i and y + h > page_h:
+        if col == 0 and y > 0 and y + h > page_h:
             page, y = page + 1, 0.0
         places.append((page, col, y))
         if col == columns - 1:
