@@ -511,6 +511,7 @@ class ChordPanel(QFrame):
         self.body.setSpacing(12)
         self.body.addWidget(self.guitar, 3)
         self.body.addWidget(self.piano, 2)
+        self.body.addStretch(0)  # beside the grid, a short keyboard stays at the top
         self.outer.addLayout(self.body, 1)
         self.resize_button.clicked.connect(
             lambda: self.set_state("reduced" if self.state == "full" else "full")
@@ -571,6 +572,7 @@ class ChordPanel(QFrame):
             self.side_width = (420 if self.wide else 340) if full else 240
             self.setMinimumSize(0, 0)
             self.setMaximumSize(self.side_width, 16777215)
+            self.piano.setMaximumHeight(230)  # wider than tall: more height is empty
             edge = "border-left"
         else:
             self.outer.setDirection(QBoxLayout.Direction.LeftToRight)
@@ -578,6 +580,7 @@ class ChordPanel(QFrame):
             self.body.setDirection(QBoxLayout.Direction.LeftToRight)
             self.setMinimumWidth(0)
             self.setMaximumWidth(16777215)
+            self.piano.setMaximumHeight(16777215)
             height = (250 if full else 150) if self.mode != "piano" else (200 if full else 120)
             self.setFixedHeight(height)
             edge = "border-top"
