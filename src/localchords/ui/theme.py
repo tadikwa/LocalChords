@@ -109,6 +109,11 @@ QScrollBar::handle:vertical {{ background: {SURFACE_3}; border-radius: 4px; min-
 QScrollBar::handle:vertical:hover {{ background: {BORDER}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ height: 0; background: none; }}
+QScrollBar:horizontal {{ background: transparent; height: 12px; margin: 0; }}
+QScrollBar::handle:horizontal {{ background: {SURFACE_3}; border-radius: 4px; min-width: 40px; margin: 2px; }}
+QScrollBar::handle:horizontal:hover {{ background: {BORDER}; }}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ width: 0; background: none; }}
 QToolTip {{ background: {SURFACE_3}; color: {TEXT}; border: 1px solid {BORDER}; padding: 4px; }}
 QCheckBox, QRadioButton {{ spacing: 8px; background: transparent; }}
 QRadioButton::indicator {{
@@ -156,6 +161,8 @@ _ICONS: dict[str, dict] = {
                    [(19, 4), (19, 21)]],
         "fill": [[(8, 10.5), (11.4, 10.5), (11.4, 12.5), (8, 12.5)]],
     },
+    "cards": {"stroke": [[(3, 6), (10, 6), (10, 18), (3, 18), (3, 6)],
+                         [(14, 6), (21, 6), (21, 18), (14, 18), (14, 6)]]},
     "volume": {
         "fill": [[(3, 9), (7, 9), (12, 5), (12, 19), (7, 15), (3, 15)]],
         "stroke": [[(15, 9), (17, 12), (15, 15)], [(18, 6), (21, 12), (18, 18)]],

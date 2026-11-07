@@ -78,7 +78,8 @@ changé : `analysis` n'est jamais modifié.
   },
   "view": {"transpose": 0, "capo": 0, "accidentals": "auto", "simplify": false,
            "min_beats": 1, "show_bass": true, "show_numerals": false,
-           "transpose_audio": false, "latin": false}
+           "transpose_audio": false, "latin": false,
+           "positions": {"g:D:maj::0": 1}}  // v1.2.1 : position choisie par accord, absente = la première
 }
 ```
 
@@ -112,6 +113,28 @@ le plus. Une analyse qui change de grille ne perd donc rien.
   par taille ; un changement d'accord se fond en 140 ms. À 1280 px et plus, le panneau est à droite de la
   grille ; en dessous, sous elle. Mode et taille sont dans `settings.json` (`diagram_mode`,
   `diagram_panel`).
+
+## Les accords du morceau et la fiche (v1.2.1)
+
+- **Une seule position par accord.** `diagrams.Positions` garde la position choisie pour chaque accord
+  (`g:` guitare, `p:` piano, avec la fondamentale, la qualité, la basse d'un renversement et le capo). Le
+  panneau, les cartes et la fiche lisent le même objet ; il est enregistré dans `view.positions` et rechargé
+  à la réouverture. Le charger n'enregistre rien.
+- **La liste.** `MainWindow._update_song_chords` passe chaque segment par `describe()`, comme la grille, et
+  garde le premier de chaque accord (`songchords.chord_key` : nom affiché, basse et capo). Elle est
+  recalculée à chaque changement du projet (correction, annulation, transposition, capo, notation), jamais
+  pendant la lecture. « À venir » ne refait ses cartes que quand l'accord en cours change.
+- **Les cartes.** `ui/songchords.py` : `ChordCard` redessine seulement ce qui a changé ; un clic émet le
+  temps du premier passage de l'accord, que la fenêtre épingle dans le panneau sans toucher au lecteur. Vue,
+  mode et état (réduit, agrandi, masqué) sont dans `settings.json` (`song_chords_view`, `song_chords_mode`,
+  `song_chords_state`).
+- **La fiche.** `pdf.write_chord_sheet` : A4 vectoriel par `QPdfWriter`, mise en page calculée d'abord
+  (`sheet_layout` : une rangée qui ne tient pas entière passe à la page suivante), dessin ensuite, pour que
+  chaque pied de page sache le nombre de pages. Les diagrammes sont ceux de l'écran, dessinés avec une
+  palette d'impression. La grille, en option, reprend le dessin de l'export PDF existant.
+- **Tests.** `tests/test_songchords.py` : ordre et doublons, corrections, transposition, capo, notation,
+  « À venir », clic sans déplacement de la lecture, clavier, positions partagées et rouvertes, pages de la
+  fiche, aucune carte coupée, clic réel sur Lecture à trois tailles de fenêtre.
 
 ## Reconstruire
 
