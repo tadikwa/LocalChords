@@ -379,6 +379,11 @@ SHORTCUTS = [
     ("Ctrl + O", "Ouvrir un morceau"),
     ("Ctrl + S", "Enregistrer une copie du projet"),
     ("Ctrl + E", "Exporter"),
+    ("D", "Afficher / masquer les diagrammes"),
+    ("G / Maj + G", "Position de guitare suivante / précédente"),
+    ("P / Maj + P", "Disposition de piano suivante / précédente"),
+    ("Clic sur un accord", "Épingler ses diagrammes"),
+    ("Échap", "Diagrammes : revenir à l'accord joué"),
     ("F1", "Cette aide"),
 ]
 

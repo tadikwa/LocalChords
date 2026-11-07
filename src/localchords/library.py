@@ -12,7 +12,14 @@ from pathlib import Path
 
 from .project import EXTENSION, Project, ProjectError
 
-DEFAULT_SETTINGS = {"engine": "model", "latin": False, "volume": 1.0, "show_bass": True}
+DEFAULT_SETTINGS = {
+    "engine": "model",
+    "latin": False,
+    "volume": 1.0,
+    "show_bass": True,
+    "diagram_mode": "guitar",  # guitar, piano or both
+    "diagram_panel": "full",  # full, reduced or hidden
+}
 PORTABLE_MARKER = "LocalChords.portable"
 LOW_SPACE_MB = 200  # an analysis writes little; a link import writes the whole song
 
