@@ -3,7 +3,7 @@ positions that voicings.py worked out and checked note by note. Nothing here dec
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QPointF, QRectF, Qt, QVariantAnimation, Signal
+from PySide6.QtCore import QEasingCurve, QPointF, QRectF, QSize, Qt, QVariantAnimation, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QBoxLayout,
@@ -409,6 +409,7 @@ class ChordPanel(QFrame):
         self.state = "full"
         self.side = True
         self.wide = False
+        self.side_width = 340
         self.shown: voicings.Shown | None = None
         self.guitar_positions: tuple = ()
         self.piano_voicings: tuple = ()
@@ -558,6 +559,7 @@ class ChordPanel(QFrame):
             return
         self.side, self.wide = side, wide
         self._fit()
+        self.updateGeometry()
 
     def _fit(self) -> None:
         full = self.state == "full"
@@ -566,10 +568,9 @@ class ChordPanel(QFrame):
             self.lead.setMaximumWidth(16777215)
             self.lead.setMinimumWidth(0)
             self.body.setDirection(QBoxLayout.Direction.TopToBottom)
-            width = (420 if self.wide else 340) if full else 240
-            self.setMinimumHeight(0)
-            self.setMaximumHeight(16777215)
-            self.setFixedWidth(width)
+            self.side_width = (420 if self.wide else 340) if full else 240
+            self.setMinimumSize(0, 0)
+            self.setMaximumSize(self.side_width, 16777215)
             edge = "border-left"
         else:
             self.outer.setDirection(QBoxLayout.Direction.LeftToRight)
@@ -587,6 +588,16 @@ class ChordPanel(QFrame):
             f"QFrame#panel {{ background: {theme.SURFACE}; border: none; "
             f"{edge}: 1px solid {theme.BORDER}; }}"
         )
+
+    # Beside the grid, the panel asks for its width but never forces the window wider: a tiling
+    # window manager can jump straight to a narrow size, and then the panel moves under the grid.
+    def sizeHint(self) -> QSize:
+        hint = super().sizeHint()
+        return QSize(self.side_width, hint.height()) if self.side else hint
+
+    def minimumSizeHint(self) -> QSize:
+        hint = super().minimumSizeHint()
+        return QSize(0, hint.height()) if self.side else hint
 
     # The chord ---------------------------------------------------------------------------------
     def show_chord(self, shown, status: str, pinned: bool, empty: str = "—") -> None:
