@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -262,6 +263,49 @@ class ChordEditor(QDialog):
         self.accept()
 
 
+class SheetDialog(QDialog):
+    """What the printed chord sheet holds: which diagrams, and the grid or not."""
+
+    MODES = (("guitar", "Guitare"), ("piano", "Piano"), ("both", "Guitare et piano"))
+
+    def __init__(self, mode: str, grid: bool, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Fiche des accords")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(10)
+        layout.addWidget(QLabel("Diagrammes à imprimer"))
+        self.group = QButtonGroup(self)
+        for value, text in self.MODES:
+            button = QRadioButton(text)
+            button.setProperty("mode", value)
+            button.setChecked(value == mode)
+            self.group.addButton(button)
+            layout.addWidget(button)
+        if self.group.checkedButton() is None:
+            self.group.buttons()[0].setChecked(True)
+        self.grid = QCheckBox("Ajouter la grille sur une page à part")
+        self.grid.setChecked(grid)
+        layout.addWidget(self.grid)
+        note = QLabel("Les positions sont celles choisies dans le programme, transposition "
+                      "et capodastre compris.")  # fmt: skip
+        note.setWordWrap(True)
+        note.setStyleSheet(f"color: {theme.TEXT_2};")
+        layout.addWidget(note)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Exporter…")
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Annuler")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    @property
+    def mode(self) -> str:
+        return self.group.checkedButton().property("mode")
+
+
 class RhythmDialog(QDialog):
     """Correct what the rhythm analysis got wrong: every change shows at once in the grid."""
 
@@ -380,6 +424,7 @@ SHORTCUTS = [
     ("Ctrl + S", "Enregistrer une copie du projet"),
     ("Ctrl + E", "Exporter"),
     ("D", "Afficher / masquer les diagrammes"),
+    ("T", "Afficher / masquer les accords du morceau"),
     ("G / Maj + G", "Position de guitare suivante / précédente"),
     ("P / Maj + P", "Disposition de piano suivante / précédente"),
     ("Clic sur un accord, Maj + D", "Épingler ses diagrammes (← → le déplacent)"),

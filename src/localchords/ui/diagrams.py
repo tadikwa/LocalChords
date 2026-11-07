@@ -3,7 +3,16 @@ positions that voicings.py worked out and checked note by note. Nothing here dec
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QPointF, QRectF, QSize, Qt, QVariantAnimation, Signal
+from PySide6.QtCore import (
+    QEasingCurve,
+    QObject,
+    QPointF,
+    QRectF,
+    QSize,
+    Qt,
+    QVariantAnimation,
+    Signal,
+)
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QBoxLayout,
@@ -26,6 +35,53 @@ BLACK_KEY = "#14171D"
 MODES = ("guitar", "piano", "both")
 STATES = ("full", "reduced", "hidden")
 FADE_MS = 140
+
+
+def positions_of(shown: voicings.Shown) -> tuple[tuple, tuple]:
+    """Every guitar position and piano voicing of a chord as shown: the guitar plays the shape,
+    the keyboard the sound."""
+    shape, sound = shown.shape, shown.sound
+    return (
+        voicings.guitar(
+            shape.root, shape.quality, shape.bass if shape.inverted else None, shown.capo
+        ),
+        voicings.piano(sound.root, sound.quality, sound.bass if sound.inverted else None),
+    )
+
+
+class Positions(QObject):
+    """The position the user chose for each chord, shared by every diagram that shows that chord
+    (the panel, the cards, the printed sheet) and saved with the project."""
+
+    changed = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.chosen: dict[str, int] = {}
+
+    @staticmethod
+    def guitar_key(shown: voicings.Shown) -> str:
+        s = shown.shape
+        return f"g:{s.root}:{s.quality}:{s.bass if s.inverted else ''}:{shown.capo}"
+
+    @staticmethod
+    def piano_key(shown: voicings.Shown) -> str:
+        s = shown.sound
+        return f"p:{s.root}:{s.quality}:{s.bass if s.inverted else ''}"
+
+    def index(self, key: str, total: int) -> int:
+        return self.chosen.get(key, 0) % total if total else 0
+
+    def step(self, key: str, total: int, delta: int) -> None:
+        if total > 1:
+            self.chosen[key] = (self.index(key, total) + delta) % total
+            self.changed.emit()
+
+    def load(self, chosen) -> None:
+        self.chosen = {
+            k: v for k, v in (chosen or {}).items() if isinstance(k, str) and isinstance(v, int)
+        }
+        self.changed.emit()
 
 
 class _Diagram(QWidget):
@@ -244,6 +300,7 @@ class PianoDiagram(_Diagram):
         self.chord: voicings.Chord | None = None
         self.message = ""
         self.compact = False
+        self.fit = False  # two octaves or more around the chord instead of C3 to B5
         self.setAccessibleName("Clavier de piano")
 
     def set_voicing(self, voicing, chord, message: str = "", animate=True) -> None:
@@ -256,7 +313,11 @@ class PianoDiagram(_Diagram):
         if v is None:
             self._message(p, r, self.message)
             return
-        whites = [n for n in range(voicings.LOW_KEY, voicings.HIGH_KEY + 1) if _is_white(n)]
+        low, high = voicings.LOW_KEY, voicings.HIGH_KEY
+        if self.fit:
+            low = min(v.notes) // 12 * 12
+            high = max(max(v.notes) // 12 * 12 + 11, low + 23)
+        whites = [n for n in range(low, high + 1) if _is_white(n)]
         labels_h = 0 if self.compact else 34
         hands_h = 0 if self.compact or not v.left else 16
         kw = min((r.width() - 8) / len(whites), (r.height() - labels_h - hands_h - 4) / 4.2)
@@ -283,7 +344,7 @@ class PianoDiagram(_Diagram):
             p.setBrush(color(n) or QColor(WHITE_KEY))
             p.drawRoundedRect(rect.adjusted(0.5, 0, -0.5, 0), 2.5, 2.5)
         bw, bh = kw * 0.62, kh * 0.62
-        for n in range(voicings.LOW_KEY, voicings.HIGH_KEY + 1):
+        for n in range(low, high + 1):
             if _is_white(n):
                 continue
             x = centers[n - 1] + kw / 2
@@ -368,7 +429,7 @@ class _Instrument(QWidget):
         self.prev.setObjectName("step")
         self.prev.setIcon(theme.icon("left", size=14))
         self.prev.setAccessibleName(f"{title} : position précédente")
-        self.prev.setToolTip(f"Position précédente (Maj + {key})")
+        self.prev.setToolTip(f"Position précédente (Maj + {key})" if key else "Position précédente")
         self.count = QLabel()
         self.count.setObjectName("caption")
         self.count.setMinimumWidth(34)
@@ -377,7 +438,7 @@ class _Instrument(QWidget):
         self.next.setObjectName("step")
         self.next.setIcon(theme.icon("right", size=14))
         self.next.setAccessibleName(f"{title} : position suivante")
-        self.next.setToolTip(f"Position suivante ({key})")
+        self.next.setToolTip(f"Position suivante ({key})" if key else "Position suivante")
         row.addWidget(name)
         row.addWidget(self.kind, 1)
         row.addWidget(self.prev)
@@ -403,9 +464,11 @@ class ChordPanel(QFrame):
     stateChanged = Signal(str)
     followRequested = Signal()
 
-    def __init__(self):
+    def __init__(self, positions: Positions | None = None):
         super().__init__()
         self.setObjectName("panel")
+        self.positions = positions or Positions()
+        self.positions.changed.connect(self._refresh)
         self.mode = "guitar"
         self.state = "full"
         self.side = True
@@ -414,7 +477,6 @@ class ChordPanel(QFrame):
         self.shown: voicings.Shown | None = None
         self.guitar_positions: tuple = ()
         self.piano_voicings: tuple = ()
-        self.guitar_index = self.piano_index = 0
 
         # The chord and its controls: above the diagrams at the side, left of them at the bottom.
         self.outer = QBoxLayout(QBoxLayout.Direction.TopToBottom, self)
@@ -611,31 +673,39 @@ class ChordPanel(QFrame):
         if shown == self.shown and (shown is not None or self.title.text() == empty):
             return
         self.shown = shown
-        self.guitar_index = self.piano_index = 0
         if shown is None:
             self.guitar_positions = self.piano_voicings = ()
             self.title.setText(empty)
             self.title.setToolTip("")
         else:
-            shape, sound = shown.shape, shown.sound
-            self.guitar_positions = voicings.guitar(
-                shape.root, shape.quality, shape.bass if shape.inverted else None, shown.capo
-            )
-            self.piano_voicings = voicings.piano(
-                sound.root, sound.quality, sound.bass if sound.inverted else None
-            )
+            self.guitar_positions, self.piano_voicings = positions_of(shown)
         self._refresh()
+
+    @property
+    def guitar_index(self) -> int:
+        if self.shown is None:
+            return 0
+        return self.positions.index(Positions.guitar_key(self.shown), len(self.guitar_positions))
+
+    @property
+    def piano_index(self) -> int:
+        if self.shown is None:
+            return 0
+        return self.positions.index(Positions.piano_key(self.shown), len(self.piano_voicings))
 
     def step(self, instrument: str, delta: int) -> None:
-        if instrument == "guitar" and self.guitar_positions:
-            self.guitar_index = (self.guitar_index + delta) % len(self.guitar_positions)
-        elif instrument == "piano" and self.piano_voicings:
-            self.piano_index = (self.piano_index + delta) % len(self.piano_voicings)
-        else:
+        """The next or previous position, for this chord wherever it is shown."""
+        if self.shown is None:
             return
-        self._refresh()
+        if instrument == "guitar":
+            key, total = Positions.guitar_key(self.shown), len(self.guitar_positions)
+        else:
+            key, total = Positions.piano_key(self.shown), len(self.piano_voicings)
+        self.positions.step(key, total, delta)
 
     def _refresh(self, animate: bool = True) -> None:
+        if self.state == "hidden" and self.shown is not None:
+            return  # brought up to date by set_state when shown again
         shown = self.shown
         note = ""
         if shown is not None:

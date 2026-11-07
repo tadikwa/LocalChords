@@ -46,10 +46,11 @@ from ..chords import key_name, parse, spell_tonic, symbol
 from ..player import Player, device_sample_rate
 from ..project import EXTENSION, Project, ProjectError, decode_waveform
 from . import theme
-from .diagrams import ChordPanel
-from .dialogs import ChordEditor, RhythmDialog, ShortcutsDialog
+from .diagrams import ChordPanel, Positions
+from .dialogs import ChordEditor, RhythmDialog, SheetDialog, ShortcutsDialog
 from .grid import ChordGrid
-from .pdf import write_pdf
+from .pdf import write_chord_sheet, write_pdf
+from .songchords import UPCOMING, Item, SongChords, chord_key
 from .waveform import Waveform
 
 AUDIO_FILTER = "Audio (" + " ".join(f"*{e}" for e in audio.AUDIO_EXTENSIONS) + ")"
@@ -341,6 +342,11 @@ class SongPage(QWidget):
         self.diagrams_button.setCheckable(True)
         self.diagrams_button.setToolTip("Diagrammes de guitare et de piano (D)")
         self.diagrams_button.setAccessibleName("Diagrammes d'accords")
+        self.chords_button = QToolButton()
+        self.chords_button.setIcon(theme.icon("cards"))
+        self.chords_button.setCheckable(True)
+        self.chords_button.setToolTip("Accords du morceau : tous, ou ceux à venir (T)")
+        self.chords_button.setAccessibleName("Accords du morceau")
         self.menu = QToolButton()
         self.menu.setIcon(theme.icon("menu"))
         self.menu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -352,6 +358,7 @@ class SongPage(QWidget):
             self.undo,
             self.redo,
             self.export,
+            self.chords_button,
             self.diagrams_button,
             self.menu,
         ):
@@ -415,12 +422,19 @@ class SongPage(QWidget):
         status.addLayout(center)
         status.addStretch()
         self.middle.addWidget(self.status_page)
-        self.panel = ChordPanel()
+        # One choice of position per chord, whichever diagram shows it.
+        self.positions = Positions()
+        self.panel = ChordPanel(self.positions)
         self.split = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self.split.setSpacing(0)
         self.split.addWidget(self.middle, 1)
         self.split.addWidget(self.panel)
         layout.addLayout(self.split, 1)
+        self.chords = SongChords(self.positions)
+        layout.addWidget(self.chords)
+        self.chords.stateChanged.connect(
+            lambda state: layout.setStretchFactor(self.chords, 1 if state == "expanded" else 0)
+        )
 
         # Transport and practice tools, in the order they get used.
         bottom = QWidget()
@@ -583,6 +597,12 @@ class SongPage(QWidget):
         self.diagrams_button.setChecked(shown)
         self.diagrams_button.blockSignals(False)
         self.panel.setVisible(has_grid and shown)
+        listed = self.chords.state != "hidden"
+        self.chords_button.setVisible(has_grid)
+        self.chords_button.blockSignals(True)
+        self.chords_button.setChecked(listed)
+        self.chords_button.blockSignals(False)
+        self.chords.setVisible(has_grid and listed)
 
     def _choices(self, title: str, options) -> QActionGroup:
         """A titled group of exclusive choices in the display menu."""
@@ -626,6 +646,9 @@ class MainWindow(QMainWindow):
         # The diagrams stay on the chord at this time (not a beat: a grid edit renumbers beats).
         self.pinned_at: float | None = None
         self._panel_restore = "full"
+        self._shown_list: list = []  # each segment as the diagrams show it, None for no chord
+        self._upcoming_at: int | None = None
+        self._positions_of = None  # the project the position choices were loaded from
 
         self.stack = QStackedWidget()
         self.home = HomePage()
@@ -643,6 +666,10 @@ class MainWindow(QMainWindow):
         self.song.panel.set_state(self.settings.get("diagram_panel", "full"), emit=False)
         if self.song.panel.state != "hidden":
             self._panel_restore = self.song.panel.state
+        chords = self.song.chords
+        chords.set_view(self.settings.get("song_chords_view", "all"))
+        chords.set_mode(self.settings.get("song_chords_mode", "guitar"))
+        chords.set_state(self.settings.get("song_chords_state", "compact"))
         self.song.sync_panel(False)
         self.tick_timer = QTimer(self)
         self.tick_timer.setInterval(16)
@@ -701,11 +728,19 @@ class MainWindow(QMainWindow):
         s.panel.stateChanged.connect(self._diagram_state_changed)
         s.panel.followRequested.connect(self.follow_playback)
         s.diagrams_button.clicked.connect(self.toggle_diagrams)
+        s.chords_button.clicked.connect(self.toggle_chords)
+        s.chords.viewChanged.connect(lambda v: self._remember("song_chords_view", v))
+        s.chords.modeChanged.connect(lambda m: self._remember("song_chords_mode", m))
+        s.chords.stateChanged.connect(self._chords_state_changed)
+        s.chords.chordChosen.connect(self._choose_chord)
+        s.positions.changed.connect(self._positions_changed)
 
         export_menu = QMenu(self)
         export_menu.addAction("Texte (.txt)…", lambda: self.export_as("txt"))
         export_menu.addAction("ChordPro (.cho)…", lambda: self.export_as("cho"))
         export_menu.addAction("PDF (.pdf)…", lambda: self.export_as("pdf"))
+        export_menu.addSeparator()
+        export_menu.addAction("Fiche des accords (PDF)…", self.export_sheet)
         s.export.setMenu(export_menu)
 
         menu = QMenu(self)
@@ -770,6 +805,7 @@ class MainWindow(QMainWindow):
         shortcut("Ctrl+E", lambda: s.export.showMenu())
         shortcut("F1", self.show_shortcuts)
         shortcut("D", self.toggle_diagrams)
+        shortcut("T", self.toggle_chords)
         shortcut("G", lambda: s.panel.step("guitar", 1))
         shortcut("Shift+G", lambda: s.panel.step("guitar", -1))
         shortcut("P", lambda: s.panel.step("piano", 1))
@@ -1293,6 +1329,10 @@ class MainWindow(QMainWindow):
         for widget in (s.key_button, s.rhythm_button, s.undo, s.redo, s.export):
             widget.setVisible(has_grid)
         s.sync_panel(has_grid and self.job is None)
+        if self._positions_of is not project:
+            self._positions_of = project
+            s.positions.load(project.view.get("positions"))
+        self._update_song_chords()
         self._update_facts()
         self._update_loop_display()
         s.undo.setEnabled(project.can_undo)
@@ -1301,6 +1341,109 @@ class MainWindow(QMainWindow):
         self._tick()
         if save and has_grid:
             self.save_timer.start()
+
+    def _shown(self, segment) -> voicings.Shown | None:
+        """A segment as the diagrams show it: exactly as the grid writes it."""
+        project = self.project
+        view = project.view
+        key = project.key()
+        return voicings.describe(
+            segment.chord,
+            segment.bass,
+            key=key["label"] if key else None,
+            transpose=int(view["transpose"]),
+            capo=int(view["capo"]),
+            accidentals=view["accidentals"],
+            simplify=bool(view["simplify"]),
+            show_bass=bool(view["show_bass"]),
+            latin=bool(view.get("latin")),
+        )
+
+    def _bar_text(self, beat: int) -> str:
+        place = self.project.bar_position(beat)
+        return f"mesure {place[0]}" if place and place[0] else "introduction"
+
+    def _update_song_chords(self) -> None:
+        """Every chord once, in the order it first comes: worked out here, not during playback."""
+        project = self.project
+        segments = project.segments()
+        grid = project.grid()
+        self._shown_list = [self._shown(x) for x in segments]
+        seen, items = set(), []
+        for segment, shown in zip(segments, self._shown_list, strict=True):
+            if shown is None or chord_key(shown) in seen:
+                continue
+            seen.add(chord_key(shown))
+            start = max(0, segment.start_beat)
+            items.append(Item(shown, grid[start], self._bar_text(segment.start_beat)))
+        self.song.chords.set_all(items)
+        self._upcoming_at = None
+        self._sync_selection()
+
+    def _update_upcoming(self, index: int | None, beat: int) -> None:
+        """The chord playing and the next ones; new cards only when the chord changes."""
+        s = self.song
+        project = self.project
+        segments = project.segments()
+        if len(self._shown_list) != len(segments):
+            return
+        here = self._shown_list[index] if index is not None else None
+        key = chord_key(here) if here is not None else None
+        if key != s.chords.current:
+            s.chords.set_current(key)
+        start = index if index is not None else (0 if beat < 0 else len(segments))
+        if start == self._upcoming_at:
+            return
+        self._upcoming_at = start
+        grid = project.grid()
+        items = []
+        for i in range(start, len(segments)):
+            shown = self._shown_list[i]
+            if shown is None:
+                continue
+            first = max(0, segments[i].start_beat)
+            place = "en cours" if i == index else self._bar_text(segments[i].start_beat)
+            items.append(Item(shown, grid[first], place, current=i == index))
+            if len(items) == UPCOMING:
+                break
+        s.chords.set_upcoming(items)
+
+    def _sync_selection(self) -> None:
+        """The card of the chord the panel is pinned to, outlined."""
+        key = None
+        if self.project is not None and self.pinned_at is not None:
+            beat = self.project.beat_at(self.pinned_at)
+            segments = self.project.segments()
+            i = next((i for i, x in enumerate(segments) if x.start_beat <= beat < x.end_beat), None)
+            if i is not None and i < len(self._shown_list) and self._shown_list[i] is not None:
+                key = chord_key(self._shown_list[i])
+        if key != self.song.chords.selected:
+            self.song.chords.set_selected(key)
+
+    def _choose_chord(self, time: float) -> None:
+        """A card was clicked: the panel shows that chord, playback stays where it is."""
+        self.pinned_at = time
+        self._update_panel()
+
+    def _positions_changed(self) -> None:
+        if self.project is not None and self._positions_of is self.project:
+            self.project.view["positions"] = dict(self.song.positions.chosen)
+            if self.project.analysis["segments"]:
+                self.save_timer.start()
+
+    def toggle_chords(self) -> None:
+        s = self.song
+        if s.chords_button.isVisible():
+            s.chords.toggle()
+
+    def _chords_state_changed(self, state: str) -> None:
+        self._remember("song_chords_state", state)
+        has_grid = bool(self.project and self.project.analysis["segments"])
+        self.song.sync_panel(has_grid and self.job is None)
+
+    def _remember(self, name: str, value) -> None:
+        self.settings[name] = value
+        library.save_settings(self.settings)
 
     def _update_facts(self) -> None:
         project = self.project
@@ -1511,6 +1654,8 @@ class MainWindow(QMainWindow):
                     next_ = export.chord_text(project, segments[index + 1])
         s.now.setText(now or "—")
         s.next.setText(f"→ {next_}" if next_ else "")
+        if segments:
+            self._update_upcoming(index, beat)
         self._update_panel(beat)
 
     # Diagrams ----------------------------------------------------------------------------------
@@ -1518,6 +1663,7 @@ class MainWindow(QMainWindow):
         """The diagrams show the chord playing, or the pinned one, exactly as the grid writes it."""
         project = self.project
         s = self.song
+        self._sync_selection()
         if project is None or s.panel.state == "hidden" or not project.analysis["segments"]:
             return
         segments = project.segments()
@@ -1529,6 +1675,7 @@ class MainWindow(QMainWindow):
         segment = next((x for x in segments if x.start_beat <= beat < x.end_beat), None)
         if pinned and segment is None:  # the grid changed under it
             self.pinned_at, pinned = None, False
+            self._sync_selection()
             beat = project.beat_at(self.player.position)
             segment = next((x for x in segments if x.start_beat <= beat < x.end_beat), None)
         status = "Suit la lecture"
@@ -1537,21 +1684,7 @@ class MainWindow(QMainWindow):
             status = f"Épinglé : mesure {place[0]}" if place and place[0] else "Épinglé"
         elif segment is None and beat < 0 and segments:
             segment, status = segments[0], "Premier accord du morceau"
-        shown = None
-        if segment is not None:
-            view = project.view
-            key = project.key()
-            shown = voicings.describe(
-                segment.chord,
-                segment.bass,
-                key=key["label"] if key else None,
-                transpose=int(view["transpose"]),
-                capo=int(view["capo"]),
-                accidentals=view["accidentals"],
-                simplify=bool(view["simplify"]),
-                show_bass=bool(view["show_bass"]),
-                latin=bool(view.get("latin")),
-            )
+        shown = self._shown(segment) if segment is not None else None
         empty = "N.C." if segment is not None else "—"
         s.panel.show_chord(shown, status, pinned, empty)
 
@@ -1823,6 +1956,32 @@ class MainWindow(QMainWindow):
                     else export.to_chordpro(self.project)
                 )
                 path.write_text(text, encoding="utf-8")
+        except OSError as exc:
+            self._alert(f"Export impossible : {exc.strerror or exc}")
+
+    def export_sheet(self) -> None:
+        """Every chord of the song with its diagrams, on paper."""
+        if not self.project or not self.project.analysis["segments"]:
+            self._alert("Il n'y a pas encore de grille à exporter.")
+            return
+        chords = self.song.chords
+        dialog = SheetDialog(chords.mode, bool(self.settings.get("sheet_grid", False)), self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        mode, grid = dialog.mode, dialog.grid.isChecked()
+        self._remember("sheet_grid", grid)
+        suggested = f"{self.project.audio.get('title') or 'morceau'} - accords.pdf"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exporter la fiche des accords", suggested, "PDF (*.pdf)"
+        )
+        if path:
+            self.export_sheet_to(Path(path), mode, grid)
+
+    def export_sheet_to(self, path: Path, mode: str, grid: bool) -> None:
+        try:
+            write_chord_sheet(
+                self.project, path, self.song.chords.all_items, mode, grid, self.song.positions
+            )
         except OSError as exc:
             self._alert(f"Export impossible : {exc.strerror or exc}")
 
