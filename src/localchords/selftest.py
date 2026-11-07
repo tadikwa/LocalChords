@@ -15,7 +15,7 @@ def run(audio_path: Path, out: Path) -> int:
 
     from . import library
     from .ui.main_window import MainWindow, app_instance
-    from .ui.pdf import write_pdf
+    from .ui.pdf import write_chord_sheet, write_pdf
 
     out.mkdir(parents=True, exist_ok=True)
     report: dict = {"audio": str(audio_path), "steps": [], "ok": False}
@@ -163,6 +163,36 @@ def run(audio_path: Path, out: Path) -> int:
         write_pdf(project, out / "grille.pdf")
         sizes = {p.name: p.stat().st_size for p in out.glob("grille.*")}
         step("export", len(sizes) == 3 and all(sizes.values()), sizes=sizes)
+
+        chords = window.song.chords
+        chords.set_state("compact")
+        chords.set_view("all")
+        cards = chords.cards()
+        at = window.player.position
+        if cards:
+            cards[-1].chosen.emit()
+            app.processEvents()
+        step(
+            "accords du morceau",
+            len(cards) == len(chords.all_items) > 0
+            and window.player.position == at
+            and panel.title.text() == cards[-1].item.shown.shape.title,
+            count=len(cards),
+            chords=[c.item.shown.shape.title for c in cards],
+        )
+        chords.set_mode("both")
+        wait(lambda: False, 0.3)
+        window.grab().save(str(out / "7_accords_du_morceau.png"))
+        pages = write_chord_sheet(
+            project, out / "fiche.pdf", chords.all_items, "both", True, window.song.positions
+        )
+        data = (out / "fiche.pdf").read_bytes()
+        step(
+            "fiche des accords",
+            data.startswith(b"%PDF") and data.count(b"/Type /Page\n") == pages >= 2,
+            pages=pages,
+            size=len(data),
+        )
 
         window.flush()
         saved = window.project_file
