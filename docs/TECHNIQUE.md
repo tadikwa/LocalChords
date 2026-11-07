@@ -12,12 +12,13 @@ src/localchords/
   worker.py             analyse et téléchargement dans un processus à part
   project.py            le projet : analyse brute + corrections, et tout ce qui s'en déduit
   chords.py             étiquettes, orthographe des notes, saisie, transposition
+  voicings.py           positions de guitare et dispositions de piano, vérifiées par leurs notes
   export.py             texte et ChordPro
   library.py            dossiers utilisateur, réglages
   player.py             lecture : PortAudio, ralenti WSOLA, boucle, hauteur
   selftest.py           le scénario complet, lancé dans le programme compilé
-  ui/                   thème, grille, chronologie, dialogues, PDF, fenêtre
-tests/                  test_core (pur), test_player, test_engines (lents), test_ui (hors écran)
+  ui/                   thème, grille, chronologie, dialogues, PDF, fenêtre, diagrammes
+tests/                  test_core (pur), test_voicings, test_player, test_engines (lents), test_ui (hors écran)
 scripts/                compilation, mesures de performance, captures d'écran
 ```
 
@@ -84,6 +85,33 @@ changé : `analysis` n'est jamais modifié.
 Les corrections sont en secondes, pas en temps : elles survivent à un changement de grille et à une
 réanalyse. Elles se superposent dans l'ordre : la dernière gagne. Chaque temps reçoit l'accord qui le couvre
 le plus. Une analyse qui change de grille ne perd donc rien.
+
+## Les diagrammes d'accords
+
+`voicings.py` ne dessine rien ; `ui/diagrams.py` ne décide d'aucune note.
+
+- **Guitare.** Accordage standard (E2 A2 D3 G3 B3 E4), 15 cases au-dessus du capo. Pour un accord et sa
+  basse, `guitar()` essaie toutes les combinaisons de cases dans une main (4 cases d'écart au plus) et ne
+  garde une position que si `check()` le confirme sur les notes réelles : la plus grave est la basse
+  demandée, toutes les autres appartiennent à l'accord, au moins 4 cordes sonnent, il manque au plus la
+  quinte d'un accord de 4 sons, et les doigts (1 à 4, barré compris) suffisent. Les formes classiques
+  (`CLASSICS`, écrites à la main : x24432 pour Bm, 2x0232 pour D/F♯…) passent les mêmes contrôles et
+  viennent en tête quand elles sont valides ; les autres sont classées par difficulté, une par endroit du
+  manche, puis en montant. Sans position valide, la liste est vide et le panneau le dit au lieu de dessiner.
+- **Piano.** `piano()` donne les renversements en position serrée, puis la basse à la main gauche et
+  l'accord à la main droite. Avec une basse demandée, elle est toujours la note la plus grave.
+- **Ce qui est affiché.** `describe()` part de l'étiquette du segment et de la vue du projet, comme la
+  grille : la forme de guitare suit `transposition − capo` (F♯m entendu, capo en case 2 : forme de Em),
+  le son et le piano suivent la transposition seule. Notation, dièses ou bémols, accords simplifiés et
+  basses masquées sont ceux de la grille.
+- **Tests.** `tests/test_voicings.py` vérifie chaque position de chaque fondamentale, qualité et basse
+  (chaque note de l'accord et deux notes étrangères) ; `tests/test_ui.py` vérifie le suivi de la lecture,
+  l'épinglage, le capo, la transposition, la notation, les corrections et la réouverture.
+- **Interface.** Le panneau suit l'accord sous la tête de lecture. Un clic épingle l'accord ;
+  « Suivre la lecture », Échap ou la lecture y reviennent. Les images sont mises en cache par accord et
+  par taille ; un changement d'accord se fond en 140 ms. À 1280 px et plus, le panneau est à droite de la
+  grille ; en dessous, sous elle. Mode et taille sont dans `settings.json` (`diagram_mode`,
+  `diagram_panel`).
 
 ## Reconstruire
 

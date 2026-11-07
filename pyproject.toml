@@ -1,6 +1,6 @@
 [project]
 name = "localchords"
-version = "1.1.0"
+version = "1.2.0"
 description = "Grille d'accords locale et synchronisée pour Windows."
 requires-python = ">=3.12,<3.13"
 dependencies = [
