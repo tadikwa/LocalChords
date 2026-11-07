@@ -38,7 +38,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/localchords/ui/theme.py" = ["E501"]  # the style sheet reads better unwrapped
-"scripts/*" = ["E501", "F841"]
+"scripts/*" = ["E501", "F841", "SIM105", "SIM115"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
