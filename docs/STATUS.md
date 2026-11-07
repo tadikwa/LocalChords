@@ -1,6 +1,6 @@
 # État du projet
 
-Mis à jour le 2026-11-07 (v1.2, branche `feature/chord-diagrams`).
+Mis à jour le 2026-11-07 (v1.2 publiée : <https://github.com/tadikwa/LocalChords/releases/tag/v1.2>, binaires de la CI vérifiés par empreinte et auto-test sur ce PC).
 
 ## Où on en est
 
