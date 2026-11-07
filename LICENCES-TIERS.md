@@ -64,3 +64,6 @@ Les diagrammes de guitare et de piano (v1.2) n'ajoutent aucune dépendance, poli
 les positions sont calculées par `voicings.py` à partir des notes de l'accord et dessinées par Qt. Les
 quelques formes usuelles écrites à la main (Bm en x24432, D/F♯ en 2x0232…) sont des connaissances musicales
 courantes, vérifiées par le programme comme les autres.
+
+La v1.2.1 (accords du morceau, fiche PDF) n'ajoute non plus aucune dépendance : la fiche est écrite par
+`QPdfWriter`, qui fait déjà partie de Qt (LGPL v3, voir plus haut).

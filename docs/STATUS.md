@@ -1,8 +1,15 @@
 # État du projet
 
-Mis à jour le 2026-11-07 (v1.2 publiée : <https://github.com/tadikwa/LocalChords/releases/tag/v1.2>, binaires de la CI vérifiés par empreinte et auto-test sur ce PC).
+Mis à jour le 2026-11-07 : v1.2.1 prête sur la branche `feature/v1.2.1` (code, tests, docs) ; reste la
+construction, la fusion, l'étiquette et la publication. v1.2 publiée et inchangée :
+<https://github.com/tadikwa/LocalChords/releases/tag/v1.2>.
 
 ## Où on en est
+
+**v1.2.1 :** section « Accords du morceau » sous la grille (tous les accords, ou ceux à venir), une position
+par accord partagée par le panneau, les cartes et la fiche, et l'export « Fiche des accords (PDF) ». Détail
+dans [TECHNIQUE.md](TECHNIQUE.md#les-accords-du-morceau-et-la-fiche-v121), notes dans
+[NOTES-v1.2.1.md](NOTES-v1.2.1.md). 613 tests passent.
 
 **v1.2 :** diagrammes d'accords de guitare et de piano à côté (ou sous) la grille, qui suivent la lecture. Détail
 dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans [NOTES-v1.2.md](NOTES-v1.2.md).
@@ -23,6 +30,7 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
 | F. Distribution | Fait, exécutable testé ; revue indépendante faite, voir plus bas |
 | H. v1.1 | Bouton « Son transposé » visible, ONNX à la place de torch, exécutable unique, mode portable |
 | I. v1.2 | Diagrammes de guitare et de piano : suivent la lecture, épinglage au clic, capo, transposition, notation |
+| J. v1.2.1 | Accords du morceau (tous / à venir), positions partagées et enregistrées, fiche des accords en PDF |
 | G. P2 | Liens, lots, comparaison de moteurs, progressions, transposition de l'audio. Non faits : sections, séparation de sources, GPU, avec leurs raisons dans DECISIONS.md |
 
 ## Limites connues
@@ -39,6 +47,8 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
   quand les modèles ONNX sont présents : à revoir si l'instabilité disparaît.
   À l'appui : 20 analyses sur 20 sans erreur par le vrai processus d'analyse (`scripts/soak_worker.py`), et
   environ 260 analyses de mesure sans plantage. Si le processus d'analyse tombe, l'interface propose de réessayer.
+- Accords du morceau : sur une fenêtre de 1000×760 avec le panneau dessous, la grille descend à sa hauteur
+  minimale ; `T` masque la section.
 - Diagrammes : accordage standard seulement ; positions jusqu'à la case 15, écart de 4 cases au plus ; doigtés
   calculés, pas relus par un guitariste. La répartition main gauche / main droite au piano n'est qu'une
   suggestion.
@@ -54,6 +64,20 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
   <https://github.com/tadikwa/LocalChords/releases>.
 
 ## Revue indépendante
+
+**v1.2.1 :** revue du diff entier, 5 constats. Deux ont été corrigés avec un test : l'ouverture d'un projet
+le réenregistrait, et un en-tête trop haut pouvait couper la première rangée de la fiche. Trois sont laissés
+de côté, car mineurs :
+- le peintre PDF n'est pas fermé en cas d'exception, comme dans l'export PDF existant ;
+- les symboles de la grille sont calculés deux fois à l'export ;
+- la palette d'impression permute les couleurs du thème le temps du dessin (raccourci documenté dans le
+  code).
+
+**Bouton Lecture / Pause (v1.2.1) : cause extérieure identifiée, pas de défaut LocalChords.**
+- Le clic réel dans la fenêtre est testé à 1000×760, 1600×1000 et 5120×1440, section réduite ou agrandie.
+- Sur ce PC, les clics perdus venaient de Jot 0.2.2 : une fenêtre invisible, toujours au premier plan, en bas
+  au centre de l'écran de 5120×1440, au-dessus du bouton quand LocalChords est dans la tuile de droite de
+  GlazeWM.
 
 **v1.2 :** relecture des diagrammes par un agent séparé, qui a recalculé les notes : aucune note fausse.
 8 constats, tous traités, avec des tests : la basse d'un renversement nommée autrement dans la grille et dans

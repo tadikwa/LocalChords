@@ -19,7 +19,8 @@ ou 11, 64 bits, gratuit, hors ligne)
   <img src="docs/images/localchords-demo.gif" width="800" alt="Lecture d'un morceau : la case en cours avance dans la grille et les diagrammes changent avec l'accord">
 </p>
 
-Les captures viennent du programme compilé, sur un morceau de démonstration synthétique créé pour l'occasion
+Les captures viennent du programme (celles des accords du morceau et de la fiche : version 1.2.1 lancée
+depuis les sources, rendu hors écran), sur un morceau de démonstration synthétique créé pour l'occasion
 (`scripts/demo_audio.py`) : aucun enregistrement du commerce.
 
 ## Fonctionnalités
@@ -32,6 +33,8 @@ Les captures viennent du programme compilé, sur un morceau de démonstration sy
   le son, capodastre.
 - **Corriger** un accord d'un double-clic, avec les autres lectures de l'analyse ; tout est enregistré seul et
   revient sans nouvelle analyse.
+- **Tous les accords du morceau** sous la grille, sans lancer la lecture, ou ceux qui arrivent.
+- **Fiche des accords en PDF** à imprimer, avec les diagrammes.
 - **Exporter** en texte, ChordPro ou PDF ; notation C D E ou Do ré mi, dièses ou bémols.
 - **Hors ligne**, sans compte ; un mode portable garde tout à côté du programme.
 
@@ -58,6 +61,34 @@ Les captures viennent du programme compilé, sur un morceau de démonstration sy
 
 Accordage standard uniquement.
 
+## Tous les accords du morceau
+
+![Sous la grille, les dix accords du morceau avec leur diagramme de guitare, dans l'ordre où ils arrivent](docs/images/localchords-song-chords.png)
+
+Sous la grille, la section **Accords du morceau** montre chaque accord une seule fois, dans l'ordre où il
+arrive, avec sa mesure et son diagramme. Pas besoin de lancer la lecture : ouvrez un morceau et travaillez
+les positions une par une, avant de jouer avec l'enregistrement.
+
+- **Tous les accords** : la liste complète, avec leur nombre. Un accord renversé (C/E) est compté à part.
+- **À venir** : l'accord en cours et les suivants, qui défilent avec la lecture.
+- Guitare, piano ou les deux. La position choisie avec `‹ ›` est la même dans la section, dans le panneau et
+  sur la fiche imprimée, et elle est enregistrée avec le projet.
+- Un clic sur une carte affiche l'accord dans le panneau sans déplacer la lecture ; les flèches passent d'une
+  carte à l'autre.
+- Section réduite, agrandie ou masquée (`T`) ; l'application s'en souvient. Elle suit la transposition, le
+  capo, les corrections et la notation.
+
+### Fiche des accords (PDF)
+
+<p align="center">
+  <img src="docs/images/localchords-sheet.png" width="420" alt="Fiche A4 imprimable : titre, tonalité, tempo et mesure, puis les accords du morceau avec leurs diagrammes de guitare et de piano">
+</p>
+
+**Exporter → Fiche des accords (PDF)** : une fiche A4 avec le titre, la tonalité, le tempo, la mesure, puis
+chaque accord avec ses diagrammes (guitare, piano ou les deux), et la grille en option sur une page à part.
+Aucun diagramme n'est coupé entre deux pages, et la fiche reprend exactement les positions, la transposition
+et le capo affichés dans le programme.
+
 ## Installer
 
 Sur la page de la [dernière version](https://github.com/tadikwa/LocalChords/releases/latest), dans « Assets »,
@@ -65,8 +96,8 @@ prenez **l'un des deux** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-v1.2-portable.exe` (environ 285 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.2-windows-x64.zip` (environ 285 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-v1.2.1-portable.exe` (environ 285 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.2.1-windows-x64.zip` (environ 285 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
 Même programme, mêmes résultats. Le dossier démarre en moins d'une seconde. L'exécutable unique se
 décompresse à chaque lancement : environ 3,5 s, et 570 Mo dans le dossier temporaire de Windows, effacés
@@ -76,7 +107,7 @@ décompresse à chaque lancement : environ 3,5 s, et 570 Mo dans le dossier temp
 **Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
 programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 Pour vérifier le fichier, son empreinte SHA-256 figure dans `SHA256SUMS.txt` sur la page de la version
-(PowerShell : `Get-FileHash .\LocalChords-v1.2-portable.exe`).
+(PowerShell : `Get-FileHash .\LocalChords-v1.2.1-portable.exe`).
 
 Pour tout garder à côté du programme (clé USB), créez un fichier vide `LocalChords.portable` à côté de
 l'exécutable : voir [docs/PORTABLE.md](docs/PORTABLE.md). Pour désinstaller, supprimez le fichier ou le
@@ -157,6 +188,6 @@ par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. En mode portable,
 ### Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md), notes de version : [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md), notes de version : [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
 Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
 [LICENCES-TIERS.md](LICENCES-TIERS.md).
