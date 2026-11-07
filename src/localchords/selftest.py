@@ -41,8 +41,12 @@ def run(audio_path: Path, out: Path) -> int:
         window = MainWindow(muted=True)
         window.show()
         app.processEvents()
-        step("démarrage", True, seconds=round(time.perf_counter() - started, 2),
-             data=str(library.data_dir()))
+        step(
+            "démarrage",
+            True,
+            seconds=round(time.perf_counter() - started, 2),
+            data=str(library.data_dir()),
+        )
         window.grab().save(str(out / "1_accueil.png"))
 
         started = time.perf_counter()
@@ -74,6 +78,7 @@ def run(audio_path: Path, out: Path) -> int:
         panel.set_mode("both")
         window.seek(0)
         window.toggle_play()
+        started = time.monotonic()
         beat_before = window.song.grid.current
         frames = out / "frames" if os.environ.get("LOCALCHORDS_SELFTEST_FRAMES") else None
         if frames:  # for the README animation: the real window, while it plays
@@ -83,10 +88,10 @@ def run(audio_path: Path, out: Path) -> int:
                 window.grab().save(str(frames / f"{i:03}.png"))
         else:
             wait(lambda: False, 3.0)
-        position = window.player.position
+        position, elapsed = window.player.position, time.monotonic() - started
         step(
             "lecture",
-            window.player.playing and 2.0 < position < 4.0,
+            window.player.playing and position > 2.0 and abs(position - elapsed) < 1.0,
             position=round(position, 3),
             device=window.player.stream is not None,
             latency=window.player.latency,
@@ -220,8 +225,17 @@ def run_pitch(audio_path: Path, out: Path) -> int:
         t0, p0 = time.time(), window.player.position
         wait(seconds)
         schedule["conditions"].append(
-            dict(name=name, semitones=semitones, audio=audio, rate=rate, region=region,
-                 t0=t0, t1=time.time(), position=(p0, window.player.position), **extra)
+            dict(
+                name=name,
+                semitones=semitones,
+                audio=audio,
+                rate=rate,
+                region=region,
+                t0=t0,
+                t1=time.time(),
+                position=(p0, window.player.position),
+                **extra,
+            )
         )
         (out / "schedule.json").write_text(json.dumps(schedule, indent=1), "utf-8")
 
@@ -244,8 +258,17 @@ def run_pitch(audio_path: Path, out: Path) -> int:
         play("boucle A/B +5 à 75 %", 8, 5, True, 0.75, "ladder", 22.0, (22.0, 24.0), **cycle)
         play("boucle, passage à -12", 6, -12, True, 0.75, "ladder", **cycle)
         play("boucle, son d'origine", 5, -12, False, 0.75, "ladder", **cycle)
-        play("boucle +12 à 100 %", 5, 12, True, 1.0, "ladder", 26.0, (26.0, 27.5),
-             expect_notes=[0, 1, 2])
+        play(
+            "boucle +12 à 100 %",
+            5,
+            12,
+            True,
+            1.0,
+            "ladder",
+            26.0,
+            (26.0, 27.5),
+            expect_notes=[0, 1, 2],
+        )
         window.toggle_play()
         schedule["ok"] = True
     except Exception:  # noqa: BLE001 - the schedule must say what broke
