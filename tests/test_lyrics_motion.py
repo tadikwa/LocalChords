@@ -7,7 +7,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QPA_FONTDIR", "C:/Windows/Fonts")
 
 import pytest
-from test_lyrics_ui import with_lyrics
 from test_ui import app, isolated, seeded, wait_for, wav  # noqa: F401 - fixtures
 
 from localchords import library
