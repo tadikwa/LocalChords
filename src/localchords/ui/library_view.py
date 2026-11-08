@@ -14,6 +14,7 @@ from PySide6.QtCore import (
     QAbstractTableModel,
     QEventLoop,
     QFile,
+    QMimeData,
     QModelIndex,
     QObject,
     QRect,
@@ -106,7 +107,7 @@ def trash(path: Path) -> bool:
     return bool(result[0] if isinstance(result, tuple) else result)
 
 
-def run_task(parent: QWidget, title: str, fn):
+def run_task(parent: QWidget, title: str, fn, cancellable: bool = True):
     """fn(progress, stop) on another thread behind a progress dialog, the window staying alive.
     progress(text, fraction or None). Returns fn's result, or raises what it raised."""
     state = {"done": False, "result": None, "error": None, "text": "", "fraction": None}
@@ -130,6 +131,8 @@ def run_task(parent: QWidget, title: str, fn):
     dialog.setAutoClose(False)
     dialog.setAutoReset(False)
     dialog.canceled.connect(cancel.set)
+    if not cancellable:
+        dialog.setCancelButton(None)
     loop = QEventLoop()
 
     def tick() -> None:
@@ -179,6 +182,9 @@ class Scanner(QObject):
 
 
 # The songs, as a table and as cards -----------------------------------------------------------
+SONGS_MIME = "application/x-localchords-songs"  # songs dragged onto a collection
+
+
 class SongModel(QAbstractTableModel):
     def __init__(self, latin=lambda: False):
         super().__init__()
@@ -194,6 +200,18 @@ class SongModel(QAbstractTableModel):
 
     def song(self, row: int) -> dict:
         return self.rows[row]
+
+    def flags(self, index):
+        return super().flags(index) | Qt.ItemFlag.ItemIsDragEnabled
+
+    def mimeTypes(self):  # noqa: N802
+        return [SONGS_MIME]
+
+    def mimeData(self, indexes):  # noqa: N802
+        rows = sorted({i.row() for i in indexes if i.isValid()})
+        mime = QMimeData()
+        mime.setData(SONGS_MIME, "\n".join(self.rows[r]["id"] for r in rows).encode())
+        return mime
 
     def rowCount(self, parent=QModelIndex()):  # noqa: B008, N802 - Qt's
         return 0 if parent.isValid() else len(self.rows)
@@ -365,6 +383,44 @@ class CardView(QListView):
         super().mouseReleaseEvent(event)
 
 
+class SideList(QListWidget):
+    """The views and collections; songs dropped on a collection or on Favoris join it."""
+
+    songsDropped = Signal(object, list)  # the view's key, the songs' ids
+
+    def __init__(self):
+        super().__init__()
+        self.setAcceptDrops(True)
+
+    def _target(self, event):
+        item = self.itemAt(event.position().toPoint())
+        key = item.data(Qt.ItemDataRole.UserRole) if item else None
+        ok = event.mimeData().hasFormat(SONGS_MIME) and key and key[0] in ("col", "fav")
+        return key if ok else None
+
+    def dragEnterEvent(self, event):  # noqa: N802
+        if event.mimeData().hasFormat(SONGS_MIME):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):  # noqa: N802
+        if self._target(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):  # noqa: N802
+        key = self._target(event)
+        if not key:
+            event.ignore()
+            return
+        ids = bytes(event.mimeData().data(SONGS_MIME)).decode().split()
+        event.acceptProposedAction()
+        if ids:
+            self.songsDropped.emit(key, ids)
+
+
 # The page -------------------------------------------------------------------------------------
 class LibraryPage(QWidget):
     openRequested = Signal()
@@ -441,8 +497,9 @@ class LibraryPage(QWidget):
         name = QLabel("Ma bibliothèque")
         name.setObjectName("h2")
         layout.addWidget(name)
-        self.side = QListWidget()
+        self.side = SideList()
         self.side.setObjectName("side")
+        self.side.songsDropped.connect(self.drop_songs)
         self.side.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.side.customContextMenuRequested.connect(self._side_menu)
         self.side.currentItemChanged.connect(self._side_changed)
@@ -581,6 +638,8 @@ class LibraryPage(QWidget):
         t.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         t.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         t.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        t.setDragEnabled(True)
+        t.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         t.setTextElideMode(Qt.TextElideMode.ElideRight)
         h = t.horizontalHeader()
         h.setHighlightSections(False)
@@ -618,6 +677,8 @@ class LibraryPage(QWidget):
         v.setSpacing(2)
         v.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         v.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        v.setDragEnabled(True)
+        v.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         v.setObjectName("cards")
         v.starClicked.connect(lambda row: self.toggle_favorite([self.model.song(row)]))
         v.doubleClicked.connect(lambda i: self.open_song(self.model.song(i.row())))
@@ -1118,6 +1179,19 @@ class LibraryPage(QWidget):
         if self._write(self.catalog.hide, ids, on):
             self.refresh()
 
+    def drop_songs(self, key: tuple, ids: list[str]) -> None:
+        """Songs dragged onto a collection join it at its end; onto Favoris, they are starred."""
+        known = self.catalog.ids()
+        ids = [i for i in dict.fromkeys(ids) if i in known]
+        if not ids:
+            return
+        if key[0] == "col":
+            done = self._write(self.catalog.add_to_collection, key[1], ids)
+        else:
+            done = self._write(self.catalog.set_favorite, ids, True)
+        if done:
+            self.refresh()
+
     # Collections -------------------------------------------------------------------------------
     def new_collection(self, ids: list[str] | None = None) -> None:
         name, ok = QInputDialog.getText(self, "Nouvelle collection", "Nom de la collection :")
@@ -1453,12 +1527,18 @@ class LibraryPage(QWidget):
             self._say(str(exc))
             return
         size = megabytes(target.stat().st_size)
-        self._say(
+        text = (
             f"Sauvegarde enregistrée : {target}\n\n{manifest['projects']} analyses, "
             f"{manifest['audio']} fichiers audio, {size}. Gardez-la ailleurs que sur ce disque "
-            "(clé USB, autre disque). C'est une copie privée : ne la partagez pas.",
-            info=True,
+            "(clé USB, autre disque). C'est une copie privée : ne la partagez pas."
         )
+        if manifest.get("left_out"):
+            text += (
+                f"\n\n{len(manifest['left_out'])} analyse(s) illisible(s) n'y sont pas : leurs "
+                "paroles ne pouvaient pas être vérifiées. Pour les inclure, cochez « Inclure "
+                "les paroles venues du catalogue en ligne »."
+            )
+        self._say(text, info=True)
 
     def restore(self) -> None:
         start = self.settings.get("backup_folder") or str(Path.home() / "Documents")
@@ -1489,14 +1569,16 @@ class LibraryPage(QWidget):
                 if own:
                     catalog.close()
 
+        folder = library.data_dir() / "projects"
+        replaced = plan["new"] + [s for s in plan["differ"] if take_newer and s in plan["newer"]]
+        # The song open in the window is not saved over what the restore writes, even meanwhile.
+        self.projectsReplaced.emit([folder / f"{s}.lchords" for s in replaced])
         try:
-            report = run_task(self, "Restaurer la bibliothèque", work)
+            report = run_task(self, "Restaurer la bibliothèque", work, cancellable=False)
         except (backup.BackupError, C.CatalogError) as exc:
             self._say(str(exc))
             self.start_scan()
             return
-        folder = library.data_dir() / "projects"
-        self.projectsReplaced.emit([folder / f"{s}.lchords" for s in plan["new"] + plan["differ"]])
         if settings:
             self.settingsRestored.emit()
         self.start_scan()

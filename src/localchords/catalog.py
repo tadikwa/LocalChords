@@ -23,6 +23,7 @@ FILE = "catalog.db"
 BACKUPS = "backups"
 KEEP_BACKUPS = 7
 SCHEMA_VERSION = 1
+FRESH = 120  # seconds: a project file this recent was just saved
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS songs (
@@ -257,10 +258,14 @@ class Catalog:
             f["audio_state"] = "unknown" if estimated else audio_state(f["audio_path"], f["kept"])
         f |= {"file": file.name, "mtime": st.st_mtime, "size": st.st_size}
         f["project_state"] = "ok" if project else "unreadable"
-        # Only for a song new to the index: the dates, and a title for an unreadable project.
+        # Only for a song new to the index: the dates, and a title for an unreadable project. A
+        # project file made before now (one from v1.3 opened before the scan reached it) was not
+        # added now: its creation date stands in, marked estimated.
+        made = _created(st)
+        older = estimated or made < now - FRESH
         new = {
-            "added_at": _created(st) if estimated else now,
-            "added_estimated": int(estimated),
+            "added_at": made if older else now,
+            "added_estimated": int(older),
             "opened_at": (st.st_mtime if estimated else now) if (opened or estimated) else None,
             "opened_estimated": int(estimated),
         }
@@ -462,8 +467,15 @@ class Catalog:
                                        (song.get("added_at"), song.get("added_estimated")))
                         if x and not est
                     ]  # fmt: skip
-                    opened = [x for x in (mine["opened_at"], song.get("opened_at")) if x]
-                    last = max(opened) if opened else None
+                    opened = [
+                        (x, bool(est))
+                        for x, est in ((mine["opened_at"], mine["opened_estimated"]),
+                                       (song.get("opened_at"), song.get("opened_estimated")))
+                        if x
+                    ]  # fmt: skip
+                    # The latest wins; at the same time, a real date over an estimated one.
+                    last, last_estimated = max(opened, key=lambda o: (o[0], not o[1]),
+                                               default=(None, False))  # fmt: skip
                     self.db.execute(
                         "UPDATE songs SET favorite = ?, genre = ?, added_at = ?, "
                         "added_estimated = ?, opened_at = ?, opened_estimated = ? WHERE id = ?",
@@ -473,9 +485,7 @@ class Catalog:
                             min(exact) if exact else first,
                             0 if exact else int(bool(first)),
                             last,
-                            int(last == mine["opened_at"] and bool(mine["opened_estimated"]))
-                            if last
-                            else 0,
+                            int(last_estimated),
                             mine["id"],
                         ),
                     )
@@ -546,6 +556,11 @@ def open_catalog(data: Path) -> tuple[Catalog, str | None]:
         return catalog, None
     except CatalogError as exc:
         return Catalog(":memory:"), f"{exc} Elle n'est pas modifiée ; rien ne sera retenu."
+    except sqlite3.OperationalError as exc:  # locked, busy, cannot open: not damage
+        return Catalog(":memory:"), (
+            f"La bibliothèque ne s'ouvre pas ({exc}) ; elle n'est pas modifiée. Favoris et "
+            "collections de cette session seront oubliés à la fermeture."
+        )
     except sqlite3.DatabaseError:
         pass
     stamp = time.strftime("%Y%m%d-%H%M%S")

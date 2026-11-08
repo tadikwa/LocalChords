@@ -162,6 +162,42 @@ def test_collections_keep_their_songs_and_order(app, wav):
     window.close()
 
 
+def test_songs_dragged_onto_a_collection_or_favourites_join_it(app, wav):
+    from PySide6.QtCore import QMimeData, QPointF, Qt
+    from PySide6.QtGui import QDropEvent
+
+    files = [song(f"{i:032d}", f"Glissé {i}", path=wav) for i in range(3)]
+    window = window_on(app, *files)
+    home = window.home
+    cid = window.catalog.create_collection("Scène")
+    home.refresh()
+    index = home.model.index
+    mime = home.model.mimeData([index(0, 1), index(2, 1), index(2, 3)])
+    ids = bytes(mime.data(library_view.SONGS_MIME)).decode().split()
+    assert ids == [home.model.rows[0]["id"], home.model.rows[2]["id"]]  # one per song, in order
+    side = home.side
+
+    def drop_on(key):
+        row = next(i for i in range(side.count())
+                   if side.item(i).data(Qt.ItemDataRole.UserRole) == key)  # fmt: skip
+        point = QPointF(side.visualItemRect(side.item(row)).center())
+        event = QDropEvent(point, Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+                           Qt.KeyboardModifier.NoModifier)  # fmt: skip
+        side.dropEvent(event)
+
+    drop_on(("col", cid))
+    assert window.catalog.members(cid) == ids
+    drop_on(("fav",))
+    assert {s["id"] for s in window.catalog.songs() if s["favorite"]} == set(ids)
+    foreign = QMimeData()
+    foreign.setText("pas des morceaux")
+    assert not side.acceptDrops() or side._target(
+        QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, foreign, Qt.MouseButton.LeftButton,
+                   Qt.KeyboardModifier.NoModifier)  # fmt: skip
+    ) is None
+    window.close()
+
+
 def test_deleting_an_analysis_never_touches_the_original(app, wav, tmp_path, monkeypatch):
     fp = "d" * 32
     kept = library.data_dir() / "audio" / f"{fp}.wav"

@@ -10,13 +10,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 import tempfile
 import time
 import zipfile
 from pathlib import Path
 
 from . import __version__, audio, library
-from .catalog import Catalog
+from .catalog import Catalog, CatalogError, audio_state
 from .project import EXTENSION, Project, ProjectError
 
 FORMAT = "localchords-backup"
@@ -39,14 +40,17 @@ def _projects() -> list[Path]:
 def _audio(catalog: Catalog) -> dict[str, Path]:
     """Each song's recording that can be read now, by song."""
     out = {}
+    roots: dict = {}
     for song in catalog.songs():
-        path = library.audio_file({"path": song["audio_path"], "kept": song["kept"]})
-        if song["audio_path"] or song["kept"]:
-            try:
-                if path.is_file():
-                    out[song["id"]] = path
-            except OSError:
-                continue
+        if not (song["audio_path"] or song["kept"]):
+            continue
+        try:
+            if audio_state(song["audio_path"], song["kept"], roots) in ("ok", "kept"):
+                out[song["id"]] = library.audio_file(
+                    {"path": song["audio_path"], "kept": song["kept"]}
+                )
+        except OSError:
+            continue
     return out
 
 
@@ -114,9 +118,14 @@ def write(
                 else:
                     try:
                         data = Project.load(path).to_dict(shared=True)
-                        z.writestr(name, json.dumps(data, ensure_ascii=False, indent=1))
                     except ProjectError:
-                        z.write(path, name)  # unreadable here: kept as it is, for a later version
+                        # Unreadable here: its lyrics cannot be checked, so it stays out.
+                        manifest["left_out"] = [*manifest.get("left_out", []), path.name]
+                        manifest["projects"] -= 1
+                        continue
+                    info = zipfile.ZipInfo.from_file(path, name)  # the project's own date
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    z.writestr(info, json.dumps(data, ensure_ascii=False, indent=1))
                 if progress:
                     progress(i + 1, total, path.stem)
             for i, (sid, path) in enumerate(found.items()):
@@ -138,7 +147,7 @@ def write(
     except BackupError:
         Path(tmp).unlink(missing_ok=True)
         raise
-    except (OSError, zipfile.BadZipFile, ValueError) as exc:
+    except (OSError, zipfile.BadZipFile, ValueError, sqlite3.Error, CatalogError) as exc:
         Path(tmp).unlink(missing_ok=True)
         raise BackupError(f"La sauvegarde a échoué : {getattr(exc, 'strerror', None) or exc}") from exc
     return manifest
@@ -278,7 +287,8 @@ def restore(
                 catalog.merge_personal(json.loads(z.read(CATALOG)))
             if settings and SETTINGS in z.namelist():
                 library.save_settings({**library.load_settings(), **json.loads(z.read(SETTINGS))})
-        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        except (OSError, ValueError, zipfile.BadZipFile, KeyError, TypeError,
+                AttributeError) as exc:  # fmt: skip
             raise BackupError(
                 f"La restauration s'est arrêtée : {getattr(exc, 'strerror', None) or exc}. Ce qui "
                 "était déjà restauré l'est entièrement ; relancer la restauration reprend le reste."

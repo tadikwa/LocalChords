@@ -649,3 +649,86 @@ def test_preferences_come_back_only_when_asked(data, tmp_path, monkeypatch):
     assert library.load_settings()["latin"] is False
     backup.restore(archive, c2, settings=True)
     assert library.load_settings()["latin"] is True
+
+
+# Found in review -------------------------------------------------------------------------------
+def test_a_v13_project_opened_before_the_scan_is_not_dated_today(data, tmp_path, monkeypatch):
+    path = make_project(wav(tmp_path, "vieux.wav"))
+    made = time.time() - 40 * 86400
+    monkeypatch.setattr(catalog, "_created", lambda st: made)  # a file from v1.3, long ago
+    c, _ = open_catalog(data)
+    c.store(path, Project.load(path), opened=True)  # opened from the window, not yet scanned
+    s = c.songs()[0]
+    assert s["added_at"] == made and s["added_estimated"] == 1
+    assert s["opened_estimated"] == 0 and s["opened_at"] > made  # the opening is real
+
+
+def test_an_estimated_opening_from_a_backup_stays_estimated(data, tmp_path):
+    path = make_project(wav(tmp_path, "a.wav"))
+    c = scanned(data)
+    s = c.songs()[0]
+    assert s["opened_estimated"] == 1
+    later = s["opened_at"] + 1000
+    entry = {"id": s["id"], "opened_at": later, "opened_estimated": 1, "tags": []}
+    c.merge_personal({"songs": [entry]})
+    s = c.songs()[0]
+    assert s["opened_at"] == later and s["opened_estimated"] == 1
+    entry |= {"opened_at": later + 5, "opened_estimated": 0}
+    c.merge_personal({"songs": [entry]})
+    assert c.songs()[0]["opened_estimated"] == 0
+    assert path.exists()
+
+
+def test_a_backup_without_catalog_lyrics_keeps_each_project_date(data, tmp_path):
+    c, a, b = library_with_everything(data, tmp_path)
+    old = time.time() - 86400
+    for f in (a, b):
+        os.utime(f, (old, old))
+    archive = tmp_path / "sans.zip"
+    backup.write(archive, c, with_audio=False, catalog_lyrics=False)
+    with zipfile.ZipFile(archive) as z:
+        stamp = time.mktime((*z.getinfo(f"projects/{b.name}").date_time, 0, 0, -1))
+    assert abs(stamp - old) < 3  # not the time of the backup: never taken for newer work
+    assert backup.inspect(archive)["newer"] == []
+
+
+def test_an_unreadable_project_stays_out_of_a_backup_without_catalog_lyrics(data, tmp_path):
+    c, a, b = library_with_everything(data, tmp_path)
+    bad = data / "projects" / ("f" * 32 + ".lchords")
+    bad.write_text('{"format": "localchords", "version": 99}', encoding="utf-8")
+    archive = tmp_path / "sans.zip"
+    manifest = backup.write(archive, c, with_audio=False, catalog_lyrics=False)
+    assert manifest["left_out"] == [bad.name]
+    with zipfile.ZipFile(archive) as z:
+        assert f"projects/{bad.name}" not in z.namelist()
+
+
+def test_a_malformed_catalog_in_a_backup_is_refused_cleanly(data, tmp_path):
+    c, a, b = library_with_everything(data, tmp_path)
+    archive = tmp_path / "s.zip"
+    backup.write(archive, c, with_audio=False)
+    broken = tmp_path / "broken.zip"
+    with zipfile.ZipFile(archive) as src, zipfile.ZipFile(broken, "w") as dst:
+        for info in src.infolist():
+            raw = src.read(info)
+            if info.filename == "catalog.json":
+                raw = json.dumps({"songs": ["x"], "collections": [{"songs": []}]}).encode()
+            dst.writestr(info, raw)
+    with pytest.raises(backup.BackupError):
+        backup.restore(broken, c)
+
+
+def test_a_locked_catalog_is_not_taken_for_a_damaged_one(data, monkeypatch):
+    c, _ = open_catalog(data)
+    c.close()
+    real = catalog.Catalog.check
+
+    def locked(self):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(catalog.Catalog, "check", locked)
+    c2, note = open_catalog(data)
+    assert "ne s'ouvre pas" in note
+    assert (data / "catalog.db").exists() and not list(data.glob("catalog-*.illisible"))
+    monkeypatch.setattr(catalog.Catalog, "check", real)
+    c2.close()
