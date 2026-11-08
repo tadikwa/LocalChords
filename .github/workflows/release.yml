@@ -1,4 +1,4 @@
-# Builds LocalChords on Windows for a tag v*, and attaches the two programs and the LGPL sources to a
+# Builds LocalChords on Windows for a tag v*, and attaches the installer, the two programs and the LGPL sources to a
 # DRAFT release. Nothing is published until a maintainer has run the self-test on a real PC (the
 # runners have no sound card) and published the draft by hand. An existing release is never touched.
 name: Release Windows
@@ -31,6 +31,16 @@ jobs:
         shell: pwsh
         run: scripts\build.ps1
 
+      # Inno Setup, pinned and checked against the hash its winget manifest publishes.
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = "$env:RUNNER_TEMP\innosetup-6.7.3.exe"
+          Invoke-WebRequest https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe -OutFile $setup -MaximumRetryCount 5 -RetryIntervalSec 30
+          if ((Get-FileHash $setup -Algorithm SHA256).Hash -ne "9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732") { throw "Inno Setup : empreinte inattendue" }
+          Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CURRENTUSER", "/DIR=$env:RUNNER_TEMP\inno" -Wait
+
       - name: Package
         shell: pwsh
         env:
@@ -39,6 +49,10 @@ jobs:
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
           New-Item -ItemType Directory out | Out-Null
+          $env:VERSION = $env:VERSION -replace '/', '-'   # a branch name in file names
+          $number = $env:VERSION.TrimStart("v")
+          if ($number -notmatch '^\d+(\.\d+){0,3}$') { $number = "0.0" }   # a run started by hand on a branch
+          & "$env:RUNNER_TEMP\inno\ISCC.exe" /Q "/DAppVersion=$number" installer\LocalChords.iss
           Copy-Item dist\onefile\LocalChords.exe "out\LocalChords-$env:VERSION-portable.exe"
           .venv\Scripts\python.exe -c "import shutil, sys; shutil.make_archive(sys.argv[1], 'zip', 'dist', 'LocalChords')" "out\LocalChords-$env:VERSION-windows-x64"
           .venv\Scripts\python.exe scripts\build_av_lgpl.py --sources "out\LocalChords-$env:VERSION-sources-tierces.zip"

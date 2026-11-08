@@ -33,6 +33,7 @@ from .diagrams import (
     describe_voicing,
     positions_of,
 )
+from .widgets import segmented
 
 VIEWS = ("all", "next")
 STATES = ("compact", "expanded", "hidden")
@@ -139,12 +140,12 @@ class ChordCard(QFrame):
         self.current = self.selected = False
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(4)
         head = QHBoxLayout()
         head.setSpacing(8)
         self.title = QLabel()
-        self.title.setStyleSheet("font-size: 20px; font-weight: 700;")
+        self.title.setObjectName("cardChord")
         self.place = QLabel()
         self.place.setObjectName("caption")
         self.place.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -153,12 +154,14 @@ class ChordCard(QFrame):
         head.addWidget(self.place)
         layout.addLayout(head)
         guitar = GuitarDiagram()
-        guitar.setFixedSize(150, 168)
+        guitar.setFixedSize(140, 150)
         piano = PianoDiagram()
         piano.fit = True
-        piano.setFixedSize(232, 118)
-        self.guitar = _Instrument("Guitare", guitar, "", "Accordage standard.")
-        self.piano = _Instrument("Piano", piano, "", "Une disposition possible parmi d'autres.")
+        piano.setFixedSize(224, 110)
+        self.guitar = _Instrument("Guitare", guitar, "", "Accordage standard.", kind_below=True)
+        self.piano = _Instrument(
+            "Piano", piano, "", "Une disposition possible parmi d'autres.", kind_below=True
+        )
         self.guitar.stepped.connect(lambda d: self._step("guitar", d))
         self.piano.stepped.connect(lambda d: self._step("piano", d))
         body = QHBoxLayout()
@@ -183,6 +186,8 @@ class ChordCard(QFrame):
         self.mode = mode
         self.guitar.setVisible(mode != "piano")
         self.piano.setVisible(mode != "guitar")
+        for instrument in (self.guitar, self.piano):  # the strip's switch already says which
+            instrument.name.setVisible(mode == "both")
         self.refresh()
         self.adjustSize()
 
@@ -193,13 +198,8 @@ class ChordCard(QFrame):
         self._style()
 
     def _style(self) -> None:
-        edge = theme.SELECT if self.selected else theme.ACCENT if self.current else theme.SURFACE_3
-        title = theme.ACCENT if self.current else theme.TEXT
-        self.setStyleSheet(
-            f"QFrame#card {{ background: {theme.SURFACE_2}; border: 2px solid {edge}; "
-            f"border-radius: 10px; }} QFrame#card:focus {{ border-color: {theme.SELECT}; }}"
-        )
-        self.title.setStyleSheet(f"font-size: 20px; font-weight: 700; color: {title};")
+        theme.restyle(self, now=self.current, selected=self.selected)
+        theme.restyle(self.title, now=self.current)
 
     def _step(self, instrument: str, delta: int) -> None:
         shown = self.item.shown
@@ -293,10 +293,6 @@ class SongChords(QFrame):
     def __init__(self, positions: Positions):
         super().__init__()
         self.setObjectName("songchords")
-        self.setStyleSheet(
-            f"QFrame#songchords {{ background: {theme.SURFACE}; border: none; "
-            f"border-top: 1px solid {theme.BORDER}; }}"
-        )
         self.positions = positions
         self.view = "all"
         self.mode = "guitar"
@@ -335,23 +331,23 @@ class SongChords(QFrame):
             b.setCheckable(True)
             b.setToolTip(tips[view])
             b.setAccessibleName(f"Accords du morceau : {text.lower()}")
-            b.setStyleSheet("padding: 4px 10px;")
             group.addButton(b)
             self.view_buttons[view] = b
-            head.addWidget(b)
             b.clicked.connect(lambda _=False, v=view: self._choose_view(v))
-        head.addSpacing(10)
+        self.view_switch = segmented(self.view_buttons.values())
+        head.addWidget(self.view_switch)
+        head.addSpacing(8)
         self.mode_buttons = {}
         group = QButtonGroup(self)
         for mode, text in zip(MODES, ("Guitare", "Piano", "Les deux"), strict=True):
             b = QPushButton(text)
             b.setCheckable(True)
             b.setAccessibleName(f"Accords du morceau : {text.lower()}")
-            b.setStyleSheet("padding: 4px 10px;")
             group.addButton(b)
             self.mode_buttons[mode] = b
-            head.addWidget(b)
             b.clicked.connect(lambda _=False, m=mode: self._choose_mode(m))
+        self.mode_switch = segmented(self.mode_buttons.values())
+        head.addWidget(self.mode_switch)
         head.addSpacing(6)
         self.resize_button = QToolButton()
         self.resize_button.setObjectName("step")
@@ -369,10 +365,9 @@ class SongChords(QFrame):
         outer.addLayout(head)
 
         self.scroll = _Strip()
+        self.scroll.setAccessibleName("Accords du morceau")
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.scroll.setStyleSheet(f"QScrollArea, QScrollArea > QWidget > QWidget "
-                                  f"{{ background: {theme.SURFACE}; }}")  # fmt: skip
         self.inner = QWidget()
         self.flow = _Flow(self.inner)
         self.empty = QLabel()

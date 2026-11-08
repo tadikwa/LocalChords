@@ -577,6 +577,33 @@ def test_transport_controls_fit_whatever_the_window_manager_imposes(app, wav, tm
     window.close()
 
 
+@pytest.mark.parametrize("width", [800, 900, 1000, 1280])
+def test_every_bar_fits_down_to_the_minimum_width(app, wav, tmp_path, width):
+    a = make_analysis(chords=("C:maj", "A:min", "F:maj", "G:7") * 12)
+    audio = {"path": str(wav), "title": "Long", "duration": a["segments"][-1]["end_time"]}
+    project = Project(audio, a)
+    project.view["capo"] = 2  # the key's longest label: "Tonalité : … · formes …"
+    project.save(tmp_path / "long.lchords")
+    window = MainWindow(muted=True)
+    window.show()
+    window.open_project_file(tmp_path / "long.lchords")
+    window.resize(width, 800)
+    app.processEvents()
+    assert window.width() == width, "the window's minimum does not come from its widest bar"
+    s = window.song
+    for name, bar in (
+        ("top", s.home.parent()),
+        ("transport", s.play.parent()),
+        ("chords", s.chords),
+    ):
+        needed = bar.minimumSizeHint().width()
+        assert needed <= width, f"the {name} bar needs {needed} px"
+    window.go_home()
+    app.processEvents()
+    assert window.home.minimumSizeHint().width() <= width
+    window.close()
+
+
 # Diagrams ----------------------------------------------------------------------------------------
 def panel_at(app, window, beat):
     window.seek(window.project.grid()[beat])
@@ -785,6 +812,8 @@ def test_the_keyboard_pins_and_unpins(app, wav, tmp_path):
     assert panel.status.text().startswith("Épinglé")
     QTest.keyClick(window, Qt.Key.Key_D, Qt.KeyboardModifier.ShiftModifier)
     assert window.pinned_at is None and panel.status.text() == "Suit la lecture"
+    # Qt keeps the last event's modifiers: Shift would stay held for the tests that follow.
+    QTest.keyRelease(window, Qt.Key.Key_Shift)
     window.close()
 
 

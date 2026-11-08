@@ -13,15 +13,14 @@ aucun abonnement.
 **[⬇ Télécharger la dernière version](https://github.com/tadikwa/LocalChords/releases/latest)** (Windows 10
 ou 11, 64 bits, gratuit, hors ligne)
 
-![LocalChords : la grille d'accords d'un morceau, l'accord en cours en surbrillance, et les diagrammes de guitare et de piano à droite](docs/images/localchords-main.png)
+![LocalChords : la grille d'accords d'un morceau, l'accord en cours en surbrillance, le diagramme de guitare à droite et les accords du morceau dessous](docs/images/localchords-main.png)
 
 <p align="center">
   <img src="docs/images/localchords-demo.gif" width="800" alt="Lecture d'un morceau : la case en cours avance dans la grille et les diagrammes changent avec l'accord">
 </p>
 
-Les captures viennent du programme (celles des accords du morceau et de la fiche : version 1.2.1, celles des
-paroles : version 1.3, celle des paroles trouvées : version 1.3.1, celles de la bibliothèque : version 1.4,
-lancées depuis les sources, rendu hors écran), sur un morceau de démonstration
+Les captures viennent du programme (version 1.5, lancée depuis les sources, rendu hors écran ; l'animation,
+les diagrammes seuls et la fiche : version 1.2.1), sur un morceau de démonstration
 synthétique créé pour l'occasion (`scripts/demo_audio.py`) et des paroles écrites pour lui
 (`scripts/screenshot_lyrics.py`) : aucun enregistrement ni aucune parole du commerce. Les morceaux de la
 bibliothèque sont huit morceaux synthétiques aux titres et artistes inventés, analysés par le programme dans
@@ -45,7 +44,9 @@ un dossier temporaire (`scripts/library_screenshots.py`).
 - **Tous les accords du morceau** sous la grille, sans lancer la lecture, ou ceux qui arrivent.
 - **Fiche des accords en PDF** à imprimer, avec les diagrammes.
 - **Exporter** en texte, ChordPro ou PDF ; notation C D E ou Do ré mi, dièses ou bémols.
-- **Hors ligne**, sans compte ; un mode portable garde tout à côté du programme.
+- **Hors ligne**, sans compte ; un installateur sans droits d'administrateur, ou un mode portable qui garde
+  tout à côté du programme.
+- **Une fenêtre utilisable dès 800 px** de large (1.5), à côté d'une autre ou en mosaïque.
 
 ## Ma bibliothèque (1.4)
 
@@ -220,14 +221,20 @@ et le capo affichés dans le programme.
 ## Installer
 
 Sur la page de la [dernière version](https://github.com/tadikwa/LocalChords/releases/latest), dans « Assets »,
-prenez **l'un des deux** fichiers :
+prenez **l'un des trois** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-v1.4-portable.exe` (environ 300 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.4-windows-x64.zip` (environ 300 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-Setup-v1.5.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
+| `LocalChords-v1.5-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.5-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
-Même programme, mêmes résultats. Le dossier démarre en moins d'une seconde. L'exécutable unique se
+Même programme, mêmes résultats. **Vos données ne bougent pas** : quel que soit le fichier choisi, vos
+morceaux, votre bibliothèque et vos sauvegardes restent dans `%LOCALAPPDATA%\LocalChords`. Installer,
+mettre à jour ou désinstaller ne les modifie ni ne les supprime jamais ; pour une mise à jour, lancez
+simplement l'installateur de la nouvelle version.
+
+Le programme installé et le dossier démarrent en moins d'une seconde. L'exécutable unique se
 décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier temporaire de Windows, effacés
 à la fermeture. Rien d'autre à installer : ni Python, ni carte graphique particulière, ni connexion Internet
 (sauf pour importer un lien, chercher des paroles ou télécharger un modèle de transcription).
@@ -235,11 +242,12 @@ décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier tempor
 **Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
 programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 Pour vérifier le fichier, son empreinte SHA-256 figure dans `SHA256SUMS.txt` sur la page de la version
-(PowerShell : `Get-FileHash .\LocalChords-v1.4-portable.exe`).
+(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.5.exe`).
 
 Pour tout garder à côté du programme (clé USB), créez un fichier vide `LocalChords.portable` à côté de
-l'exécutable : voir [docs/PORTABLE.md](docs/PORTABLE.md). Pour désinstaller, supprimez le fichier ou le
-dossier ; vos analyses restent dans `%LOCALAPPDATA%\LocalChords` tant que vous ne les effacez pas.
+l'exécutable unique ou du dossier : voir [docs/PORTABLE.md](docs/PORTABLE.md). Pour désinstaller : Paramètres
+→ Applications pour la version installée, ou supprimez le fichier ou le dossier ; vos analyses restent dans
+`%LOCALAPPDATA%\LocalChords` tant que vous ne les effacez pas vous-même.
 
 ## Utiliser en 5 étapes
 
@@ -322,6 +330,6 @@ par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. Les modèles de t
 ### Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md), notes de version : [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), notes de version : [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
 Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
 [LICENCES-TIERS.md](LICENCES-TIERS.md).

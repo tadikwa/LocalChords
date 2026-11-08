@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from . import theme
 
@@ -33,6 +41,19 @@ class ElidedLabel(QLabel):
     def _apply(self) -> None:
         metrics = self.fontMetrics()
         self.setText(metrics.elidedText(self._full, Qt.TextElideMode.ElideRight, self.width()))
+
+
+def segmented(buttons) -> QFrame:
+    """A few exclusive choices side by side in one track (the theme's QFrame#segmented); the
+    caller keeps its QButtonGroup and its signals."""
+    frame = QFrame()
+    frame.setObjectName("segmented")
+    row = QHBoxLayout(frame)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(0)
+    for b in buttons:
+        row.addWidget(b)
+    return frame
 
 
 class Stepper(QWidget):

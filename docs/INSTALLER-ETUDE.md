@@ -1,5 +1,8 @@
 # Étude : un installateur Windows pour LocalChords
 
+> **Réalisé en v1.5** avec Inno Setup : voir [INSTALLATEUR.md](INSTALLATEUR.md). L'étude ci-dessous
+> est conservée telle qu'écrite pour la v1.4.
+
 > Étude seulement. La v1.4 ne contient **aucun** installateur et **aucune** mise à jour
 > automatique : LocalChords reste distribué en exécutable unique et en dossier zip
 > ([PORTABLE.md](PORTABLE.md)).
