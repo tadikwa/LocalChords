@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 
 from .. import voicings
 from . import theme
+from .widgets import segmented
 
 WHITE_KEY = "#D7DBE2"
 BLACK_KEY = "#14171D"
@@ -225,7 +226,7 @@ class GuitarDiagram(_Diagram):
 
         radius = min(sx, fy) * 0.38
         finger_font = theme.app_font(max(10, radius * 1.15), 700)
-        accent = QColor(theme.ACCENT)
+        ink = QColor(theme.TEXT)  # light dots like a printed chart; amber stays for the bass
 
         def dot_center(s, fret):
             return QPointF(xs[s], y0 + (fret - start + 0.5) * fy)
@@ -242,7 +243,7 @@ class GuitarDiagram(_Diagram):
             barred = {s for s in range(first, last + 1) if f.frets[s] == fret}
             a, b = dot_center(first, fret), dot_center(last, fret)
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(accent)
+            p.setBrush(ink)
             bar = QRectF(a.x() - radius, a.y() - radius * 0.85, b.x() - a.x() + 2 * radius,
                          radius * 1.7)  # fmt: skip
             p.drawRoundedRect(bar, radius * 0.85, radius * 0.85)
@@ -252,7 +253,7 @@ class GuitarDiagram(_Diagram):
                 continue
             c = dot_center(s, fret)
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(accent)
+            p.setBrush(ink)
             p.drawEllipse(c, radius, radius)
             number(c, f.fingers[s])
 
@@ -409,7 +410,7 @@ class _Instrument(QWidget):
 
     stepped = Signal(int)
 
-    def __init__(self, title: str, diagram: _Diagram, key: str, tip: str):
+    def __init__(self, title: str, diagram: _Diagram, key: str, tip: str, kind_below=False):
         super().__init__()
         self.diagram = diagram
         layout = QVBoxLayout(self)
@@ -419,7 +420,7 @@ class _Instrument(QWidget):
         row = QHBoxLayout(self.header)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(6)
-        name = QLabel(title)
+        self.name = name = QLabel(title)
         name.setObjectName("h2")
         name.setToolTip(tip)
         self.kind = QLabel()
@@ -440,12 +441,18 @@ class _Instrument(QWidget):
         self.next.setAccessibleName(f"{title} : position suivante")
         self.next.setToolTip(f"Position suivante ({key})" if key else "Position suivante")
         row.addWidget(name)
-        row.addWidget(self.kind, 1)
+        if kind_below:  # a narrow card: the position's name gets its own line instead of being cut
+            row.addStretch(1)
+        else:
+            row.addWidget(self.kind, 1)
         row.addWidget(self.prev)
         row.addWidget(self.count)
         row.addWidget(self.next)
         layout.addWidget(self.header)
         layout.addWidget(diagram, 1)
+        if kind_below:
+            self.kind.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(self.kind)
         self.prev.clicked.connect(lambda: self.stepped.emit(-1))
         self.next.clicked.connect(lambda: self.stepped.emit(1))
 
@@ -492,7 +499,7 @@ class ChordPanel(QFrame):
         titles = QVBoxLayout()
         titles.setSpacing(0)
         self.title = QLabel("—")
-        self.title.setStyleSheet(f"font-size: 26px; font-weight: 700; color: {theme.ACCENT};")
+        self.title.setObjectName("panelChord")
         self.title.setAccessibleName("Accord des diagrammes")
         self.status = QLabel()
         self.status.setObjectName("caption")
@@ -502,10 +509,6 @@ class ChordPanel(QFrame):
         self.follow.setToolTip(
             "Les diagrammes restent sur l'accord cliqué. Revenir à l'accord joué (Échap) ; "
             "lancer la lecture y revient aussi."
-        )
-        self.follow.setStyleSheet(
-            f"QPushButton#link {{ background: transparent; border: none; padding: 0 2px; "
-            f"color: {theme.ACCENT}; font-weight: 600; text-decoration: underline; }}"
         )
         self.follow.setCursor(Qt.CursorShape.PointingHandCursor)
         self.follow.hide()
@@ -538,11 +541,10 @@ class ChordPanel(QFrame):
             b = QPushButton(text)
             b.setCheckable(True)
             b.setAccessibleName(f"Diagrammes : {text.lower()}")
-            b.setStyleSheet("padding: 4px 10px;")
             self.mode_group.addButton(b)
             self.mode_buttons[mode] = b
-            modes.addWidget(b)
             b.clicked.connect(lambda _=False, m=mode: self._choose_mode(m))
+        modes.addWidget(segmented(self.mode_buttons.values()))
         modes.addStretch(1)
         lead.addWidget(self.modes)
 
@@ -635,7 +637,7 @@ class ChordPanel(QFrame):
             self.setMinimumSize(0, 0)
             self.setMaximumSize(self.side_width, 16777215)
             self.piano.setMaximumHeight(230)  # wider than tall: more height is empty
-            edge = "border-left"
+            edge = "left"
         else:
             self.outer.setDirection(QBoxLayout.Direction.LeftToRight)
             self.lead.setFixedWidth(250 if full else 170)
@@ -644,21 +646,25 @@ class ChordPanel(QFrame):
             self.setMaximumWidth(16777215)
             self.piano.setMaximumHeight(16777215)
             height = (250 if full else 150) if self.mode != "piano" else (200 if full else 120)
-            self.setFixedHeight(height)
-            edge = "border-top"
+            # On a short screen (a laptop at 125 or 150 %), the full panel gives way before the
+            # window outgrows the screen. shortcut: read when the panel's layout changes, not
+            # when the window moves to another screen.
+            short = self.screen().availableGeometry().height() < 700
+            self.setMaximumHeight(height)
+            self.setMinimumHeight(0 if full and short else height)
+            edge = "top"
         # Stacked, the fretboard wants height; side by side, the keyboard wants width.
         self.body.setStretchFactor(self.guitar, 3 if self.side else 2)
         self.body.setStretchFactor(self.piano, 2 if self.side else 3)
-        self.setStyleSheet(
-            f"QFrame#panel {{ background: {theme.SURFACE}; border: none; "
-            f"{edge}: 1px solid {theme.BORDER}; }}"
-        )
+        theme.restyle(self, edge=edge)
 
     # Beside the grid, the panel asks for its width but never forces the window wider: a tiling
     # window manager can jump straight to a narrow size, and then the panel moves under the grid.
     def sizeHint(self) -> QSize:
         hint = super().sizeHint()
-        return QSize(self.side_width, hint.height()) if self.side else hint
+        if self.side:
+            return QSize(self.side_width, hint.height())
+        return QSize(hint.width(), self.maximumHeight())
 
     def minimumSizeHint(self) -> QSize:
         hint = super().minimumSizeHint()

@@ -36,7 +36,7 @@ LOOSE_GAP = 3.0  # seconds: another recording, whose times would not fit
 def _note(text: str) -> QLabel:
     label = QLabel(text)
     label.setWordWrap(True)
-    label.setStyleSheet(f"color: {theme.TEXT_2};")
+    label.setObjectName("muted")
     return label
 
 
@@ -102,7 +102,7 @@ class SearchDialog(QDialog):
         self.go.setObjectName("primary")
         self.go.clicked.connect(self.search)
         self.status = QLabel()
-        self.status.setStyleSheet(f"color: {theme.TEXT_2};")
+        self.status.setObjectName("muted")
         row.addWidget(self.go)
         row.addWidget(self.status, 1)
         layout.addLayout(row)
@@ -247,7 +247,7 @@ class TranscribeDialog(QDialog):
         )
         if not transcribe.engine_ready():
             warn = QLabel("Le moteur de transcription manque dans cette installation.")
-            warn.setStyleSheet(f"color: {theme.ERROR};")
+            warn.setObjectName("error")
             layout.addWidget(warn)
         grid = QGridLayout()
         grid.setHorizontalSpacing(12)
@@ -258,7 +258,7 @@ class TranscribeDialog(QDialog):
             radio.setProperty("model", m["id"])
             self.group.addButton(radio)
             status = QLabel()
-            status.setStyleSheet(f"color: {theme.TEXT_2};")
+            status.setObjectName("muted")
             button = QPushButton()
             button.clicked.connect(lambda _c=False, mid=m["id"]: self._model_action(mid))
             grid.addWidget(radio, 2 * i, 0)
@@ -329,7 +329,8 @@ class TranscribeDialog(QDialog):
         for w in (self.progress, self.progress_text, self.cancel_button):
             w.setVisible(busy)
         folder = transcribe.models_dir()
-        self.folder.setStyleSheet(f"color: {theme.TEXT_2};")
+        self.folder.setObjectName("muted")
+        theme.restyle(self.folder)
         free = library.free_mb(folder if folder.exists() else library.data_dir())
         self.folder.setText(
             f"Dossier des modèles : {folder}" + (f" · {free / 1024:.1f} Go libres" if free else "")
@@ -371,7 +372,8 @@ class TranscribeDialog(QDialog):
         self._refresh()
         if task.error and not task.cancelled:
             self.folder.setText(task.error)
-            self.folder.setStyleSheet(f"color: {theme.ERROR};")
+            self.folder.setObjectName("error")
+            theme.restyle(self.folder)
 
     def _cancel(self) -> None:
         if self.task is not None:

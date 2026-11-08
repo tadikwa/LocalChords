@@ -35,7 +35,6 @@ from ..chords import (
     transpose_key,
 )
 from ..project import Project
-from . import theme
 
 
 class ChordEditor(QDialog):
@@ -67,7 +66,7 @@ class ChordEditor(QDialog):
         self.input = QLineEdit()
         self.input.setPlaceholderText("Am7, D/F#, Bb, N.C.…")
         self.input.setAccessibleName("Accord")
-        self.input.setStyleSheet("font-size: 22px; font-weight: 600; padding: 8px 12px;")
+        self.input.setObjectName("chordInput")
         self.input.textChanged.connect(self._typed)
         label = QLabel("Accord")
         label.setObjectName("h2")
@@ -290,7 +289,7 @@ class SheetDialog(QDialog):
         note = QLabel("Les positions sont celles choisies dans le programme, transposition "
                       "et capodastre compris.")  # fmt: skip
         note.setWordWrap(True)
-        note.setStyleSheet(f"color: {theme.TEXT_2};")
+        note.setObjectName("muted")
         layout.addWidget(note)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -446,6 +445,6 @@ class ShortcutsDialog(QDialog):
         layout.setVerticalSpacing(8)
         for i, (keys, what) in enumerate(SHORTCUTS):
             k = QLabel(keys)
-            k.setStyleSheet(f"color: {theme.ACCENT}; font-weight: 600;")
+            k.setObjectName("key")
             layout.addWidget(k, i, 0, Qt.AlignmentFlag.AlignRight)
             layout.addWidget(QLabel(what), i, 1)

@@ -59,6 +59,7 @@ from .widgets import ElidedLabel, Stepper, fmt_time
 
 AUDIO_FILTER = "Audio (" + " ".join(f"*{e}" for e in audio.AUDIO_EXTENSIONS) + ")"
 SIDE_PANEL_WIDTH = 1280
+MIN_WIDTH = 800  # every bar collapses to fit this; a tiling window manager may go narrower
 SPEEDS = [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.25, 1.5]
 
 
@@ -118,7 +119,7 @@ class SongPage(QWidget):
         titles = QVBoxLayout()
         titles.setSpacing(0)
         self.title = ElidedLabel()
-        self.title.setObjectName("title")
+        self.title.setObjectName("songTitle")
         self.title.setTextFormat(Qt.TextFormat.PlainText)
         self.subtitle = ElidedLabel()
         self.subtitle.setObjectName("caption")
@@ -128,12 +129,12 @@ class SongPage(QWidget):
         row.addLayout(titles, 3)
         # Now and next: what to play without reading the grid.
         self.now = QLabel("—")
-        self.now.setStyleSheet(f"font-size: 30px; font-weight: 700; color: {theme.ACCENT};")
+        self.now.setObjectName("chordNow")
         self.now.setAccessibleName("Accord en cours")
         self.now.setMinimumWidth(96)
         self.now.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.next = QLabel("")
-        self.next.setStyleSheet(f"font-size: 18px; color: {theme.TEXT_2};")
+        self.next.setObjectName("chordNext")
         self.next.setAccessibleName("Accord suivant")
         self.next.setMinimumWidth(80)
         row.addWidget(self.now)
@@ -142,7 +143,7 @@ class SongPage(QWidget):
         self.key_button = QToolButton()
         self.key_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.key_button.setAccessibleName("Tonalité")
-        self.rhythm_button = QPushButton()
+        self.rhythm_button = QToolButton()
         self.rhythm_button.setAccessibleName("Tempo et mesure")
         self.rhythm_button.setToolTip("Corriger le tempo, la mesure ou le décalage de la grille")
         self.undo = QToolButton()
@@ -179,12 +180,22 @@ class SongPage(QWidget):
         self.menu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.menu.setToolTip("Plus d'options")
         self.menu.setAccessibleName("Plus d'options")
+        # Undo and redo step aside on a narrow window (Ctrl + Z and Ctrl + Y stay).
+        self.history = QWidget()
+        history = QHBoxLayout(self.history)
+        history.setContentsMargins(0, 0, 0, 0)
+        history.setSpacing(8)
+        history.addWidget(self.undo)
+        history.addWidget(self.redo)
+        # What gives way on a narrow window: labels first (the icon, the tooltip and the
+        # accessible name stay), then the long forms of the key and the tempo.
+        self.collapsible = [self.export]
+        self._facts = {}
         for w in (
             self.star,
             self.key_button,
             self.rhythm_button,
-            self.undo,
-            self.redo,
+            self.history,
             self.export,
             self.chords_button,
             self.diagrams_button,
@@ -223,6 +234,7 @@ class SongPage(QWidget):
         self.middle = QStackedWidget()
         self.grid = ChordGrid()
         self.scroll = GridScroll()
+        self.scroll.setAccessibleName("Grille d'accords")
         self.scroll.setWidget(self.grid)
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -300,6 +312,7 @@ class SongPage(QWidget):
         self.loop_button = QPushButton(" Boucle")
         self.loop_button.setIcon(theme.icon("loop", size=16))
         self.loop_button.setCheckable(True)
+        self.loop_button.setAccessibleName("Boucle")
         self.loop_button.setToolTip("Boucler la sélection, ou arrêter la boucle (L)")
         self.loop_a = QPushButton("A")
         self.loop_a.setToolTip("Début de boucle à la position actuelle (A)")
@@ -346,6 +359,8 @@ class SongPage(QWidget):
         # How the chords are written: asked for rarely, kept one click away.
         self.display = QToolButton()
         self.display.setText("Affichage")
+        self.display.setIcon(theme.icon("sliders", size=16))
+        self.display.setAccessibleName("Affichage des accords")
         self.display.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.display.setToolTip("Niveau de détail, altérations et accords courts")
         self.display.setMenu(QMenu(self.display))
@@ -399,6 +414,21 @@ class SongPage(QWidget):
     def adapt_to_width(self, width: int) -> None:
         """A tiling window manager can make the window narrower than its minimum, so what is
         rarely needed gives way first; all of it stays on the keyboard."""
+        self._top_wide = width >= 1240
+        for button in self.collapsible:
+            button.setToolButtonStyle(
+                Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+                if self._top_wide
+                else Qt.ToolButtonStyle.ToolButtonIconOnly
+            )
+        for button, (full, short) in self._facts.items():
+            button.setText(full if self._top_wide else short)
+        self.history.setVisible(width >= 900)
+        self.display.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextOnly
+            if width >= 960
+            else Qt.ToolButtonStyle.ToolButtonIconOnly
+        )
         self._audio_wide = width >= 1240  # narrower, the icon and its highlight say it
         self.audio_button.setText(self._audio_text if self._audio_wide else "")
         for widget in (self.volume, self.volume_icon):
@@ -416,6 +446,11 @@ class SongPage(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.adapt_to_width(event.size().width())
+
+    def set_fact(self, button: QToolButton, full: str, short: str) -> None:
+        """A fact in the top bar, said in full when there is room."""
+        self._facts[button] = (full, short)
+        button.setText(full if self._top_wide else short)
 
     def sync_panel(self, has_grid: bool) -> None:
         """No diagrams before there is a grid to follow."""
@@ -452,6 +487,8 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(QPixmap.fromImage(theme.app_image())))
         self.setAcceptDrops(True)
         self.resize(1360, 820)
+        # Set, so the bars' widest content does not decide it: they collapse to fit instead.
+        self.setMinimumWidth(MIN_WIDTH)
         self.settings = library.load_settings()
         self.player = Player(device_sample_rate())
         self.player.volume = 0.0 if muted else float(self.settings.get("volume", 1.0))
@@ -1353,10 +1390,11 @@ class MainWindow(QMainWindow):
         shift = project.sounding_shift()
         # What sounds; with a capo, the shapes the hands play are named apart.
         label = key["label"] if key else None
-        text = f"Tonalité : {key_name(label, int(project.view['transpose']), latin=latin)}"
+        short = key_name(label, int(project.view["transpose"]), latin=latin)
+        text = f"Tonalité : {short}"
         if key and project.view["capo"]:
             text += f" · formes {key_name(label, shift, latin=latin)}"
-        s.key_button.setText(text)
+        s.set_fact(s.key_button, text, short)
         menu = QMenu(self)
         if key:
             s.key_button.setToolTip(self._key_tooltip(key))
@@ -1388,7 +1426,7 @@ class MainWindow(QMainWindow):
         if not meter.get("edited") and float(meter.get("confidence", 1.0)) < 0.25:
             unsure.append("mesure incertaine")
         mark = "  ?" if unsure else ""
-        s.rhythm_button.setText(f"{bpm} · {meter['beats_per_bar']} temps{mark}")
+        s.set_fact(s.rhythm_button, f"{bpm} · {meter['beats_per_bar']} temps{mark}", bpm + mark)
         tip = "Corriger le tempo, la mesure ou le décalage de la grille"
         s.rhythm_button.setToolTip(f"{tip}\nÀ vérifier : {', '.join(unsure)}." if unsure else tip)
 

@@ -26,6 +26,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QBoxLayout,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -58,7 +59,7 @@ from .. import lyrics as L
 from ..chords import key_name
 from ..project import Project, ProjectError
 from . import theme
-from .widgets import fmt_time
+from .widgets import fmt_time, segmented
 
 MONTHS = ("janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.",
           "nov.", "déc.")  # fmt: skip
@@ -84,6 +85,11 @@ COLUMNS = [
     ("opened", "Ouvert", "opened"),
 ]  # fmt: skip
 NARROW_HIDDEN = ("year", "chords", "added")  # the columns that go first on a narrow window
+VIEW_ICONS = {
+    "all": "music", "fav": "star", "recent": "clock", "latest": "plus", "hidden": "hidden",
+    "col": "collection",
+}  # fmt: skip
+COUNT_ROLE = Qt.ItemDataRole.UserRole + 1
 VIEWS = {"all": "Tous les morceaux", "fav": "Favoris", "recent": "Récemment ouverts",
          "latest": "Derniers ajouts", "hidden": "Retirés de la bibliothèque"}  # fmt: skip
 
@@ -397,6 +403,23 @@ class SongTable(QTableView):
         self.fit_title()
 
 
+class SideDelegate(QStyledItemDelegate):
+    """Each view's number of songs, right-aligned in the room the style sheet keeps for it."""
+
+    def paint(self, p: QPainter, option, index):
+        super().paint(p, option, index)
+        count = index.data(COUNT_ROLE)
+        if count is None:
+            return
+        p.save()
+        p.setFont(theme.app_font(theme.SIZE_CAPTION))
+        p.setPen(QColor(theme.TEXT_2))
+        box = option.rect.adjusted(0, 0, -10, 0)
+        align = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        p.drawText(box, int(align), str(count))
+        p.restore()
+
+
 class SideList(QListWidget):
     """The views and collections; songs dropped on a collection or on Favoris join it."""
 
@@ -405,6 +428,9 @@ class SideList(QListWidget):
     def __init__(self):
         super().__init__()
         self.setAcceptDrops(True)
+        self.setItemDelegate(SideDelegate(self))
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # names elide
+        self.setIconSize(QSize(16, 16))
 
     def _target(self, event):
         item = self.itemAt(event.position().toPoint())
@@ -468,7 +494,7 @@ class LibraryPage(QWidget):
         column.setContentsMargins(24, 18, 24, 12)
         column.setSpacing(10)
         column.addLayout(self._top())
-        column.addLayout(self._filters())
+        column.addWidget(self._filters())
         self.batch_box = QWidget()
         batch_row = QHBoxLayout(self.batch_box)
         batch_row.setContentsMargins(0, 0, 0, 0)
@@ -502,7 +528,7 @@ class LibraryPage(QWidget):
 
     # Building ----------------------------------------------------------------------------------
     def _sidebar(self) -> QWidget:
-        side = QWidget()
+        self.sidebar = side = QWidget()
         side.setObjectName("bar")
         side.setFixedWidth(232)
         layout = QVBoxLayout(side)
@@ -519,8 +545,10 @@ class LibraryPage(QWidget):
         self.side.currentItemChanged.connect(self._side_changed)
         self.side.itemDoubleClicked.connect(lambda item: self._rename_collection(item))
         layout.addWidget(self.side, 1)
-        new = QPushButton("+  Nouvelle collection")
+        new = QPushButton("Nouvelle collection")
         new.setObjectName("link")
+        new.setIcon(theme.icon("plus", theme.SELECT, 14))
+        new.setToolTip("Créer une collection ; on peut aussi y glisser des morceaux")
         new.clicked.connect(lambda: self.new_collection())
         layout.addWidget(new, 0, Qt.AlignmentFlag.AlignLeft)
         place = "Tout reste sur votre ordinateur."
@@ -548,14 +576,20 @@ class LibraryPage(QWidget):
         self.search = QLineEdit()
         self.search.setPlaceholderText("Rechercher un titre, un artiste, un genre, une étiquette…")
         self.search.setClearButtonEnabled(True)
-        self.search.setMinimumWidth(240)
+        self.search.addAction(
+            theme.icon("search", theme.TEXT_2, 16), QLineEdit.ActionPosition.LeadingPosition
+        )
+        self.search.setToolTip("Rechercher (Ctrl + F)")
+        self.search.setMinimumWidth(200)
         self.search.setMaximumWidth(460)
         self.search.setAccessibleName("Rechercher dans la bibliothèque")
         self.search.textChanged.connect(lambda: self.search_timer.start())
         row.addWidget(self.search, 2)
         self.add_button = QToolButton()
+        self.add_button.setObjectName("primary")
         self.add_button.setText("Ajouter un morceau")
-        self.add_button.setIcon(theme.icon("plus"))
+        self.add_button.setAccessibleName("Ajouter un morceau")
+        self.add_button.setIcon(theme.icon("plus", theme.ON_ACCENT))
         self.add_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.add_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.add_button.setToolTip(
@@ -567,7 +601,7 @@ class LibraryPage(QWidget):
         self.add_button.setMenu(add)
         row.addWidget(self.add_button)
         self.menu_button = QToolButton()
-        self.menu_button.setIcon(theme.icon("menu"))
+        self.menu_button.setIcon(theme.icon("more"))
         self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.menu_button.setToolTip("Sauvegarde, restauration et autres options")
         self.menu_button.setAccessibleName("Options de la bibliothèque")
@@ -584,9 +618,15 @@ class LibraryPage(QWidget):
         row.addWidget(self.menu_button)
         return row
 
-    def _filters(self) -> QHBoxLayout:
+    def _filters(self) -> QWidget:
+        """The filters, then the sort: side by side, or one above the other when narrow."""
+        box = QWidget()
+        self.filter_rows = QBoxLayout(QBoxLayout.Direction.LeftToRight, box)
+        self.filter_rows.setContentsMargins(0, 0, 0, 0)
+        self.filter_rows.setSpacing(8)
         row = QHBoxLayout()
         row.setSpacing(8)
+        self.filter_rows.addLayout(row)
         self.genre_box = QComboBox()
         self.genre_box.setAccessibleName("Genre")
         self.tag_box = QComboBox()
@@ -597,9 +637,12 @@ class LibraryPage(QWidget):
                             ("Sans paroles", "nolyrics"), ("Audio introuvable", "missing"),
                             ("Audio conservé", "kept")):  # fmt: skip
             self.state_box.addItem(text, value)
-        for box in (self.genre_box, self.tag_box, self.state_box):
-            box.currentIndexChanged.connect(self.refresh)
-            row.addWidget(box)
+        for combo in (self.genre_box, self.tag_box, self.state_box):
+            combo.currentIndexChanged.connect(self.refresh)
+            row.addWidget(combo)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        self.filter_rows.addLayout(row, 1)
         self.clear_filters = QPushButton("Effacer les filtres")
         self.clear_filters.setObjectName("link")
         self.clear_filters.clicked.connect(self.reset_filters)
@@ -619,36 +662,38 @@ class LibraryPage(QWidget):
         self.sort_box.currentIndexChanged.connect(self._sort_changed)
         row.addWidget(self.sort_box)
         self.desc = QToolButton()
+        self.desc.setObjectName("sortDir")
         self.desc.setCheckable(True)
         self.desc.setChecked(bool(self.settings.get("library_desc", False)))
         self.desc.toggled.connect(self._desc_changed)
         row.addWidget(self.desc)
         self.view_list = QToolButton()
-        self.view_list.setIcon(theme.icon("rows"))
+        self.view_list.setIcon(theme.icon("rows", on=None))
         self.view_list.setToolTip("Liste")
         self.view_list.setAccessibleName("Affichage en liste")
         self.view_cards = QToolButton()
-        self.view_cards.setIcon(theme.icon("tiles"))
+        self.view_cards.setIcon(theme.icon("tiles", on=None))
         self.view_cards.setToolTip("Cartes")
         self.view_cards.setAccessibleName("Affichage en cartes")
         for b, mode in ((self.view_list, "list"), (self.view_cards, "cards")):
             b.setCheckable(True)
             b.clicked.connect(lambda _=False, m=mode: self.set_mode(m))
-            row.addWidget(b)
+        row.addWidget(segmented((self.view_list, self.view_cards)))
         self._show_direction()
-        return row
+        return box
 
     def _table(self) -> QTableView:
         t = SongTable()
         t.setModel(self.model)
         t.setObjectName("songs")
+        t.setAccessibleName("Morceaux")
         t.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         t.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         t.setShowGrid(False)
         t.setWordWrap(False)
         t.setAlternatingRowColors(False)
         t.verticalHeader().hide()
-        t.verticalHeader().setDefaultSectionSize(34)
+        t.verticalHeader().setDefaultSectionSize(36)
         t.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         t.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         t.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -749,7 +794,7 @@ class LibraryPage(QWidget):
         buttons.addWidget(self.link_button)
         buttons.addStretch()
         formats = QLabel("MP3, WAV, FLAC, M4A, OGG, OPUS… Une sauvegarde de bibliothèque se "
-                         "restaure depuis le menu ☰.")  # fmt: skip
+                         "restaure depuis le menu Options, en haut à droite.")  # fmt: skip
         formats.setObjectName("caption")
         formats.setWordWrap(True)
         layout.addWidget(title)
@@ -884,6 +929,7 @@ class LibraryPage(QWidget):
         counts = {
             "all": len(songs) - hidden,
             "fav": sum(1 for s in songs if s["favorite"] and not s["hidden"]),
+            "hidden": hidden,
         }
         entries = [("all",), ("fav",), ("recent",), ("latest",)]
         if hidden:
@@ -893,15 +939,16 @@ class LibraryPage(QWidget):
             item = QListWidgetItem(text)
             if key[0] in counts:
                 item.setToolTip(f"{counts[key[0]]} morceau" + ("x" if counts[key[0]] > 1 else ""))
-            if key[0] == "fav":
-                item.setIcon(theme.icon("star", theme.ACCENT, 16))
+                item.setData(COUNT_ROLE, counts[key[0]])
+            color = theme.ACCENT if key[0] == "fav" else theme.TEXT_2
+            item.setIcon(theme.icon(VIEW_ICONS[key[0]], color, 16, on=None))
             item.setData(Qt.ItemDataRole.UserRole, key)
             side.addItem(item)
-        head = QListWidgetItem("COLLECTIONS")
+        head = QListWidgetItem("Collections")
         head.setFlags(Qt.ItemFlag.NoItemFlags)
-        head.setForeground(QColor(theme.TEXT_3))
-        font = theme.app_font(11, 600)
-        head.setFont(font)
+        head.setForeground(QColor(theme.TEXT_2))
+        head.setFont(theme.app_font(theme.SIZE_CAPTION, 600))
+        head.setSizeHint(QSize(0, 40))  # a little air above the collections
         side.addItem(head)
         if not collections:
             none = QListWidgetItem("Aucune pour l'instant")
@@ -911,6 +958,8 @@ class LibraryPage(QWidget):
         for c in collections:
             item = QListWidgetItem(c["name"])
             item.setToolTip(f"{c['count']} morceau" + ("x" if c["count"] > 1 else ""))
+            item.setData(COUNT_ROLE, c["count"])
+            item.setIcon(theme.icon("collection", theme.TEXT_2, 16, on=None))
             item.setData(Qt.ItemDataRole.UserRole, ("col", c["cid"]))
             side.addItem(item)
         found = None
@@ -961,6 +1010,16 @@ class LibraryPage(QWidget):
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
+        tight = self.width() < 1000  # what makes the library fit a narrow window
+        self.sidebar.setFixedWidth(220 if tight else 232)
+        self.add_button.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonIconOnly
+            if tight
+            else Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self.filter_rows.setDirection(
+            QBoxLayout.Direction.TopToBottom if tight else QBoxLayout.Direction.LeftToRight
+        )
         narrow = self.width() < 1240
         for i, (key, _, _) in enumerate(COLUMNS):
             if key in NARROW_HIDDEN:
@@ -1004,7 +1063,7 @@ class LibraryPage(QWidget):
 
     def _show_direction(self) -> None:
         down = self.desc.isChecked()
-        self.desc.setText("↓" if down else "↑")
+        self.desc.setIcon(theme.icon("sort_down" if down else "sort_up", on=None))
         self.desc.setToolTip("Ordre décroissant" if down else "Ordre croissant")
         self.desc.setAccessibleName(self.desc.toolTip())
 

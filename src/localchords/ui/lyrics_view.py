@@ -59,8 +59,7 @@ class Fonts:
         self.chord = theme.app_font(size * 0.92, 700)
         self.approx = QFont(self.chord)
         self.approx.setItalic(True)
-        self.section = theme.app_font(size * 0.72, 700)
-        self.section.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 108)
+        self.section = theme.app_font(size * 0.78, 600)
         self.tm = QFontMetricsF(self.text)
         self.cm = QFontMetricsF(self.chord)
         self.am = QFontMetricsF(self.approx)
@@ -97,7 +96,7 @@ def lay_out(rows: list[dict], width: float, f: Fonts, chords_on: bool) -> list[L
                 Line(
                     r,
                     kind,
-                    [(0.0, row["text"].upper(), 0)],
+                    [(0.0, row["text"], 0)],
                     [],
                     f.sm.height() * 1.4,
                     0.0,
@@ -156,7 +155,7 @@ SCREEN_COLORS = {
     "approx": theme.TEXT_2,
     "manual": theme.EDITED,
     "now": theme.ACCENT,
-    "section": theme.ACCENT,
+    "section": theme.TEXT_2,
 }
 
 
@@ -560,10 +559,7 @@ class LyricsPage(QWidget):
         self.origin = ElidedLabel()
         self.origin.setObjectName("caption")
         self.badge = QLabel()
-        self.badge.setStyleSheet(
-            f"color: {theme.ON_ACCENT}; background: {theme.ACCENT}; border-radius: 4px;"
-            "padding: 1px 6px; font-weight: 600;"
-        )
+        self.badge.setObjectName("badge")
         self.badge.hide()
         row.addWidget(self.origin, 1)
         row.addWidget(self.badge)
@@ -717,6 +713,9 @@ class LyricsController(QObject):
         # The button in the song's top bar.
         self.button = QToolButton()
         self.button.setText("Paroles")
+        self.button.setIcon(theme.icon("lyrics", size=16))
+        self.button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        s.collapsible.append(self.button)
         self.button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.button.setToolTip("Grille, paroles, ou paroles et accords (K)")
         self.button.setAccessibleName("Paroles")
@@ -729,6 +728,7 @@ class LyricsController(QObject):
         self.button.setMenu(menu)
         top = s.key_button.parentWidget().layout()
         top.insertWidget(top.indexOf(s.key_button), self.button)
+        QWidget.setTabOrder(s.star, self.button)  # where it sits, not where it was made
 
         p = self.page
         p.text_size.set_value(int(settings.get("lyrics_size", 20)))
