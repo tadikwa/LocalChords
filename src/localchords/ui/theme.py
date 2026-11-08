@@ -120,7 +120,23 @@ QRadioButton::indicator {{
     width: 14px; height: 14px; border-radius: 8px; border: 1px solid {TEXT_2}; background: {SURFACE_2};
 }}
 QRadioButton::indicator:checked {{ background: {ACCENT}; border: 3px solid {SURFACE_3}; }}
+QToolButton#star:checked {{ background: {SURFACE_2}; border-color: {BORDER}; }}
 QToolButton#step {{ padding: 4px 5px; min-height: 20px; min-width: 20px; }}
+QListWidget#side {{ background: transparent; border: none; outline: 0; }}
+QListWidget#side::item {{ padding: 7px 8px; border-radius: 6px; }}
+QListWidget#side::item:hover {{ background: {SURFACE_2}; }}
+QListWidget#side::item:selected {{ background: {SURFACE_3}; color: {TEXT}; }}
+QTableView#songs, QListView#cards {{
+    background: {BG}; border: none; outline: 0; selection-background-color: {SURFACE_3};
+    selection-color: {TEXT};
+}}
+QTableView#songs::item {{ padding: 0 6px; border-bottom: 1px solid {SURFACE_2}; }}
+QTableView#songs::item:selected {{ background: {SURFACE_3}; }}
+QHeaderView::section {{
+    background: {BG}; color: {TEXT_3}; border: none; border-bottom: 1px solid {BORDER};
+    padding: 6px; font-size: 12px; font-weight: 600;
+}}
+QHeaderView::section:hover {{ color: {TEXT}; }}
 QLabel#drop {{
     background: rgba(245, 185, 74, 36); border: 2px dashed {ACCENT}; border-radius: 12px;
     font-size: 26px; font-weight: 600;
@@ -128,6 +144,8 @@ QLabel#drop {{
 """
 
 # On a 24 × 24 grid: a list of strokes (open polylines) and fills (closed polygons).
+_STAR = [(12, 3.3), (14.4, 9.6), (21, 9.9), (15.8, 14), (17.6, 20.5), (12, 16.8), (6.4, 20.5),
+         (8.2, 14), (3, 9.9), (9.6, 9.6)]  # fmt: skip
 _ICONS: dict[str, dict] = {
     "play": {"fill": [[(7, 4), (20, 12), (7, 20)]]},
     "pause": {"fill": [[(6, 4), (10, 4), (10, 20), (6, 20)], [(14, 4), (18, 4), (18, 20), (14, 20)]]},
@@ -163,6 +181,11 @@ _ICONS: dict[str, dict] = {
     },
     "cards": {"stroke": [[(3, 6), (10, 6), (10, 18), (3, 18), (3, 6)],
                          [(14, 6), (21, 6), (21, 18), (14, 18), (14, 6)]]},
+    "star": {"fill": [_STAR]},
+    "star_line": {"stroke": [_STAR + [_STAR[0]]]},
+    "rows": {"stroke": [[(4, 6), (20, 6)], [(4, 10), (20, 10)], [(4, 14), (20, 14)], [(4, 18), (20, 18)]]},
+    "tiles": {"stroke": [[(4, 4), (10, 4), (10, 10), (4, 10), (4, 4)], [(14, 4), (20, 4), (20, 10), (14, 10), (14, 4)],
+                         [(4, 14), (10, 14), (10, 20), (4, 20), (4, 14)], [(14, 14), (20, 14), (20, 20), (14, 20), (14, 14)]]},
     "volume": {
         "fill": [[(3, 9), (7, 9), (12, 5), (12, 19), (7, 15), (3, 15)]],
         "stroke": [[(15, 9), (17, 12), (15, 15)], [(18, 6), (21, 12), (18, 18)]],

@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import audio, export, identify, lyrics_online, transcribe
+from .. import audio, export, identify, library, lyrics_online, transcribe
 from .. import lyrics as L
 from . import theme
 from .widgets import ElidedLabel, Stepper, fmt_time
@@ -1466,7 +1466,7 @@ class LyricsController(QObject):
         project = self.w.project
         if not project or self.task is not None:
             return
-        path = Path(project.audio.get("path", ""))
+        path = library.audio_file(project.audio)
         if not path.is_file():
             self.w._alert("Le fichier audio est introuvable : il faut l'écouter pour transcrire.")
             return

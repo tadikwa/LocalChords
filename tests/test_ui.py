@@ -12,7 +12,6 @@ import synth
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QPushButton
 from test_core import analysis as make_analysis
 
 from localchords import library
@@ -78,9 +77,11 @@ def click_beat(app, window, beat, button=Qt.MouseButton.LeftButton, double=False
     app.processEvents()
 
 
-def test_home_shows_nothing_recent_at_first(app):
+def test_home_welcomes_an_empty_library(app):
     window = MainWindow(muted=True)
-    assert not window.home.recent_title.isVisibleTo(window.home)
+    assert wait_for(app, lambda: not window.home.scanning)
+    assert window.home.pages.currentWidget() is window.home.welcome
+    assert window.home.open_button.isVisibleTo(window.home)
     window.close()
 
 
@@ -312,7 +313,9 @@ def test_full_path_drop_analyze_play_correct_save_reopen(app, tmp_path):
     assert window.job is None, "an analyzed song must not be analyzed again"
     assert window.project.segments()[0].chord == "E:min"
     assert Path(window.project.audio["path"]) == wav
-    assert [p for p, _ in library.recent()] == [saved]
+    songs = window.catalog.songs()
+    assert [s["file"] for s in songs] == [saved.name]
+    assert songs[0]["opened_at"] and not songs[0]["opened_estimated"]
     window.close()
 
 
@@ -356,7 +359,7 @@ def test_long_title_does_not_widen_the_window(app, wav, tmp_path):
     window.close()
 
 
-def test_recent_songs_stay_within_the_window_and_say_when_audio_is_gone(app, wav, tmp_path):
+def test_library_stays_within_the_window_and_says_when_audio_is_gone(app, wav, tmp_path):
     long = {"path": str(wav), "title": "très long titre " * 30, "duration": 8.0}
     gone = {"path": str(tmp_path / "parti.wav"), "title": "Parti", "duration": 8.0}
     Project(long, make_analysis()).save(library.project_path("a" * 16))
@@ -364,12 +367,15 @@ def test_recent_songs_stay_within_the_window_and_say_when_audio_is_gone(app, wav
     window = MainWindow(muted=True)
     window.resize(1100, 700)
     window.show()
-    app.processEvents()
+    home = window.home
+    assert wait_for(app, lambda: not home.scanning and len(home.model.rows) == 2)
     assert window.width() == 1100
-    texts = {b.text(): b.toolTip() for b in window.home.findChildren(QPushButton, "recent")}
-    assert any("Parti" in t and "audio introuvable" in t for t in texts)
-    shortened = next(t for t in texts if t.startswith("très"))
-    assert "…" in shortened and "très long titre " * 30 in texts[shortened]
+    assert home.pages.currentWidget() is home.table
+    by_title = {r["title"]: r for r in home.model.rows}
+    assert home.model.text(by_title["Parti"], "audio") == "Introuvable"
+    assert home.model.text(by_title["très long titre " * 30], "audio") == "Disponible"
+    # Dates from before v1.4 are not passed off as known.
+    assert home.model.text(by_title["Parti"], "added").startswith("≈ ")
     window.close()
 
 
@@ -472,7 +478,7 @@ def test_batch_analyzes_several_files_in_the_background(app, tmp_path):
     assert window.stack.currentWidget() is window.home
     assert wait_for(app, lambda: not window.batch_timer.isActive(), 240)
     assert "terminée" in window.home.batch_text.text() and "abîmé" in window.home.batch_text.text()
-    assert len(library.recent()) == 2
+    assert len(window.catalog.songs()) == 2
     window.open_path(files[1])
     assert window.job is None and window.project.segments()
     window.close()

@@ -270,9 +270,19 @@ def run(audio_path: Path, out: Path) -> int:
             and window.project.view["transpose"] == 2,
             seconds=round(reopened, 2),
             file=str(saved),
-            recent=len(library.recent()),
+            recent=len(window.catalog.songs()),
         )
         wait(lambda: window.audio_ready, 60)  # a decode left running crashes Python at exit
+        window.song.star.setChecked(True)
+        window.go_home()
+        wait(lambda: not window.home.scanning, 30)
+        rows = window.home.model.rows
+        step(
+            "bibliothèque : index SQLite, favori, page d'accueil",
+            len(rows) == 1 and rows[0]["favorite"] == 1 and bool(rows[0]["opened_at"])
+            and window.home.pages.currentWidget() is window.home.table,
+            songs=len(rows),
+        )  # fmt: skip
         window.close()
         report["ok"] = True
     except Exception:  # noqa: BLE001 - the report must say what broke

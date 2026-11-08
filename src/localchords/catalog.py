@@ -153,7 +153,8 @@ def _nocase(a: str, b: str) -> int:
 class Catalog:
     def __init__(self, path: Path | str):
         self.path = path
-        self.db = sqlite3.connect(str(path), timeout=10)
+        # check_same_thread off: a catalog in memory is shared with the backup task's thread.
+        self.db = sqlite3.connect(str(path), timeout=10, check_same_thread=False)
         try:
             self.db.row_factory = sqlite3.Row
             # SQLite's own NOCASE folds only A-Z: « À apprendre » and « à apprendre » are one tag.
