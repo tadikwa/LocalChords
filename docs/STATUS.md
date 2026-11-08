@@ -1,8 +1,8 @@
 # État du projet
 
-Mis à jour le 2026-11-08 : v1.5 (interface revue et installateur Windows) en préparation sur la branche
-`feature/v1.5-desktop-redesign`. v1.4 (<https://github.com/tadikwa/LocalChords/releases/tag/v1.4>) est la
-dernière version publiée ; v1.1 à v1.3.1 restent en ligne, inchangées.
+Mis à jour le 2026-11-08 : v1.5 (interface revue et installateur Windows) publiée
+(<https://github.com/tadikwa/LocalChords/releases/tag/v1.5>), dernière version. Les versions v1.1 à v1.4
+restent en ligne, inchangées.
 
 ## Où on en est
 
@@ -20,6 +20,13 @@ paires avant/après régénérées sur les morceaux de démonstration. Installat
 (installation, réinstallation, mise à jour application ouverte, désinstallation, dossier portable
 refusé, auto-test 17 sur 17, données réelles inchangées). Construction complète de la CI réussie sur la
 branche (installateur, exécutable unique, zip, sources tierces).
+Binaires de la CI vérifiés avant publication : empreintes SHA256SUMS (CRLF) ; installateur silencieux dans
+un dossier avec espace et accent, fichiers identiques au zip, entrée « Applications », désinstallation
+complète ; auto-test du programme installé, du zip et de l'exécutable unique, 18 étapes sur 18 chacun,
+données vides séparées ; FFmpeg LGPL v3 sans x264 ni x265, notices et sources tierces jointes. Après
+publication, les cinq fichiers téléchargés sans compte correspondent aux empreintes.
+Un premier tag `v1.5` a été poussé par erreur sur le commit de la v1.4 (fusion ratée) : la CI a été
+annulée avant toute publication et le tag supprimé, puis recréé sur la fusion.
 
 **v1.4 :** la page d'accueil devient une bibliothèque : index SQLite (`catalog.db`) reconstruit à partir des
 projets `.lchords`, qui restent la référence et ne sont pas modifiés ; recherche, filtres, tris, favoris,
