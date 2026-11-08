@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -918,8 +919,15 @@ class MainWindow(QMainWindow):
                 project = Project.load(saved)
                 project.audio["path"] = str(path)
                 return project, saved, True
-            except ProjectError:
-                pass  # a damaged save doesn't stop a new analysis, which replaces it
+            except ProjectError as exc:
+                # A new analysis replaces it, but the file is kept aside: it may hold corrections
+                # and lyrics, or come from a newer version.
+                aside = saved.with_name(f"{saved.stem}-{int(time.time())}.illisible")
+                try:
+                    saved.replace(aside)
+                    _log(f"{exc} Gardé sous {aside.name}.")
+                except OSError:
+                    _log(f"{exc} Impossible de le mettre de côté.")
         info = audio.metadata(path)
         # Lyrics found beside the recording or in its tags: on this computer, so used at once.
         found = L.find_local(path, info.get("lyrics") or "")
@@ -928,6 +936,7 @@ class MainWindow(QMainWindow):
                 "path": str(path),
                 "title": info["title"],
                 "artist": info["artist"],
+                "album": info.get("album") or "",
                 "duration": float(info["duration"] or 0.0),
                 "fingerprint": fingerprint,
                 "waveform": None,
@@ -1866,7 +1875,7 @@ class MainWindow(QMainWindow):
         )
         if path:
             try:
-                self.project.save(Path(path))
+                self.project.save(Path(path), shared=True)  # leaves the program: no catalog lyrics
             except OSError as exc:
                 self._alert(f"Enregistrement impossible : {exc.strerror or exc}")
 

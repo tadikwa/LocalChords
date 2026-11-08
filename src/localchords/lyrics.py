@@ -256,10 +256,16 @@ def timed(lyrics: dict | None) -> bool:
 def line_at(lyrics: dict, t: float) -> int | None:
     """Index of the timed line being sung at t (the last one begun), None before the first."""
     offset = float(lyrics.get("offset") or 0.0)
-    idx = [i for i, x in enumerate(lyrics["lines"]) if x["start"] is not None]
+    idx = _by_start(lyrics["lines"])
     starts = [lyrics["lines"][i]["start"] + offset for i in idx]
     k = bisect_right(starts, t + 1e-3) - 1
     return idx[k] if k >= 0 else None
+
+
+def _by_start(lines: list[dict]) -> list[int]:
+    """Indexes of the timed lines in time order: hand-timed lines may be out of text order."""
+    return sorted((i for i, x in enumerate(lines) if x["start"] is not None),
+                  key=lambda i: lines[i]["start"])  # fmt: skip
 
 
 def new(lines: list[dict], source: dict) -> dict:
@@ -275,12 +281,18 @@ def new(lines: list[dict], source: dict) -> dict:
 def checked(d) -> dict | None:
     """Lyrics read from a project file, completed, or None if they are not lyrics."""
 
+    def number(v):
+        return isinstance(v, int | float) and not isinstance(v, bool)
+
     def line_ok(x):
         return (
             isinstance(x, dict)
             and isinstance(x.get("text"), str)
-            and (x.get("start") is None or isinstance(x["start"], int | float))
+            and (x.get("start") is None or number(x["start"]))
         )
+
+    def word_ok(w):
+        return isinstance(w, list) and len(w) == 2 and isinstance(w[0], int) and number(w[1])
 
     if not (
         isinstance(d, dict)
@@ -292,8 +304,14 @@ def checked(d) -> dict | None:
     d.setdefault("original", copy.deepcopy(d["lines"]))
     if not isinstance(d.get("offset"), int | float):
         d["offset"] = 0.0
-    if not isinstance(d.get("anchors"), dict):
-        d["anchors"] = {}
+    anchors = d.get("anchors") if isinstance(d.get("anchors"), dict) else {}
+    d["anchors"] = {
+        k: a for k, a in anchors.items()
+        if isinstance(a, dict) and isinstance(a.get("line"), int) and isinstance(a.get("char"), int)
+    }  # fmt: skip
+    for x in d["lines"]:
+        if "words" in x and not (isinstance(x["words"], list) and all(map(word_ok, x["words"]))):
+            del x["words"]
     if "previous" in d and checked(d["previous"]) is None:
         del d["previous"]
     return d
@@ -317,7 +335,18 @@ def edited(lyrics: dict) -> bool:
 
 def exportable(lyrics: dict | None) -> bool:
     """Catalog lyrics are shown, never exported: their rights are the catalog's, not ours."""
-    return bool(lyrics) and bool(lyrics["source"].get("exportable"))
+    source = lyrics["source"] if lyrics else {}
+    return bool(source.get("exportable")) and source.get("kind") != "catalog"
+
+
+def shareable(lyrics: dict | None) -> dict | None:
+    """What of the lyrics may leave the program: nothing of a catalog's, even kept as previous."""
+    if not exportable(lyrics):
+        return None
+    out = dict(lyrics)
+    if "previous" in out and not exportable(out["previous"]):
+        del out["previous"]
+    return out
 
 
 # Chords over the words --------------------------------------------------------------------------
@@ -339,7 +368,7 @@ def sheet(lyrics: dict, chords: list[tuple[float, float, str]], duration: float)
     lines = lyrics["lines"]
     offset = float(lyrics.get("offset") or 0.0)
     anchors = lyrics.get("anchors") or {}
-    timed_idx = [i for i, x in enumerate(lines) if x["start"] is not None]
+    timed_idx = _by_start(lines)
     rows = []
     for i, x in enumerate(lines):
         kind = "section" if x.get("section") else ("line" if x["text"] else "break")

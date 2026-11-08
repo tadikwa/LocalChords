@@ -110,6 +110,42 @@ def test_catalog_lyrics_are_never_exportable():
     assert not L.exportable(L.new([], {"kind": "catalog", "exportable": False}))
     assert L.exportable(L.new([], {"kind": "user", "exportable": True}))
     assert not L.exportable(None)
+    assert not L.exportable(L.new([], {"kind": "catalog", "exportable": True}))  # a forged flag
+
+
+def test_shareable_lyrics_leave_the_catalog_behind():
+    catalog = L.new([{"text": "a", "start": 1.0}], {"kind": "catalog", "exportable": False})
+    mine = L.replaced(catalog, [{"text": "b", "start": 1.0}], {"kind": "user", "exportable": True})
+    assert L.shareable(catalog) is None
+    shared = L.shareable(mine)
+    assert shared["lines"] == mine["lines"] and "previous" not in shared
+    assert "previous" in mine  # the program's own copy keeps it
+
+
+def test_checked_drops_malformed_anchors_and_words():
+    d = {
+        "source": {"kind": "user", "exportable": True},
+        "lines": [
+            {"text": "un deux", "start": 1.0, "words": [[0, 1.0], [3, "x"]]},
+            {"text": "trois", "start": 2.0, "words": [[0, 2.0]]},
+        ],
+        "anchors": {"1.00": "x", "2.00": {"line": 0, "char": 3}, "3.00": {"line": "0"}},
+    }
+    c = L.checked(d)
+    assert c["anchors"] == {"2.00": {"line": 0, "char": 3}}
+    assert "words" not in c["lines"][0] and c["lines"][1]["words"] == [[0, 2.0]]
+    L.sheet(c, [(1.0, 2.0, "C"), (2.0, 3.0, "G")], 4.0)  # no crash
+
+
+def test_lines_timed_out_of_text_order_get_their_own_chords():
+    lyr = L.new(
+        [{"text": "B", "start": 20.0}, {"text": "A", "start": 10.0}, {"text": "C", "start": 30.0}],
+        {"kind": "user", "exportable": True},
+    )
+    rows = L.sheet(lyr, [(12.0, 15.0, "Am"), (22.0, 25.0, "F")], 40.0)
+    labels = {r["text"]: [c["label"] for c in r["chords"]] for r in rows if r["kind"] == "line"}
+    assert "F" in labels["B"] and "Am" in labels["A"] and "F" not in labels["A"]
+    assert L.line_at(lyr, 21.0) == 0 and L.line_at(lyr, 11.0) == 1
 
 
 # Chords over words -----------------------------------------------------------------------------

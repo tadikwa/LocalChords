@@ -31,7 +31,10 @@ import numpy as np
 from . import audio, library
 from .lyrics_online import USER_AGENT
 
-HF = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"
+# Pinned to a revision: the sizes and hashes below are this one's, a later upload would not match.
+HF = (
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/"
+)
 MODELS = [
     {
         "id": "small-q5_1",
@@ -244,7 +247,11 @@ def transcribe(path: Path, model_id: str, language: str, task: Task) -> dict:
         raise TranscribeError(str(exc)) from exc
     if task.cancelled:
         raise TranscribeError("Transcription annulée.")
-    with tempfile.TemporaryDirectory(prefix="localchords-") as tmp:
+    # whisper-cli opens files with ANSI names: a Cyrillic or CJK folder would not open. So it runs
+    # in the models folder (the working directory is passed as Unicode) and gets ASCII names.
+    home = models_dir()
+    with tempfile.TemporaryDirectory(prefix="tmp-", dir=home) as tmp:
+        rel = Path(Path(tmp).name)
         wav, out = Path(tmp) / "audio.wav", Path(tmp) / "result"
         with wave.open(str(wav), "wb") as w:
             w.setnchannels(1)
@@ -252,7 +259,10 @@ def transcribe(path: Path, model_id: str, language: str, task: Task) -> dict:
             w.setframerate(RATE)
             w.writeframes((np.clip(y, -1, 1) * 32767).astype(np.int16).tobytes())
         task.status = "Transcription…"
-        _run_engine(command(model_path(model_id), wav, out, language), task)
+        cmd = command(
+            Path(model_info(model_id)["file"]), rel / "audio.wav", rel / "result", language
+        )
+        _run_engine(cmd, task, home)
         raw = (out.with_suffix(".json")).read_bytes()
     data = json.loads(raw.decode("utf-8", "surrogateescape"))
     lines = lines_from(data, y)
@@ -260,7 +270,7 @@ def transcribe(path: Path, model_id: str, language: str, task: Task) -> dict:
     return {"lines": lines, "language": found}
 
 
-def _run_engine(cmd: list[str], task: Task) -> None:
+def _run_engine(cmd: list[str], task: Task, cwd: Path | None = None) -> None:
     flags = 0
     if sys.platform == "win32":
         flags = subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
@@ -272,6 +282,7 @@ def _run_engine(cmd: list[str], task: Task) -> None:
             stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
             creationflags=flags,
+            cwd=cwd,
         )
     except OSError as exc:
         raise TranscribeError(f"Le moteur de transcription n'a pas démarré : {exc}") from exc

@@ -94,24 +94,26 @@ class Project:
         self._cache: dict = {}
 
     # The file ----------------------------------------------------------------------------------
-    def to_dict(self) -> dict:
+    def to_dict(self, shared: bool = False) -> dict:
+        """shared: for a copy that leaves the program, without lyrics it may not hand out."""
+        lyrics = lyrics_module.shareable(self.lyrics) if shared else self.lyrics
         d = {
             "format": FORMAT,
             # Version 1 programs would drop lyrics they cannot read: given 2, they refuse the file.
-            "version": VERSION if self.lyrics else 1,
+            "version": VERSION if lyrics else 1,
             "audio": self.audio,
             "analysis": self.analysis,
             "edits": self.edits,
             "view": self.view,
         }
-        if self.lyrics:
-            d["lyrics"] = self.lyrics
+        if lyrics:
+            d["lyrics"] = lyrics
         return d
 
-    def save(self, path: Path) -> None:
+    def save(self, path: Path, shared: bool = False) -> None:
         """Write atomically: a crash midway leaves the previous file whole."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        data = json.dumps(self.to_dict(), ensure_ascii=False, indent=1).encode("utf-8")
+        data = json.dumps(self.to_dict(shared), ensure_ascii=False, indent=1).encode("utf-8")
         fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as f:

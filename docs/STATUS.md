@@ -11,7 +11,7 @@ whisper.cpp, ou saisie), quatre vues (`K`), accords posés sur les mots et dépl
 main, export PDF, texte et `.lrc` réservé aux paroles exportables. Détail dans
 [TECHNIQUE.md](TECHNIQUE.md#les-paroles-v13), mesures de transcription dans
 [BENCHMARKS.md](BENCHMARKS.md#transcription-des-paroles-v13), notes dans [NOTES-v1.3.md](NOTES-v1.3.md).
-668 tests passent. Auto-test (`--self-test`) avec une étape « paroles et accords » ; captures sur des paroles écrites pour la
+676 tests passent. Auto-test (`--self-test`) avec une étape « paroles et accords » ; captures sur des paroles écrites pour la
 démo (`scripts/screenshot_lyrics.py`).
 
 **v1.2.1 :** section « Accords du morceau » sous la grille (tous les accords, ou ceux à venir), une position
@@ -46,6 +46,7 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
 
 - Paroles transcrites : un brouillon (environ un mot sur trois faux avec le modèle conseillé, sur 12 chansons
   libres) ; pas mesuré sur des morceaux du commerce. Modèles de 190 et 574 Mo à télécharger.
+- Accord déplacé à la main : perdu si le lissage ou une correction change le début de son segment.
 - Paroles en ligne : LRCLIB seulement, et pas d'export de ces paroles (droits des auteurs).
 - Placement des accords : sur le mot le plus proche quand la transcription donne les mots, sinon réparti
   dans la ligne (« approx ») ; à vérifier à l'œil, les accords se déplacent à la main.
@@ -78,6 +79,25 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
   <https://github.com/tadikwa/LocalChords/releases>.
 
 ## Revue indépendante
+
+**v1.3 :** revue du diff entier par un agent séparé, 11 constats. Dix corrigés, avec des tests :
+- « Enregistrer une copie du projet » emportait les paroles du catalogue : la copie les laisse de côté,
+  même gardées comme version précédente ;
+- le texte du catalogue pouvait être copié depuis l'aperçu de recherche ou l'éditeur, puis recollé comme
+  paroles « à vous » : copie bloquée pour ces paroles, et `exportable` refuse toute source « catalog » ;
+- une transcription finie après réouverture du même morceau était perdue : elle va au morceau ouvert ;
+- un projet illisible (paroles abîmées, version plus récente) était remplacé par une nouvelle analyse :
+  il est d'abord mis de côté (`<empreinte>-<date>.illisible`, signalé dans `log.txt`) ;
+- whisper-cli n'ouvrait pas un dossier au nom cyrillique ou chinois : il tourne dans le dossier des modèles
+  et ne reçoit que des noms ASCII ;
+- des lignes calées dans le désordre recevaient les accords d'une autre ligne : triées par temps ;
+- ancres et temps des mots mal formés dans un projet : écartés à la lecture au lieu de planter ;
+- supprimer un modèle demande confirmation ;
+- les modèles sont téléchargés depuis une révision fixe de Hugging Face (empreintes vérifiées dessus) ;
+- l'album est gardé avec le projet pour la recherche LRCLIB.
+
+Laissé : un accord déplacé à la main tient au début de son segment ; si le lissage (« Accords très
+courts ») ou une correction déplace ce début, l'accord revient à sa place calculée. Limite notée plus haut.
 
 **v1.2.1 :** revue du diff entier, 5 constats. Deux ont été corrigés avec un test : l'ouverture d'un projet
 le réenregistrait, et un en-tête trop haut pouvait couper la première rangée de la fiche. Trois sont laissés

@@ -125,6 +125,29 @@ def test_task_reports_errors_instead_of_raising():
     assert task.done and task.error == "non"
 
 
+def test_engine_gets_ascii_names_in_the_models_folder(tmp_path, monkeypatch):
+    """whisper-cli opens ANSI names only: a Cyrillic folder must never reach its arguments."""
+    home = tmp_path / "Привет été"
+    home.mkdir()
+    (home / T.MODELS[0]["file"]).write_bytes(b"0")
+    monkeypatch.setattr(T, "models_dir", lambda: home)
+    monkeypatch.setattr(T, "engine_ready", lambda: True)
+    monkeypatch.setattr(T, "installed", lambda mid: True)
+    monkeypatch.setattr(T.audio, "decode", lambda *a, **k: np.zeros((RATE, 1), np.float32))
+    seen = {}
+
+    def run(cmd, task, cwd=None):
+        seen["cmd"], seen["cwd"] = cmd, cwd
+        out = Path(cwd) / cmd[cmd.index("-of") + 1]
+        out.with_suffix(".json").write_text('{"transcription": []}', encoding="utf-8")
+
+    monkeypatch.setattr(T, "_run_engine", run)
+    T.transcribe(tmp_path / "Привет.wav", T.MODELS[0]["id"], "fr", T.Task())
+    assert seen["cwd"] == home
+    assert all(arg.isascii() for arg in seen["cmd"][1:]), seen["cmd"]
+    assert not [p for p in home.iterdir() if p.is_dir()]  # the temporary folder is gone
+
+
 @pytest.mark.slow
 def test_engine_on_an_instrumental_writes_no_words(tmp_path, monkeypatch):
     """The demo song has no voice: a model run over it must not invent lyrics."""

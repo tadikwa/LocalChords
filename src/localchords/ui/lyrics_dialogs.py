@@ -3,7 +3,7 @@ text, and choosing what the printed lyrics and chords sheet holds."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QMimeData, Qt, QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
@@ -98,6 +99,7 @@ class SearchDialog(QDialog):
         layout.addWidget(self.results, 1)
         self.preview = QPlainTextEdit()
         self.preview.setReadOnly(True)
+        self.preview.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)  # no copy
         layout.addWidget(self.preview, 2)
         self.plain = QCheckBox("Garder le texte seul, sans les horodatages du catalogue")
         self.plain.setToolTip(
@@ -318,6 +320,15 @@ class TranscribeDialog(QDialog):
 
     def _model_action(self, mid: str) -> None:
         if transcribe.installed(mid):
+            info = transcribe.model_info(mid)
+            sure = QMessageBox.question(
+                self,
+                "Supprimer le modèle",
+                f"Supprimer le modèle « {info['label']} » ? Les paroles déjà transcrites restent ; "
+                "il faudra le retélécharger pour transcrire à nouveau.",
+            )
+            if sure != QMessageBox.StandardButton.Yes:
+                return
             transcribe.delete_model(mid)  # the transcriptions stay in their projects
             self._refresh()
             return
@@ -351,10 +362,17 @@ class TranscribeDialog(QDialog):
         super().done(result)
 
 
+class _NoCopyEdit(QPlainTextEdit):
+    """Editable, but nothing copied or dragged out: catalog lyrics stay in the program."""
+
+    def createMimeDataFromSelection(self):  # noqa: N802 (Qt's name)
+        return QMimeData()
+
+
 class LyricsEditor(QDialog):
     """The whole text at once: a line per line, `[Refrain]` for a section, LRC times kept."""
 
-    def __init__(self, text: str, parent=None):
+    def __init__(self, text: str, parent=None, copyable: bool = True):
         super().__init__(parent)
         self.setWindowTitle("Paroles")
         self.resize(680, 640)
@@ -369,7 +387,7 @@ class LyricsEditor(QDialog):
                 "de ses mots."
             )
         )
-        self.edit = QPlainTextEdit(text)
+        self.edit = (QPlainTextEdit if copyable else _NoCopyEdit)(text)
         font = QFont(theme.app_font(15))
         self.edit.setFont(font)
         layout.addWidget(self.edit, 1)

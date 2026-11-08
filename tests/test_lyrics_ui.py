@@ -276,3 +276,56 @@ def test_project_without_lyrics_opens_as_before(app, wav, tmp_path):
     assert window.song.middle.currentWidget() is window.song.scroll
     window.flush()
     window.close()
+
+
+def test_a_copy_of_the_project_leaves_catalog_lyrics_out(app, wav, tmp_path, monkeypatch):
+    import json
+
+    from localchords.ui import main_window as mw
+
+    source = {"kind": "catalog", "name": "LRCLIB", "exportable": False}
+    window = with_lyrics(app, wav, tmp_path, source)
+    copy = tmp_path / "copie.lchords"
+    monkeypatch.setattr(mw.QFileDialog, "getSaveFileName", lambda *a, **k: (str(copy), ""))
+    window.save_as()
+    d = json.loads(copy.read_text(encoding="utf-8"))
+    assert "lyrics" not in d and d["version"] == 1
+    assert window.project.lyrics["source"]["kind"] == "catalog"  # still shown here
+    window.close()
+
+
+def test_a_project_that_cannot_be_read_is_kept_aside(app, wav, tmp_path):
+    from localchords import audio, library
+
+    saved = library.project_path(audio.fingerprint(wav))
+    saved.parent.mkdir(parents=True, exist_ok=True)
+    saved.write_text('{"format": "localchords", "version": 99}', encoding="utf-8")
+    window = MainWindow(muted=True)
+    project, file, known = window._project_for(wav)
+    assert not known and file == saved and not saved.exists()
+    aside = list(saved.parent.glob(f"{saved.stem}-*.illisible"))
+    assert len(aside) == 1 and '"version": 99' in aside[0].read_text(encoding="utf-8")
+    window.close()
+
+
+def test_a_transcription_reaches_its_song_reopened_meanwhile(app, wav, tmp_path):
+    window = with_lyrics(app, wav, tmp_path)
+    c = window.lyrics
+    task = transcribe.Task(done=True, result={"lines": [{"text": "Bonjour", "start": 1.0}],
+                                              "language": "fr"})  # fmt: skip
+    earlier = Project.load(window.project_file)  # the same song, as it was when it began
+    c.task, c.task_target = task, (earlier, window.project_file)
+    c.task_info = {"model": "small-q5_1", "language": "auto", "began": 0.0}
+    c._poll()
+    assert window.project.lyrics["source"]["kind"] == "transcription"
+    window.close()
+
+
+def test_catalog_lyrics_cannot_be_copied_out_of_the_editor(app):
+    from localchords.ui.lyrics_dialogs import LyricsEditor
+
+    for copyable, expected in ((True, "Une ligne"), (False, "")):
+        dialog = LyricsEditor("Une ligne", copyable=copyable)
+        dialog.edit.selectAll()
+        assert dialog.edit.createMimeDataFromSelection().text() == expected
+        dialog.close()

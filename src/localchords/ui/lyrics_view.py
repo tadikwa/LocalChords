@@ -1124,7 +1124,8 @@ class LyricsController(QObject):
         if not project:
             return
         lyr = project.lyrics
-        dialog = LyricsEditor(L.to_editor(lyr["lines"]) if lyr else "", self.w)
+        text = L.to_editor(lyr["lines"]) if lyr else ""
+        dialog = LyricsEditor(text, self.w, copyable=not lyr or L.exportable(lyr))
         if not dialog.exec():
             return
         lines = L.from_editor(dialog.text(), lyr["lines"] if lyr else [])
@@ -1226,7 +1227,9 @@ class LyricsController(QObject):
             )
             return
         project, file = self.task_target
-        if project is self.w.project:
+        # The same song reopened meanwhile is another Project object, but the same file.
+        open_now = self.w.project is not None
+        if open_now and (project is self.w.project or (file and file == self.w.project_file)):
             self._replace(result["lines"], source)
         elif file is not None:  # another song is open: the transcription goes to its own project
             from ..project import Project, ProjectError
