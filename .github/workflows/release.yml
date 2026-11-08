@@ -49,6 +49,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
           New-Item -ItemType Directory out | Out-Null
+          $env:VERSION = $env:VERSION -replace '/', '-'   # a branch name in file names
           $number = $env:VERSION.TrimStart("v")
           if ($number -notmatch '^\d+(\.\d+){0,3}$') { $number = "0.0" }   # a run started by hand on a branch
           & "$env:RUNNER_TEMP\inno\ISCC.exe" /Q "/DAppVersion=$number" installer\LocalChords.iss
