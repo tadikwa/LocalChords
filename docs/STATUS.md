@@ -1,8 +1,8 @@
 # État du projet
 
-Mis à jour le 2026-11-08 : v1.3 (paroles) terminée sur la branche `feature/v1.3-lyrics`, en cours de
-vérification avant publication. La v1.2.1 reste la dernière version publiée
-(<https://github.com/tadikwa/LocalChords/releases/tag/v1.2.1>), inchangée.
+Mis à jour le 2026-11-08 : v1.3 (paroles) publiée
+(<https://github.com/tadikwa/LocalChords/releases/tag/v1.3>), dernière version. Les versions v1.1, v1.2 et
+v1.2.1 restent en ligne, inchangées.
 
 ## Où on en est
 
@@ -14,6 +14,7 @@ main, export PDF, texte et `.lrc` réservé aux paroles exportables. Détail dan
 676 tests passent. Auto-test (`--self-test`) avec une étape « paroles et accords » ; captures sur des paroles écrites pour la
 démo (`scripts/screenshot_lyrics.py`).
 Builds locaux vérifiés : auto-test sans modèle, puis avec le modèle 190 Mo et la recherche LRCLIB (transcription 10 lignes en 10 s, 20 résultats). Exécutable unique 302 Mo, démarrage 4 s, 606 Mo décompressés ; dossier 606 Mo.
+Binaires de la CI vérifiés avant publication : empreintes SHA256SUMS, auto-test du zip sans modèle, puis du zip et de l'exécutable unique avec modèle et LRCLIB ; URL des modèles épinglées (taille et empreinte conformes).
 
 **v1.2.1 :** section « Accords du morceau » sous la grille (tous les accords, ou ceux à venir), une position
 par accord partagée par le panneau, les cartes et la fiche, et l'export « Fiche des accords (PDF) ». Détail
