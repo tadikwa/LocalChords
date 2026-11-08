@@ -13,6 +13,7 @@ main, export PDF, texte et `.lrc` réservé aux paroles exportables. Détail dan
 [BENCHMARKS.md](BENCHMARKS.md#transcription-des-paroles-v13), notes dans [NOTES-v1.3.md](NOTES-v1.3.md).
 676 tests passent. Auto-test (`--self-test`) avec une étape « paroles et accords » ; captures sur des paroles écrites pour la
 démo (`scripts/screenshot_lyrics.py`).
+Builds locaux vérifiés : auto-test sans modèle, puis avec le modèle 190 Mo et la recherche LRCLIB (transcription 10 lignes en 10 s, 20 résultats). Exécutable unique 302 Mo, démarrage 4 s, 606 Mo décompressés ; dossier 606 Mo.
 
 **v1.2.1 :** section « Accords du morceau » sous la grille (tous les accords, ou ceux à venir), une position
 par accord partagée par le panneau, les cartes et la fiche, et l'export « Fiche des accords (PDF) ». Détail

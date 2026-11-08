@@ -134,11 +134,11 @@ prenez **l'un des deux** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-v1.2.1-portable.exe` (environ 285 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.2.1-windows-x64.zip` (environ 285 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-v1.3-portable.exe` (environ 300 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.3-windows-x64.zip` (environ 300 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
 Même programme, mêmes résultats. Le dossier démarre en moins d'une seconde. L'exécutable unique se
-décompresse à chaque lancement : environ 3,5 s, et 570 Mo dans le dossier temporaire de Windows, effacés
+décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier temporaire de Windows, effacés
 à la fermeture. Rien d'autre à installer : ni Python, ni carte graphique particulière, ni connexion Internet
 (sauf pour importer un lien, chercher des paroles ou télécharger un modèle de transcription).
 
