@@ -125,7 +125,7 @@ QPushButton#primary, QToolButton#primary {{
     padding: 6px 16px;
 }}
 QPushButton#primary:hover, QToolButton#primary:hover {{ background: {ACCENT_HOVER}; border-color: {ACCENT_HOVER}; }}
-QPushButton#primary:focus, QToolButton#primary:focus {{ border: 1px solid {TEXT}; }}
+QPushButton#primary:focus, QToolButton#primary:focus {{ border: 2px solid {ON_ACCENT}; }}
 QPushButton#primary:disabled {{ background: {SURFACE_2}; color: {TEXT_3}; border-color: {BORDER}; }}
 QPushButton#link {{
     background: transparent; border: 1px solid transparent; color: {SELECT}; padding: 2px 4px;
@@ -136,16 +136,16 @@ QPushButton#link:focus {{ border: 1px solid {SELECT}; }}
 QPushButton#recent {{ text-align: left; padding: 10px 14px; background: {SURFACE}; }}
 QPushButton#recent:hover {{ background: {SURFACE_2}; }}
 
-/* In the bars, tool buttons stay quiet until pointed at: the bar is chrome, not content. */
-QWidget#bar QToolButton {{ background: transparent; border: 1px solid transparent; }}
-QWidget#bar QToolButton:hover {{ background: {SURFACE_2}; border-color: {BORDER}; }}
-QWidget#bar QToolButton:pressed {{ background: {SURFACE_3}; }}
-QWidget#bar QToolButton:checked {{
-    background: {ACCENT_SOFT}; border-color: {ACCENT_LINE}; color: {ACCENT_TEXT};
-}}
-QWidget#bar QToolButton:checked:hover {{ background: {ACCENT_SOFT_HOVER}; }}
-QWidget#bar QToolButton:focus {{ border: 1px solid {SELECT}; }}
-QWidget#bar QToolButton:disabled {{ background: transparent; }}
+/* In the song's header, and for icon-only buttons in any bar, tool buttons stay quiet until
+   pointed at: chrome, not content. A text button in a work bar keeps its frame, like its
+   neighbours. toolButtonStyle 0 is Qt.ToolButtonIconOnly; restyle() after changing it. */
+QWidget#bar[quiet="true"] QToolButton, QWidget#bar QToolButton[toolButtonStyle="0"] {{ background: transparent; border: 1px solid transparent; }}
+QWidget#bar[quiet="true"] QToolButton:hover, QWidget#bar QToolButton[toolButtonStyle="0"]:hover {{ background: {SURFACE_2}; border-color: {BORDER}; }}
+QWidget#bar[quiet="true"] QToolButton:pressed, QWidget#bar QToolButton[toolButtonStyle="0"]:pressed {{ background: {SURFACE_3}; }}
+QWidget#bar[quiet="true"] QToolButton:checked, QWidget#bar QToolButton[toolButtonStyle="0"]:checked {{ background: {ACCENT_SOFT}; border-color: {ACCENT_LINE}; color: {ACCENT_TEXT}; }}
+QWidget#bar[quiet="true"] QToolButton:checked:hover, QWidget#bar QToolButton[toolButtonStyle="0"]:checked:hover {{ background: {ACCENT_SOFT_HOVER}; }}
+QWidget#bar[quiet="true"] QToolButton:focus, QWidget#bar QToolButton[toolButtonStyle="0"]:focus {{ border: 1px solid {SELECT}; }}
+QWidget#bar[quiet="true"] QToolButton:disabled, QWidget#bar QToolButton[toolButtonStyle="0"]:disabled {{ background: transparent; }}
 QToolButton#play, QWidget#bar QToolButton#play {{
     background: {ACCENT}; border: 1px solid {ACCENT}; border-radius: 22px;
     min-width: 42px; min-height: 42px; padding: 0;
@@ -153,7 +153,7 @@ QToolButton#play, QWidget#bar QToolButton#play {{
 QToolButton#play:hover, QWidget#bar QToolButton#play:hover {{
     background: {ACCENT_HOVER}; border-color: {ACCENT_HOVER};
 }}
-QToolButton#play:focus, QWidget#bar QToolButton#play:focus {{ border: 2px solid {TEXT}; }}
+QToolButton#play:focus, QWidget#bar QToolButton#play:focus {{ border: 2px solid {ON_ACCENT}; }}
 QToolButton#play:disabled, QWidget#bar QToolButton#play:disabled {{
     background: {SURFACE_2}; border-color: {BORDER};
 }}
@@ -176,7 +176,7 @@ QFrame#segmented QPushButton:hover, QFrame#segmented QToolButton:hover {{
     background: {SURFACE_2}; color: {TEXT};
 }}
 QFrame#segmented QPushButton:checked, QFrame#segmented QToolButton:checked {{
-    background: {SURFACE_3}; border-color: {BORDER}; color: {TEXT};
+    background: {SURFACE_3}; border-color: {TEXT_3}; color: {TEXT};
 }}
 QFrame#segmented QPushButton:focus, QFrame#segmented QToolButton:focus {{
     border: 1px solid {SELECT};

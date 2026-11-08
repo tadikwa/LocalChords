@@ -205,7 +205,8 @@ class GuitarDiagram(_Diagram):
             p.setPen(QColor(theme.TEXT_2))
             p.setFont(theme.app_font(max(11, sx * 0.42), 600))
             p.drawText(
-                QRectF(r.left(), y0, x0 - r.left() - 6, fy),
+                # Clear of the barre, which reaches a dot's radius left of the first string.
+                QRectF(r.left(), y0, x0 - r.left() - min(sx, fy) * 0.38 - 4, fy),
                 int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
                 str(start),
             )

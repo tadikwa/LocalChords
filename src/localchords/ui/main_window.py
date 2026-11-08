@@ -108,6 +108,7 @@ class SongPage(QWidget):
         # Facts and file actions.
         top = QWidget()
         top.setObjectName("bar")
+        top.setProperty("quiet", True)
         row = QHBoxLayout(top)
         row.setContentsMargins(12, 8, 12, 8)
         row.setSpacing(8)
@@ -159,6 +160,7 @@ class SongPage(QWidget):
         self.export.setIcon(theme.icon("export"))
         self.export.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.export.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.export.setToolTip("Exporter (Ctrl + E)")
         self.diagrams_button = QToolButton()
         self.diagrams_button.setIcon(theme.icon("diagram"))
         self.diagrams_button.setCheckable(True)
@@ -429,6 +431,7 @@ class SongPage(QWidget):
             if width >= 960
             else Qt.ToolButtonStyle.ToolButtonIconOnly
         )
+        theme.restyle(self.display)  # the style sheet frames it only with its text
         self._audio_wide = width >= 1240  # narrower, the icon and its highlight say it
         self.audio_button.setText(self._audio_text if self._audio_wide else "")
         for widget in (self.volume, self.volume_icon):
@@ -1100,6 +1103,9 @@ class MainWindow(QMainWindow):
 
     def _retarget(self, button: QPushButton, fn) -> None:
         self._button_actions[button] = fn
+        # Cancelling is not the screen's main action: amber stays for what moves you forward.
+        button.setObjectName("" if fn == self.cancel_analysis else "primary")
+        theme.restyle(button)
 
     def _stop_job(self) -> None:
         self.job_timer.stop() if hasattr(self, "job_timer") else None

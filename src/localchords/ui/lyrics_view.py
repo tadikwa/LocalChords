@@ -565,6 +565,8 @@ class LyricsPage(QWidget):
         row.addWidget(self.badge)
         self.get = QToolButton()
         self.get.setText("Obtenir les paroles")
+        # Text only: the style sheet frames it like its neighbours.
+        self.get.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         self.get.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.get.setMenu(QMenu(self.get))
         self.edit = QPushButton("Modifier le texte…")

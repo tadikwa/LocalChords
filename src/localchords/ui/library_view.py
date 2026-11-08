@@ -85,6 +85,7 @@ COLUMNS = [
     ("opened", "Ouvert", "opened"),
 ]  # fmt: skip
 NARROW_HIDDEN = ("year", "chords", "added")  # the columns that go first on a narrow window
+TIGHT_HIDDEN = ("genre", "bpm", "lyrics", "audio", "opened")  # then these, so nothing is cut
 VIEW_ICONS = {
     "all": "music", "fav": "star", "recent": "clock", "latest": "plus", "hidden": "hidden",
     "col": "collection",
@@ -780,8 +781,7 @@ class LibraryPage(QWidget):
         )
         lead.setObjectName("muted")
         lead.setWordWrap(True)
-        self.open_button = QPushButton("Ouvrir un morceau…")
-        self.open_button.setObjectName("primary")
+        self.open_button = QPushButton("Ouvrir un morceau…")  # amber: « Ajouter », just above
         self.open_button.setToolTip("Ctrl + O")
         self.open_button.clicked.connect(self.openRequested)
         self.link_button = QPushButton("Importer un lien…")
@@ -1022,9 +1022,9 @@ class LibraryPage(QWidget):
         )
         narrow = self.width() < 1240
         for i, (key, _, _) in enumerate(COLUMNS):
-            if key in NARROW_HIDDEN:
-                self.table.setColumnHidden(i, narrow)
-        self.table.setColumnHidden(COLUMNS.index(("genre", "Genre", "genre")), self.width() < 980)
+            self.table.setColumnHidden(
+                i, key in NARROW_HIDDEN and narrow or key in TIGHT_HIDDEN and tight
+            )
         self.table.fit_title()
 
     def select_view(self, key: tuple) -> None:
