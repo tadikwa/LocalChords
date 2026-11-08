@@ -42,6 +42,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 "tests/test_lyrics_ui.py" = ["F811"]  # reuses the fixtures of test_ui
 "tests/test_lyrics_suggest.py" = ["F811"]
 "tests/test_lyrics_motion.py" = ["F811"]
+"tests/test_updates.py" = ["F811"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

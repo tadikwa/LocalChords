@@ -54,6 +54,7 @@ from .library_view import LibraryPage
 from .lyrics_view import LyricsController
 from .pdf import write_chord_sheet, write_pdf
 from .songchords import UPCOMING, Item, SongChords, chord_key
+from .update_banner import UpdateController
 from .waveform import Waveform
 from .widgets import ElidedLabel, Stepper, fmt_time
 
@@ -526,13 +527,22 @@ class MainWindow(QMainWindow):
         self.song = SongPage()
         self.stack.addWidget(self.home)
         self.stack.addWidget(self.song)
-        self.setCentralWidget(self.stack)
+        self.updates = UpdateController(self)
+        central = QWidget()
+        column = QVBoxLayout(central)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(0)
+        column.addWidget(self.updates.banner)  # above both pages: seen wherever the user is
+        column.addWidget(self.stack, 1)
+        self.setCentralWidget(central)
         self.drop_hint = QLabel("Déposez le morceau ici", self.stack)
         self.drop_hint.setObjectName("drop")
         self.drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop_hint.hide()
 
         self._wire()
+        self.updates.add_to(self.song.menu.menu())
+        self.updates.add_to(self.home.menu_button.menu())
         self.lyrics = LyricsController(self)
         self.song.panel.set_mode(self.settings.get("diagram_mode", "guitar"))
         self.song.panel.set_state(self.settings.get("diagram_panel", "full"), emit=False)
@@ -1937,6 +1947,7 @@ class MainWindow(QMainWindow):
         ):
             action.setChecked(bool(self.settings.get(key, default)))
         self.auto_lyrics_action.setChecked(self.settings.get("lyrics_auto") is True)
+        self.updates.sync()
         self.home.refresh()
 
     def flush(self) -> None:
@@ -2046,6 +2057,7 @@ class MainWindow(QMainWindow):
         self._cancel_download()
         self.cancel_batch()
         self.lyrics.cancel()
+        self.updates.stop()
         self.player.pause()
         self.player.close_device()
         library.save_settings(self.settings)

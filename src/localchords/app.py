@@ -88,6 +88,7 @@ def main() -> int:
         )
     window = MainWindow()
     window.show()
+    window.updates.start()  # asks first; looks online only if allowed
     arguments = [a for a in sys.argv[1:] if not a.startswith("-")]
     if arguments:
         window.open_path(Path(arguments[0]))
