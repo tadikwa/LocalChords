@@ -1,10 +1,25 @@
 # État du projet
 
-Mis à jour le 2026-11-08 : v1.4 (Ma bibliothèque) publiée
-(<https://github.com/tadikwa/LocalChords/releases/tag/v1.4>), dernière version. Les versions v1.1, v1.2,
-v1.2.1, v1.3 et v1.3.1 restent en ligne, inchangées.
+Mis à jour le 2026-11-08 : v1.5 (interface revue et installateur Windows) en préparation sur la branche
+`feature/v1.5-desktop-redesign`. v1.4 (<https://github.com/tadikwa/LocalChords/releases/tag/v1.4>) est la
+dernière version publiée ; v1.1 à v1.3.1 restent en ligne, inchangées.
 
 ## Où on en est
+
+**v1.5 :** installateur Windows par utilisateur (Inno Setup 6.7.3, sans droits d'administrateur,
+`%LOCALAPPDATA%\Programs\LocalChords` par défaut, menu Démarrer, bureau et association `.lchords` au
+choix, entrée « Applications », mise à jour qui ferme l'application ouverte, données jamais touchées,
+dossier portable refusé) construit par la CI ; détail et essais dans [INSTALLATEUR.md](INSTALLATEUR.md).
+Interface revue sur des jetons centralisés (`theme.py`, [DESIGN.md](DESIGN.md)) : une seule action ambre
+par écran, barres discrètes, contrôles segmentés, bascules tonales, focus visible ; fenêtre utilisable dès
+800 px (barres repliées en icônes, colonnes de la bibliothèque retirées plutôt que coupées) ; nom de la
+position sous le diagramme ; panneau du bas qui cède sur un écran court. Moteur, synchronisation,
+lecture, transcription, formats et stockage inchangés. Notes dans [NOTES-v1.5.md](NOTES-v1.5.md).
+769 tests passent (dont ceux des largeurs de 800 à 1280 px et des barres repliées). Captures v1.5 et
+paires avant/après régénérées sur les morceaux de démonstration. Installateur essayé localement
+(installation, réinstallation, mise à jour application ouverte, désinstallation, dossier portable
+refusé, auto-test 17 sur 17, données réelles inchangées). Construction complète de la CI réussie sur la
+branche (installateur, exécutable unique, zip, sources tierces).
 
 **v1.4 :** la page d'accueil devient une bibliothèque : index SQLite (`catalog.db`) reconstruit à partir des
 projets `.lchords`, qui restent la référence et ne sont pas modifiés ; recherche, filtres, tris, favoris,
@@ -107,9 +122,11 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
 - Diagrammes : accordage standard seulement ; positions jusqu'à la case 15, écart de 4 cases au plus ; doigtés
   calculés, pas relus par un guitariste. La répartition main gauche / main droite au piano n'est qu'une
   suggestion.
-- Fenêtre : la barre de lecture large impose environ 1093 px de large (997 px une fois réduite), comme en
-  v1.1. Le comportement de GlazeWM en dessous n'a pas été observé en vrai. Le panneau, lui, passe sous la
-  grille sous 1280 px et n'impose aucune largeur (testé en imposant la taille, comme un gestionnaire de tuiles).
+- Fenêtre : 800 px de large au minimum depuis la v1.5 (testé de 800 à 1280 px en imposant la taille, comme
+  un gestionnaire de tuiles) ; le comportement de GlazeWM n'a pas été observé en vrai.
+- Interface : les flèches des champs numériques (fenêtre Rythme) sont peu dessinées ; avec la vue Grille et
+  paroles sur un écran de 820 px, les cartes d'accords défilent en hauteur (déjà en v1.4).
+- Installateur non signé : SmartScreen avertit au premier lancement.
 - L'import YouTube dépend d'un site qui change, et parfois de Node.js ou Deno.
 - 592 Mo sur disque (dossier), 283 Mo en exécutable unique ou en zip. Programme non signé : SmartScreen avertit.
 - Exécutable unique : 3,4 s de démarrage et 567 Mo décompressés dans `%TEMP%` à chaque lancement, laissés
@@ -119,6 +136,12 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
   <https://github.com/tadikwa/LocalChords/releases>.
 
 ## Revue indépendante
+
+**v1.5 :** relecture produit et accessibilité par un agent séparé, sur les captures et le code. Corrigés :
+focus peu visible sur les boutons ambre (contour sombre de 2 px), segment choisi peu distinct, numéro de
+case caché par le barré, deux boutons ambre sur l'accueil et pendant l'analyse, boutons de barre
+incohérents, infobulle manquante d'« Exporter » réduit, colonne Tempo coupée à 900 px. Laissés, déjà en
+v1.4 : flèches des champs numériques, cartes d'accords qui défilent à 820 px de haut.
 
 **v1.4 :** revue du diff entier par un agent séparé, 10 constats. Neuf corrigés, avec des tests :
 - un projet v1.3 ouvert avant que l'index ne l'ait lu était daté « ajouté aujourd'hui » : sa date de
