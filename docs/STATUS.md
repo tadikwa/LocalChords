@@ -22,6 +22,8 @@ seconde (test). Auto-test avec une étape « bibliothèque ». Captures sur huit
 Migration vérifiée sur une copie des données réelles de ce PC (3 projets v1.3.1) : deux lancements, 3 morceaux
 sans doublon, dates marquées estimées, audio retrouvé, fichiers `.lchords` identiques octet pour octet et
 à la même date.
+Builds locaux vérifiés : auto-test du dossier et de l'exécutable unique (302 Mo), 18 étapes sur 18,
+sortie sans erreur.
 
 **v1.3.1 :** ligne « Aucune parole disponible » au-dessus de la grille, reconnaissance du morceau par ses
 noms (informations musicales du lien, titre de vidéo nettoyé, étiquettes, nom du fichier ; jamais la chaîne
