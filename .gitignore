@@ -16,3 +16,4 @@ models/*.onnx
 dist-v1.2/
 build-v1.2/
 build-v1.2.log
+vendor/

@@ -12,10 +12,11 @@ from pathlib import Path
 
 def run(audio_path: Path, out: Path) -> int:
     import os
+    import sys
 
-    from . import library
+    from . import library, lyrics, lyrics_online, transcribe
     from .ui.main_window import MainWindow, app_instance
-    from .ui.pdf import write_chord_sheet, write_pdf
+    from .ui.pdf import write_chord_sheet, write_lyrics_sheet, write_pdf
 
     out.mkdir(parents=True, exist_ok=True)
     report: dict = {"audio": str(audio_path), "steps": [], "ok": False}
@@ -193,6 +194,48 @@ def run(audio_path: Path, out: Path) -> int:
             pages=pages,
             size=len(data),
         )
+
+        # Made-up lyrics, never a real song's: the sheet, its PDF and the bundled engine.
+        made_up = "[00:01.00]Une ligne pour essayer\n[00:05.00]Puis une autre pour finir\n"
+        source = {"kind": "user", "name": "", "exportable": True}
+        project.set_lyrics(lyrics.new(lyrics.parse(made_up), source))
+        window._content_changed()
+        window.lyrics.set_mode("sheet")
+        wait(lambda: False, 0.3)
+        window.grab().save(str(out / "8_paroles_et_accords.png"))
+        lyric_pages = write_lyrics_sheet(
+            project, out / "paroles.pdf", {}, chords.all_items, window.song.positions
+        )
+        step(
+            "paroles et accords",
+            sum(1 for r in window.lyrics.rows if r["kind"] == "line") == 2
+            and any(r["chords"] for r in window.lyrics.rows)
+            and (out / "paroles.pdf").read_bytes().startswith(b"%PDF")
+            and lyric_pages >= 1
+            and (transcribe.engine_ready() or not getattr(sys, "frozen", False)),  # ships with it
+            pages=lyric_pages,
+            engine=transcribe.engine_ready(),
+            models=transcribe.installed_models(),
+        )
+        # The bundled engine for real, when a model was downloaded (none ships with the program).
+        models = transcribe.installed_models()
+        if transcribe.engine_ready() and models:
+            began = time.perf_counter()
+            result = transcribe.transcribe(audio_path, models[0], "fr", transcribe.Task())
+            step(
+                "transcription locale",
+                isinstance(result["lines"], list),
+                model=models[0],
+                lines=len(result["lines"]),
+                seconds=round(time.perf_counter() - began, 1),
+            )
+        # LRCLIB only when asked: otherwise the self-test sends nothing. Only a count is kept.
+        if os.environ.get("LOCALCHORDS_SELFTEST_ONLINE") == "1":
+            found = lyrics_online.search("Hello", "", "", 0.0)
+            step("recherche LRCLIB", isinstance(found, list), results=len(found))
+        window.lyrics.set_mode("grid")
+        project.set_lyrics(None)
+        window._content_changed()
 
         window.flush()
         saved = window.project_file

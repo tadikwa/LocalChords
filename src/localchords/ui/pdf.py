@@ -55,14 +55,13 @@ PRINT_COLORS = {
 PRINT_KEYS = {"WHITE_KEY": "#FFFFFF", "BLACK_KEY": "#222222"}
 
 
-def _writer(path: Path, title: str) -> tuple[QPdfWriter, QPainter]:
+def _writer(path: Path, title: str, landscape: bool = False) -> tuple[QPdfWriter, QPainter]:
     writer = QPdfWriter(str(path))
+    orientation = (
+        QPageLayout.Orientation.Landscape if landscape else QPageLayout.Orientation.Portrait
+    )
     writer.setPageLayout(
-        QPageLayout(
-            QPageSize(QPageSize.PageSizeId.A4),
-            QPageLayout.Orientation.Portrait,
-            QMarginsF(14, 14, 14, 14),
-        )
+        QPageLayout(QPageSize(QPageSize.PageSizeId.A4), orientation, QMarginsF(14, 14, 14, 14))
     )
     writer.setResolution(144)
     writer.setTitle(title or "LocalChords")
@@ -251,7 +250,12 @@ def _draw_card(
 
     def caption(text: str) -> None:
         p.setPen(QColor("#444444"))
-        p.setFont(_fit_font(text, 11, 400, inner.width()))
+        font = _fit_font(text, 11, 400, inner.width())
+        if QFontMetricsF(font).horizontalAdvance(text) > inner.width():  # a narrow card
+            text = text.split(" · ", 1)[-1]
+            font = _fit_font(text, 11, 400, inner.width())
+            text = QFontMetricsF(font).elidedText(text, Qt.TextElideMode.ElideRight, inner.width())
+        p.setFont(font)
         p.drawText(
             QRectF(inner.left(), y, inner.width(), CAPTION_H),
             int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter),
@@ -286,6 +290,25 @@ def _draw_card(
         caption(text)
 
 
+def _foot(p: QPainter, project: Project, width: float, height: float, page: int, total: int):
+    """The title and the page number, under the page's content (device pixels)."""
+    p.setPen(FAINT)
+    p.setFont(theme.app_font(11))
+    title = project.audio.get("title") or "LocalChords"
+    p.drawText(
+        QRectF(0, height + 4, width, FOOTER_H - 4),
+        int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
+        QFontMetricsF(p.font()).elidedText(
+            f"{title} · LocalChords", Qt.TextElideMode.ElideRight, width * 0.7
+        ),
+    )
+    p.drawText(
+        QRectF(0, height + 4, width, FOOTER_H - 4),
+        int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
+        f"Page {page} / {total}",
+    )
+
+
 def write_chord_sheet(
     project: Project, path: Path, items: list, mode: str, include_grid: bool,
     positions: Positions,
@@ -306,21 +329,7 @@ def write_chord_sheet(
     page = [1]
 
     def foot() -> None:
-        p.setPen(FAINT)
-        p.setFont(theme.app_font(11))
-        title = project.audio.get("title") or "LocalChords"
-        p.drawText(
-            QRectF(0, height + 4, width, FOOTER_H - 4),
-            int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
-            QFontMetricsF(p.font()).elidedText(
-                f"{title} · LocalChords", Qt.TextElideMode.ElideRight, width * 0.7
-            ),
-        )
-        p.drawText(
-            QRectF(0, height + 4, width, FOOTER_H - 4),
-            int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
-            f"Page {page[0]} / {total}",
-        )
+        _foot(p, project, width, height, page[0], total)
 
     def new_page() -> None:
         foot()
@@ -363,4 +372,168 @@ def write_chord_sheet(
         _draw_grid(p, project, grid, width, new_page)
     foot()
     p.end()
+    return total
+
+
+# The lyrics with the chords over them ------------------------------------------------------------
+
+LYRIC_SIZES = {"small": 13, "medium": 16, "large": 20}  # sheet pixels: 16 prints at 12 pt
+PORTRAIT_SHEET_W = 688  # the sheet's width in portrait, which COLUMNS were chosen for
+LYRIC_COLORS = {
+    "text": "#111111",
+    "text_now": "#111111",
+    "chord": "#1F4E8C",
+    "approx": "#5A5A5A",
+    "manual": "#0F766E",
+    "now": "#1F4E8C",
+    "section": "#C2410C",
+}
+
+
+def _paginate(blocks: list[dict], first_top: float, page_h: float) -> list[tuple[int, float]]:
+    """(page, top) of each block, in sheet pixels. A block is never cut; one marked keep (a
+    heading) goes to the next page with the block after it rather than stay alone at the foot."""
+    places, page, y = [], 0, first_top
+    for i, b in enumerate(blocks):
+        y += b["gap"] if y > 0 else 0.0
+        need = b["h"] + (
+            blocks[i + 1]["gap"] + blocks[i + 1]["h"]
+            if b.get("keep") and i + 1 < len(blocks)
+            else 0.0
+        )
+        if y > 0 and y + min(need, page_h) > page_h:
+            page, y = page + 1, 0.0
+        places.append((page, y))
+        y += b["h"]
+    return places
+
+
+def write_lyrics_sheet(
+    project: Project,
+    path: Path,
+    options: dict,
+    items: list,
+    positions: Positions,
+) -> int:
+    """The lyrics with the chords over their words, as on screen, the diagrams before or after
+    them. Vector text on A4 pages; nothing cut, a line too long wraps. Returns the page count."""
+    from ..export import approximate, lyric_rows
+    from ..lyrics import KINDS
+    from .lyrics_view import Fonts, lay_out, paint, stack
+
+    writer, p = _writer(path, project.audio.get("title"), bool(options.get("landscape")))
+    width, height = writer.width(), writer.height() - FOOTER_H
+    sheet_w, sheet_h = width / SHEET_SCALE, height / SHEET_SCALE
+    blocks: list[dict] = []
+
+    def text_block(text: str, font, color, gap: float, keep: bool = False) -> None:
+        m = QFontMetricsF(font)
+        box = m.boundingRect(QRectF(0, 0, sheet_w, 10_000), Qt.TextFlag.TextWordWrap, text)
+
+        h = box.height()
+
+        def draw(y, text=text, font=font, color=color, h=h):
+            p.setFont(font)
+            p.setPen(QColor(color))
+            p.drawText(QRectF(0, y, sheet_w, h + 2), Qt.TextFlag.TextWordWrap, text)
+
+        blocks.append({"h": h, "gap": gap, "draw": draw, "keep": keep})
+
+    # The head: the title, what to know before playing, where the words come from.
+    fields = dict(header(project))
+    title = fields.pop("Titre", "") or "Sans titre"
+    artist = fields.pop("Artiste", "")
+    text_block(title, theme.app_font(26, 700), "#111111", 0)
+    if artist:
+        text_block(artist, theme.app_font(16, 600), "#3A3A3A", 2)
+    if options.get("details", True) and fields:
+        text_block(
+            "   ·   ".join(f"{k} : {v}" for k, v in fields.items()),
+            theme.app_font(12),
+            "#3A3A3A",
+            8,
+        )
+    lyr = project.lyrics
+    src = lyr["source"]
+    origin = f"Paroles : {KINDS.get(src.get('kind'), '')}"
+    if src.get("name"):
+        origin += f" ({src['name']})"
+    rows = lyric_rows(project)
+    if approximate(rows):
+        origin += ". En italique gris : accord placé approximativement dans la ligne."
+    text_block(origin, theme.app_font(11), "#5A5A5A", 6)
+
+    # The diagrams, a row of cards per block.
+    mode = options.get("diagrams", "guitar")
+    card_blocks: list[dict] = []
+    if mode != "none" and items:
+        columns = max(COLUMNS[mode], int(COLUMNS[mode] * sheet_w / PORTRAIT_SHEET_W))
+        card_w = (sheet_w - CARD_GAP * (columns - 1)) / columns
+        h = card_height(mode)
+        guitar, piano = GuitarDiagram(), PianoDiagram()
+        piano.fit = True
+        for i in range(0, len(items), columns):
+
+            def draw(y, row=items[i : i + columns], h=h):
+                with _print_palette():
+                    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                    for col, item in enumerate(row):
+                        rect = QRectF(col * (card_w + CARD_GAP), y, card_w, h)
+                        _draw_card(p, rect, item, mode, positions, guitar, piano)
+
+            card_blocks.append({"h": h, "gap": CARD_GAP, "draw": draw})
+        heading = {
+            "h": 26,
+            "gap": 18,
+            "keep": True,
+            "draw": lambda y: (
+                p.setFont(theme.app_font(15, 700)),
+                p.setPen(INK),
+                p.drawText(QRectF(0, y, sheet_w, 26), "Accords"),
+            ),
+        }
+        card_blocks.insert(0, heading)
+    else:
+        guitar = piano = None
+
+    # The lyrics, a sung line (wrapped or not) per block, a section heading kept with its line.
+    f = Fonts(LYRIC_SIZES.get(options.get("size"), 16))
+    lines = lay_out(rows, sheet_w, f, True)
+    lyric_blocks: list[dict] = []
+    for r in sorted({ln.row for ln in lines}):
+        mine = [ln for ln in lines if ln.row == r]
+        gap = mine[0].gap
+        mine[0].gap = 0.0
+        h = stack(mine)
+
+        def draw(y, mine=mine):
+            p.save()
+            p.translate(0, y)
+            paint(p, mine, f, LYRIC_COLORS)
+            p.restore()
+
+        lyric_blocks.append({"h": h, "gap": gap, "draw": draw, "keep": mine[0].kind == "section"})
+    if lyric_blocks:
+        lyric_blocks[0]["gap"] = 20
+
+    first = options.get("diagrams_first", True)
+    blocks += (card_blocks + lyric_blocks) if first else (lyric_blocks + card_blocks)
+
+    places = _paginate(blocks, 0.0, sheet_h)
+    total = places[-1][0] + 1 if places else 1
+    page = 0
+    for b, (on_page, y) in zip(blocks, places, strict=True):
+        while page < on_page:
+            _foot(p, project, width, height, page + 1, total)
+            writer.newPage()
+            page += 1
+        p.save()
+        p.scale(SHEET_SCALE, SHEET_SCALE)
+        b["draw"](y)
+        p.restore()
+    _foot(p, project, width, height, page + 1, total)
+    p.end()
+    if guitar is not None:
+        guitar.deleteLater()
+        piano.deleteLater()
     return total

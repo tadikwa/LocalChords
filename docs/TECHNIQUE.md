@@ -136,6 +136,53 @@ le plus. Une analyse qui change de grille ne perd donc rien.
   « À venir », clic sans déplacement de la lecture, clavier, positions partagées et rouvertes, pages de la
   fiche, aucune carte coupée, clic réel sur Lecture à trois tailles de fenêtre.
 
+## Les paroles (v1.3)
+
+`lyrics.py` lit, place et écrit les paroles ; `lyrics_online.py` interroge LRCLIB ; `transcribe.py`
+fait tourner whisper.cpp ; `ui/lyrics_view.py` et `ui/lyrics_dialogs.py` les affichent ; `ui/pdf.py`
+écrit la fiche paroles et accords.
+
+**D'où elles viennent, dans cet ordre :**
+
+1. **Le disque** : un `.lrc`, `.srt` ou `.txt` du même nom que l'audio, ou les paroles écrites dans le
+   fichier audio (balises lues par PyAV). Proposées à l'ouverture, prises d'office pour un morceau neuf.
+2. **LRCLIB** (<https://lrclib.net>), seulement sur demande : API publique sans clé, faite pour ça. Seuls
+   le titre, l'artiste, l'album et la durée partent ; jamais l'audio. LRCLIB n'annonce aucune licence pour les paroles
+   qu'il sert, et elles appartiennent à leurs auteurs : marquées `exportable: false`, elles sont
+   affichées pour jouer, avec leur origine, mais refusées par tous les exports (texte, LRC, PDF). Aucun
+   autre catalogue n'est interrogé : les autres sites de paroles n'ouvrent pas d'API publique à cet usage.
+3. **La transcription sur ce PC** : `whisper-cli.exe` (whisper.cpp b5454, CPU), livré avec le programme et
+   lancé comme un processus à part, sur un WAV 16 kHz temporaire. Les modèles se téléchargent à la demande
+   depuis Hugging Face (taille et SHA-256 vérifiés) : `small-q5_1` (190 Mo, par défaut) ou
+   `large-v3-turbo-q5_0` (574 Mo, plus juste, environ 2,5 fois plus lent). Commande :
+   `-ojf -pp -np -sns -mc 0` (repli de température gardé, pas de contexte d'une fenêtre à l'autre). Le
+   résultat est un brouillon : les lignes répétées en boucle, les génériques (« sous-titres par… ») et les
+   mots posés sur du silence sont retirés (`plausible`). Choix mesurés : voir
+   [BENCHMARKS.md](BENCHMARKS.md#transcription-des-paroles-v13).
+
+**Dans le projet** (`.lchords` version 2, écrit en version 1 tant qu'il n'y a pas de paroles) :
+
+```jsonc
+"lyrics": {
+  "source": {"kind": "file", "name": "chanson.lrc", "exportable": true},  // user, file, embedded, catalog, transcription
+  "original": [ … ],          // les lignes telles que reçues, pour « Revenir à l'original »
+  "lines": [{"text": "…", "start": 12.5, "end": 15.1, "section": false,
+             "words": [[0, 12.5], [4, 12.9]]}],  // [caractère, temps] de chaque mot, si la source les donne
+  "offset": 0.0,              // décalage global, en secondes
+  "anchors": {"12.10": {"line": 3, "char": 14}},  // accords placés à la main : clé = début de l'accord
+  "previous": { … }           // les paroles d'avant le dernier remplacement, une fois
+}
+```
+
+**Les accords sur les mots** (`lyrics.sheet`) : chaque accord va sur la ligne chantée à son début, au mot
+chanté à cet instant si la source donne le temps des mots, sinon réparti dans la ligne et affiché en
+italique gris (« approximatif »). Un accord qui sonne déjà au début d'une ligne y est rappelé. Glisser un
+accord sur un autre mot n'écrit qu'une ancre (ligne, caractère) : l'harmonie et la grille ne changent pas.
+Ancres, décalage et corrections de lignes passent par la pile d'annulation du projet.
+
+**Vues** : grille seule, grille et paroles (deux lignes sous la barre de lecture), paroles seules, paroles et
+accords ; `K` alterne. La vue suit la lecture, sauf 5 s après un défilement à la main.
+
 ## Reconstruire
 
 `scripts\build.ps1`, puis `dist\LocalChords\LocalChords.exe --self-test <audio> <dossier>` : code de

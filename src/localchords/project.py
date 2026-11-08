@@ -2,7 +2,7 @@
 
 docs/FORMAT.md documents the file. Nothing here overwrites `analysis`: every view of the song is
 computed from it and from `edits`, so a correction can always be undone, and `edits` survives a
-new beat grid because it is written in seconds.
+new beat grid because it is written in seconds. The lyrics (lyrics.py) sit beside both.
 """
 
 from __future__ import annotations
@@ -18,8 +18,10 @@ from pathlib import Path
 
 import numpy as np
 
+from . import lyrics as lyrics_module
+
 FORMAT = "localchords"
-VERSION = 1
+VERSION = 2  # 2 adds the lyrics; a project without lyrics is still written as 1
 EXTENSION = ".lchords"
 DEFAULT_EDITS = {"chords": [], "meter": None, "grid": None, "key": None}
 DEFAULT_VIEW = {
@@ -81,30 +83,37 @@ def decode_waveform(text: str | None) -> np.ndarray:
 
 
 class Project:
-    def __init__(self, audio: dict, analysis: dict, edits=None, view=None):
+    def __init__(self, audio: dict, analysis: dict, edits=None, view=None, lyrics=None):
         self.audio = audio
         self.analysis = analysis
         self.edits = {**copy.deepcopy(DEFAULT_EDITS), **(edits or {})}
+        self.lyrics: dict | None = lyrics
         self.view = {**DEFAULT_VIEW, **(view or {})}
-        self._undo: list[dict] = []
-        self._redo: list[dict] = []
+        self._undo: list[tuple] = []  # (edits, lyrics) before each change
+        self._redo: list[tuple] = []
         self._cache: dict = {}
 
     # The file ----------------------------------------------------------------------------------
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self, shared: bool = False) -> dict:
+        """shared: for a copy that leaves the program, without lyrics it may not hand out."""
+        lyrics = lyrics_module.shareable(self.lyrics) if shared else self.lyrics
+        d = {
             "format": FORMAT,
-            "version": VERSION,
+            # Version 1 programs would drop lyrics they cannot read: given 2, they refuse the file.
+            "version": VERSION if lyrics else 1,
             "audio": self.audio,
             "analysis": self.analysis,
             "edits": self.edits,
             "view": self.view,
         }
+        if lyrics:
+            d["lyrics"] = lyrics
+        return d
 
-    def save(self, path: Path) -> None:
+    def save(self, path: Path, shared: bool = False) -> None:
         """Write atomically: a crash midway leaves the previous file whole."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        data = json.dumps(self.to_dict(), ensure_ascii=False, indent=1).encode("utf-8")
+        data = json.dumps(self.to_dict(shared), ensure_ascii=False, indent=1).encode("utf-8")
         fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as f:
@@ -132,14 +141,19 @@ class Project:
             analysis["beats"], analysis["segments"], d["audio"]["duration"]  # noqa: B018
         except (KeyError, TypeError) as exc:
             raise ProjectError(f"« {path.name} » est incomplet.") from exc
-        return cls(d["audio"], analysis, d.get("edits"), d.get("view"))
+        lyr = d.get("lyrics")
+        if lyr is not None:
+            lyr = lyrics_module.checked(lyr)
+            if lyr is None:
+                raise ProjectError(f"Les paroles de « {path.name} » sont illisibles.")
+        return cls(d["audio"], analysis, d.get("edits"), d.get("view"), lyr)
 
     # Corrections and undo ----------------------------------------------------------------------
     def _touch(self) -> None:
         self._cache.clear()
 
     def _record(self) -> None:
-        self._undo.append(copy.deepcopy(self.edits))
+        self._undo.append(copy.deepcopy((self.edits, self.lyrics)))
         self._redo.clear()
         self._touch()
 
@@ -175,8 +189,14 @@ class Project:
         self.edits["key"] = key
 
     def reset_edits(self) -> None:
+        """Back to the analysis; the lyrics are not chords and stay."""
         self._record()
         self.edits = copy.deepcopy(DEFAULT_EDITS)
+
+    def set_lyrics(self, lyrics: dict | None) -> None:
+        """Every change to the lyrics comes here whole, so it can be undone like a chord."""
+        self._record()
+        self.lyrics = copy.deepcopy(lyrics)
 
     def replace_analysis(self, analysis: dict) -> None:
         """A new analysis keeps the corrections: they are in seconds, not on the old grid."""
@@ -193,14 +213,14 @@ class Project:
 
     def undo(self) -> None:
         if self._undo:
-            self._redo.append(self.edits)
-            self.edits = self._undo.pop()
+            self._redo.append((self.edits, self.lyrics))
+            self.edits, self.lyrics = self._undo.pop()
             self._touch()
 
     def redo(self) -> None:
         if self._redo:
-            self._undo.append(self.edits)
-            self.edits = self._redo.pop()
+            self._undo.append((self.edits, self.lyrics))
+            self.edits, self.lyrics = self._redo.pop()
             self._touch()
 
     def set_view(self, **values) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -33,7 +34,6 @@ from PySide6.QtWidgets import (
     QProgressDialog,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QSlider,
     QStackedWidget,
     QToolButton,
@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__, audio, engines, export, library, voicings, worker
+from .. import lyrics as L
 from ..chords import key_name, parse, spell_tonic, symbol
 from ..player import Player, device_sample_rate
 from ..project import EXTENSION, Project, ProjectError, decode_waveform
@@ -49,90 +50,15 @@ from . import theme
 from .diagrams import ChordPanel, Positions
 from .dialogs import ChordEditor, RhythmDialog, SheetDialog, ShortcutsDialog
 from .grid import ChordGrid
+from .lyrics_view import LyricsController
 from .pdf import write_chord_sheet, write_pdf
 from .songchords import UPCOMING, Item, SongChords, chord_key
 from .waveform import Waveform
+from .widgets import ElidedLabel, Stepper, fmt_time
 
 AUDIO_FILTER = "Audio (" + " ".join(f"*{e}" for e in audio.AUDIO_EXTENSIONS) + ")"
 SIDE_PANEL_WIDTH = 1280
 SPEEDS = [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.25, 1.5]
-
-
-def fmt_time(seconds: float) -> str:
-    seconds = max(0, int(seconds))
-    return f"{seconds // 60}:{seconds % 60:02d}"
-
-
-class ElidedLabel(QLabel):
-    """A label that cuts long text with an ellipsis instead of widening the window."""
-
-    def __init__(self):
-        super().__init__()
-        self._full = ""
-        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-
-    def set_full_text(self, text: str) -> None:
-        self._full = text
-        self.setToolTip(text)
-        self._apply()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._apply()
-
-    def _apply(self) -> None:
-        metrics = self.fontMetrics()
-        self.setText(metrics.elidedText(self._full, Qt.TextElideMode.ElideRight, self.width()))
-
-
-class Stepper(QWidget):
-    """− value +: for anything counted in steps, such as semitones."""
-
-    changed = Signal(int)
-
-    def __init__(self, label: str, low: int, high: int, value: int = 0, render=str, tip=""):
-        super().__init__()
-        self.low, self.high, self.value, self.render = low, high, value, render
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(4)
-        self.minus = QToolButton()
-        self.minus.setObjectName("step")
-        self.minus.setIcon(theme.icon("minus", size=14))
-        self.minus.setAccessibleName(f"{label} : moins")
-        self.plus = QToolButton()
-        self.plus.setObjectName("step")
-        self.plus.setIcon(theme.icon("plus", size=14))
-        self.plus.setAccessibleName(f"{label} : plus")
-        middle = QVBoxLayout()
-        middle.setSpacing(0)
-        caption = QLabel(label)
-        caption.setObjectName("caption")
-        caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.text = QLabel()
-        self.text.setMinimumWidth(52)
-        self.text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        middle.addWidget(caption)
-        middle.addWidget(self.text)
-        self.setToolTip(tip)
-        row.addWidget(self.minus)
-        row.addLayout(middle)
-        row.addWidget(self.plus)
-        self.minus.clicked.connect(lambda: self.step(-1))
-        self.plus.clicked.connect(lambda: self.step(1))
-        self.set_value(value)
-
-    def set_value(self, value: int) -> None:
-        self.value = max(self.low, min(self.high, value))
-        self.text.setText(self.render(self.value))
-        self.minus.setEnabled(self.value > self.low)
-        self.plus.setEnabled(self.value < self.high)
-
-    def step(self, delta: int) -> None:
-        before = self.value
-        self.set_value(self.value + delta)
-        if self.value != before:
-            self.changed.emit(self.value)
 
 
 class AudioLoader(QObject):
@@ -662,6 +588,7 @@ class MainWindow(QMainWindow):
         self.drop_hint.hide()
 
         self._wire()
+        self.lyrics = LyricsController(self)
         self.song.panel.set_mode(self.settings.get("diagram_mode", "guitar"))
         self.song.panel.set_state(self.settings.get("diagram_panel", "full"), emit=False)
         if self.song.panel.state != "hidden":
@@ -812,6 +739,7 @@ class MainWindow(QMainWindow):
         shortcut("Shift+P", lambda: s.panel.step("piano", -1))
         shortcut("Escape", self.follow_playback)
         shortcut("Shift+D", self.toggle_pin)
+        shortcut("K", lambda: self.lyrics.toggle_mode())
 
     # Opening -----------------------------------------------------------------------------------
     def choose_file(self) -> None:
@@ -991,20 +919,31 @@ class MainWindow(QMainWindow):
                 project = Project.load(saved)
                 project.audio["path"] = str(path)
                 return project, saved, True
-            except ProjectError:
-                pass  # a damaged save doesn't stop a new analysis, which replaces it
+            except ProjectError as exc:
+                # A new analysis replaces it, but the file is kept aside: it may hold corrections
+                # and lyrics, or come from a newer version.
+                aside = saved.with_name(f"{saved.stem}-{int(time.time())}.illisible")
+                try:
+                    saved.replace(aside)
+                    _log(f"{exc} Gardé sous {aside.name}.")
+                except OSError:
+                    _log(f"{exc} Impossible de le mettre de côté.")
         info = audio.metadata(path)
+        # Lyrics found beside the recording or in its tags: on this computer, so used at once.
+        found = L.find_local(path, info.get("lyrics") or "")
         project = Project(
             {
                 "path": str(path),
                 "title": info["title"],
                 "artist": info["artist"],
+                "album": info.get("album") or "",
                 "duration": float(info["duration"] or 0.0),
                 "fingerprint": fingerprint,
                 "waveform": None,
                 "source_url": source_url,
             },
             {"beats": [], "segments": []},
+            lyrics=L.new(*found) if found else None,
         )
         return project, saved, False
 
@@ -1312,7 +1251,7 @@ class MainWindow(QMainWindow):
         s.waveform.set_project(project if has_grid else None)
         s.waveform.invalidate()
         if has_grid and self.job is None:
-            s.middle.setCurrentWidget(s.scroll)
+            s.middle.setCurrentWidget(self.lyrics.middle_page())
         elif not has_grid and self.job is None:
             path = Path(project.audio.get("path", ""))
             self.job_path, self.job_engine = (
@@ -1335,6 +1274,7 @@ class MainWindow(QMainWindow):
         self._update_song_chords()
         self._update_facts()
         self._update_loop_display()
+        self.lyrics.refresh(has_grid)
         s.undo.setEnabled(project.can_undo)
         s.redo.setEnabled(project.can_redo)
         self._last_beat = None
@@ -1451,9 +1391,12 @@ class MainWindow(QMainWindow):
         key = project.key()
         latin = bool(project.view.get("latin"))
         shift = project.sounding_shift()
-        s.key_button.setText(
-            f"Tonalité : {key_name(key['label'] if key else None, shift, latin=latin)}"
-        )
+        # What sounds; with a capo, the shapes the hands play are named apart.
+        label = key["label"] if key else None
+        text = f"Tonalité : {key_name(label, int(project.view['transpose']), latin=latin)}"
+        if key and project.view["capo"]:
+            text += f" · formes {key_name(label, shift, latin=latin)}"
+        s.key_button.setText(text)
         menu = QMenu(self)
         if key:
             s.key_button.setToolTip(self._key_tooltip(key))
@@ -1622,6 +1565,7 @@ class MainWindow(QMainWindow):
             self._update_play_icon()
         s.time.setText(f"{fmt_time(position)} / {fmt_time(self.project.duration)}")
         beat = self.project.beat_at(position)
+        self.lyrics.tick(position, beat)
         if beat == self._last_beat:
             return
         self._last_beat = beat
@@ -1815,6 +1759,8 @@ class MainWindow(QMainWindow):
 
     # Corrections -------------------------------------------------------------------------------
     def edit_selected(self) -> None:
+        if self.lyrics.tap():  # Enter times the chosen line while the lyrics are being synced
+            return
         if not self.project or not self.project.grid():
             return
         selection = self.song.grid.selection
@@ -1929,7 +1875,7 @@ class MainWindow(QMainWindow):
         )
         if path:
             try:
-                self.project.save(Path(path))
+                self.project.save(Path(path), shared=True)  # leaves the program: no catalog lyrics
             except OSError as exc:
                 self._alert(f"Enregistrement impossible : {exc.strerror or exc}")
 
@@ -2020,6 +1966,7 @@ class MainWindow(QMainWindow):
         self._stop_job()
         self._cancel_download()
         self.cancel_batch()
+        self.lyrics.cancel()
         self.player.pause()
         self.player.close_device()
         library.save_settings(self.settings)

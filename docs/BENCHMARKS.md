@@ -139,6 +139,29 @@ Sorties identiques à la précision enregistrée : les scores de qualité ci-des
 L'export lui-même est contrôlé contre torch sur un enregistrement (log-mel et sorties de chaque réseau). `LOCALCHORDS_BACKEND=torch` revient à torch
 en développement.
 
+## Transcription des paroles (v1.3)
+
+`scripts/bench_lyrics.py`, sur 12 chansons de [JamendoLyrics](https://github.com/f90/jamendolyrics)
+(licences Creative Commons, 6 en anglais, 6 en français ; rien n'est copié dans le dépôt), whisper.cpp
+b5454 sur CPU, ce PC. WER : taux d'erreur sur les mots (0 = parfait). RTF : temps de calcul / durée du
+morceau. « Lignes < 1 s » et « mots < 0,5 s » : part des débuts placés à moins de 1 s (lignes) ou 0,5 s
+(mots) des annotations.
+
+| Configuration | Langue | WER moyen | WER médian | RTF | RAM max | Lignes < 1 s | Mots < 0,5 s |
+|---|---|---|---|---|---|---|---|
+| base | en / fr | 1,78 / 0,58 | 0,70 / 0,56 | 0,04 / 0,03 | 459 Mo | 0,59 / 0,64 | 0,40 / 0,49 |
+| small-q5_1, réglages par défaut | en / fr | 0,44 / 0,34 | 0,39 / 0,32 | 0,06 / 0,09 | 620 Mo | 0,65 / 0,58 | 0,49 / 0,49 |
+| **small-q5_1, repli + `-mc 0`** | en / fr | **0,39 / 0,32** | 0,29 / 0,32 | 0,10 / 0,08 | 553 Mo | **0,87 / 0,87** | 0,67 / 0,66 |
+| large-v3-turbo-q5_0, réglages par défaut (3 chansons) | en | 1,37 | 0,97 | 0,59 | 973 Mo | 0,27 | 0,35 |
+| **large-v3-turbo-q5_0, repli + `-mc 0`** | en / fr | **0,32 / 0,21** | 0,25 / 0,21 | 0,26 / 0,25 | 868 Mo | 0,70 / 0,51 | 0,69 / 0,50 |
+
+Choix : `small-q5_1` par défaut (le meilleur calage des lignes, 10 fois plus vite que le temps réel),
+`large-v3-turbo-q5_0` proposé pour qui veut moins de fautes et accepte d'attendre. Sans contexte d'une
+fenêtre à l'autre (`-mc 0`), le modèle ne part plus en boucle sur une phrase, la cause des WER > 1. `base`
+écarté. faster-whisper n'a pas pu être mesuré (son PyAV refuse les fichiers du banc) et ajouterait
+CTranslate2 et un second décodeur au programme : non retenu. Même avec le meilleur réglage, une ligne sur trois à
+cinq est fausse : la transcription reste un brouillon, présenté comme tel.
+
 ## Programme compilé, v1.1
 
 | | v1.0 (torch) | v1.1 (ONNX) | Gain |

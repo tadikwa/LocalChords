@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from . import __version__
+from . import lyrics as L
 from .chords import key_name, symbol
 from .project import Project, Segment
 
@@ -58,14 +59,17 @@ def header(project: Project) -> list[tuple[str, str]]:
     if project.audio.get("artist"):
         fields.append(("Artiste", project.audio["artist"]))
     if key:
-        fields.append(("Tonalité", key_name(key["label"], project.sounding_shift())))
+        # What sounds, transposition included; with a capo, the shapes played are another key.
+        fields.append(("Tonalité", key_name(key["label"], int(view["transpose"]))))
+        if view["capo"]:
+            fields.append(("Formes jouées", key_name(key["label"], project.sounding_shift())))
     if tempo["bpm"]:
         fields.append(("Tempo", f"{tempo['bpm']:.0f} BPM"))
     fields.append(("Mesure", f"{meter['beats_per_bar']} temps"))
     if view["transpose"]:
         fields.append(("Transposition", f"{view['transpose']:+d} demi-tons"))
     if view["capo"]:
-        fields.append(("Capodastre", f"case {view['capo']}"))
+        fields.append(("Capodastre", f"case {view['capo']} (choisie, non détectée)"))
     return fields
 
 
@@ -110,3 +114,58 @@ def to_chordpro(project: Project) -> str:
             cells.append(" ".join(chords) if chords else "%")
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
+
+
+# With the lyrics -------------------------------------------------------------------------------
+
+
+def lyric_rows(project: Project) -> list[dict]:
+    """The lyrics as rows with the chords over their words, named as the grid names them."""
+    chords = [
+        (s.start, s.end, chord_text(project, s) if s.chord != "N" else None)
+        for s in project.segments()
+    ]
+    return L.sheet(project.lyrics, chords, project.duration)
+
+
+def approximate(rows: list[dict]) -> bool:
+    return any(
+        c["how"] in ("approx", "held") for r in rows if r["kind"] == "line" for c in r["chords"]
+    )
+
+
+def to_text_with_lyrics(project: Project, width: int = 72) -> str:
+    """The chords over the words in plain text, from the same layout as the screen and the PDF,
+    with a character as the unit."""
+    rows = lyric_rows(project)
+    out = [f"{k} : {v}" for k, v in header(project)]
+    if approximate(rows):
+        out.append("(Accords placés approximativement dans les lignes sans minutage des mots.)")
+    out.append("")
+    for row in rows:
+        if row["kind"] == "section":
+            out += ["", f"[{row['text']}]"]
+        elif row["kind"] == "break":
+            out.append("")
+        elif row["kind"] == "chords":
+            out.append("  ".join(c["label"] for c in row["chords"]))
+        else:
+            for vis in L.layout(row["text"], row["chords"], width, len, len, 1):
+                above = ""
+                for x, n in vis["chords"]:
+                    above = above.ljust(int(x)) + row["chords"][n]["label"]
+                text = ""
+                for x, piece, _ in vis["runs"]:
+                    text = text.ljust(int(x)) + piece
+                if above:
+                    out.append(above.rstrip())
+                out.append(text.rstrip())
+    out.append("")
+    out.append(
+        f"Paroles : {L.KINDS.get(project.lyrics['source'].get('kind'), '')}"
+        + (f" ({project.lyrics['source']['name']})" if project.lyrics["source"].get("name") else "")
+    )
+    out.append(
+        f"(LocalChords {__version__} : accords extraits automatiquement, à vérifier à l'oreille.)"
+    )
+    return "\n".join(out) + "\n"

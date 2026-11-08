@@ -36,6 +36,10 @@ for package in ("chordotomy", "lv-chordia", "beat-this", "librosa", "soundfile",
 datas += collect_data_files("lv_chordia")
 datas += collect_data_files("librosa")
 datas += collect_data_files("yt_dlp_ejs")
+# The transcription engine (scripts/fetch_whisper.py), run as its own process from whisper/.
+if not Path("vendor/whisper/whisper-cli.exe").exists():
+    raise SystemExit("Run scripts/fetch_whisper.py first: the transcription engine ships with the program.")
+datas += [(str(f), "whisper") for f in Path("vendor/whisper").iterdir()]
 
 hidden = (
     collect_submodules("chordotomy")
