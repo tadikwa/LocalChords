@@ -137,6 +137,7 @@ QHeaderView::section {{
     padding: 6px; font-size: 12px; font-weight: 600;
 }}
 QHeaderView::section:hover {{ color: {TEXT}; }}
+QHeaderView {{ background: {BG}; border: none; }}
 QLabel#drop {{
     background: rgba(245, 185, 74, 36); border: 2px dashed {ACCENT}; border-radius: 12px;
     font-size: 26px; font-weight: 600;

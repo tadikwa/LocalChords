@@ -383,6 +383,20 @@ class CardView(QListView):
         super().mouseReleaseEvent(event)
 
 
+class SongTable(QTableView):
+    """The title takes the room the other columns leave, between readable and not adrift."""
+
+    def fit_title(self) -> None:
+        h = self.horizontalHeader()
+        shown = [i for i in range(h.count()) if i != 1 and not h.isSectionHidden(i)]
+        rest = sum(h.sectionSize(i) for i in shown)
+        self.setColumnWidth(1, min(560, max(220, self.viewport().width() - rest)))
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        self.fit_title()
+
+
 class SideList(QListWidget):
     """The views and collections; songs dropped on a collection or on Favoris join it."""
 
@@ -625,7 +639,7 @@ class LibraryPage(QWidget):
         return row
 
     def _table(self) -> QTableView:
-        t = QTableView()
+        t = SongTable()
         t.setModel(self.model)
         t.setObjectName("songs")
         t.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -646,11 +660,10 @@ class LibraryPage(QWidget):
         h.setSectionsClickable(True)
         h.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         widths = {"favorite": 36, "title": 260, "artist": 170, "genre": 130, "year": 64,
-                  "duration": 64, "key": 110, "bpm": 84, "chords": 72, "lyrics": 70,
-                  "audio": 110, "added": 104, "opened": 104}  # fmt: skip
+                  "duration": 64, "key": 96, "bpm": 84, "chords": 72, "lyrics": 70,
+                  "audio": 100, "added": 104, "opened": 104}  # fmt: skip
         for i, (key, _, _) in enumerate(COLUMNS):
             t.setColumnWidth(i, widths[key])
-        h.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         h.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         h.sectionClicked.connect(self._header_clicked)
         t.clicked.connect(
@@ -953,6 +966,7 @@ class LibraryPage(QWidget):
             if key in NARROW_HIDDEN:
                 self.table.setColumnHidden(i, narrow)
         self.table.setColumnHidden(COLUMNS.index(("genre", "Genre", "genre")), self.width() < 980)
+        self.table.fit_title()
 
     def select_view(self, key: tuple) -> None:
         index = None
