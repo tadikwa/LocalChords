@@ -11,8 +11,9 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
+from difflib import SequenceMatcher
 
-from . import __version__
+from . import __version__, identify
 from . import lyrics as L
 
 API = "https://lrclib.net/api"
@@ -90,6 +91,90 @@ def search(
         return abs(float(r.get("duration") or 0) - duration) if duration else 0.0
 
     return sorted(out, key=lambda r: (gap(r), not r.get("syncedLyrics")))
+
+
+# Choosing among the candidates, for a suggestion made without being asked -------------------------
+
+SURE = 0.85  # a suggestion offered as it is: names that match and no other version close behind
+PLAUSIBLE = 0.6  # below: not offered at all, another song's lyrics would be worse than none
+CLOSE = 0.06  # another candidate within this, with other lyrics: the user chooses
+_JOIN = {"and", "et", "feat", "ft", "featuring", "with", "avec", "x", "vs"}  # folded "&" is "and"
+
+
+def _like(a: str, b: str, artists: bool = False) -> float:
+    a, b = identify.fold(identify.clean_title(a)), identify.fold(identify.clean_title(b))
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    ratio = SequenceMatcher(None, a, b).ratio()
+    # "Artist" against "Artist & Friend": one of the names credited, joined by "&", "feat."…
+    # Not "Queen" against "Queen Latifah", nor for titles: "Song" and "Song Two" are other songs.
+    short, long_ = sorted((a.split(), b.split()), key=len)
+    n = len(short)
+    if artists and (
+        (long_[:n] == short and long_[n] in _JOIN)
+        or (long_[-n:] == short and long_[-n - 1] in _JOIN)
+    ):
+        ratio = max(ratio, 0.85)
+    return ratio
+
+
+def score(record: dict, title: str, artist: str, album: str, duration: float) -> float:
+    """How likely a record is the recording described: 0 to 1. A duration alone proves nothing,
+    so it weighs little next to the names."""
+    t = _like(record.get("trackName") or "", title)
+    a = _like(record.get("artistName") or "", artist, True) if artist else 0.0
+    s = 0.5 * t + 0.35 * a
+    if duration and record.get("duration"):
+        gap = abs(float(record["duration"]) - duration)
+        s += 0.1 if gap <= 2 else 0.07 if gap <= 5 else 0.02 if gap <= 15 else -0.1
+    if album and record.get("albumName") and _like(record["albumName"], album) > 0.9:
+        s += 0.03
+    if record.get("syncedLyrics"):
+        s += 0.02
+    # "Song (Live)" for a studio recording, or the other way round: another performance.
+    if identify.is_version(record.get("trackName") or "") != identify.is_version(title):
+        s -= 0.2
+    return round(min(s, 1.0), 3)
+
+
+def _text(record: dict) -> str:
+    words = record.get("plainLyrics") or L.to_text(
+        {"lines": L.parse(record.get("syncedLyrics") or ""), "offset": 0}
+    )
+    return identify.fold(words)[:400]
+
+
+def suggest(records: list[dict], identity: dict, duration: float) -> dict:
+    """{"verdict": "sure" | "choose" | "none", "candidates": [records, best first],
+    "synced": whether the best one's times may be used}. Never sure on a duration alone, nor
+    when another version with other lyrics comes close."""
+    title, artist, album = identity["title"], identity["artist"], identity.get("album", "")
+    swap = identity.get("how") in ("title", "filename") and not identity.get("sure")
+    scored = []
+    for r in records:
+        if r.get("instrumental") or not (r.get("plainLyrics") or r.get("syncedLyrics")):
+            continue
+        s = score(r, title, artist, album, duration)
+        if swap:  # "Title - Artist" read the wrong way round
+            s = max(s, score(r, artist, title, album, duration))
+        if s >= PLAUSIBLE:
+            scored.append((s, r))
+    scored.sort(key=lambda x: -x[0])
+    candidates = [r for _s, r in scored[:6]]
+    if not scored:
+        return {"verdict": "none", "candidates": [], "synced": False}
+    best_s, best = scored[0]
+    rival = any(best_s - s < CLOSE and _text(r) != _text(best) for s, r in scored[1:])
+    gap = abs(float(best.get("duration") or 0) - duration) if duration else None
+    # Times from another performance would not fall right: the words are kept, not the times.
+    version = identify.is_version(
+        title, identity.get("video_title", ""), best.get("trackName") or ""
+    )
+    synced = bool(best.get("syncedLyrics")) and not version and (gap is None or gap <= 3)
+    sure = best_s >= SURE and not rival and (gap is None or gap <= 5)
+    return {"verdict": "sure" if sure else "choose", "candidates": candidates, "synced": synced}
 
 
 def lines_of(record: dict, synced: bool = True) -> list[dict]:

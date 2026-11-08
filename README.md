@@ -20,7 +20,8 @@ ou 11, 64 bits, gratuit, hors ligne)
 </p>
 
 Les captures viennent du programme (celles des accords du morceau et de la fiche : version 1.2.1, celles des
-paroles : version 1.3, lancées depuis les sources, rendu hors écran), sur un morceau de démonstration
+paroles : version 1.3, celle des paroles trouvées : version 1.3.1, lancées depuis les sources, rendu hors
+écran), sur un morceau de démonstration
 synthétique créé pour l'occasion (`scripts/demo_audio.py`) et des paroles écrites pour lui
 (`scripts/screenshot_lyrics.py`) : aucun enregistrement ni aucune parole du commerce.
 
@@ -30,7 +31,8 @@ synthétique créé pour l'occasion (`scripts/demo_audio.py`) et des paroles éc
   renversements (`D/F♯`), avec la tonalité, le tempo et la mesure.
 - **Grille synchronisée** : l'accord en cours s'allume, le suivant est annoncé, un clic place la lecture.
 - **Paroles et accords** : les accords au-dessus des mots, qui suivent la lecture ; paroles de votre
-  fichier, cherchées en ligne à votre demande, ou transcrites par l'IA sur votre PC.
+  fichier, cherchées en ligne (à votre demande, ou proposées seules si vous l'avez permis), ou transcrites
+  par l'IA sur votre PC.
 - **Diagrammes de guitare et de piano** qui suivent la lecture, ou un accord épinglé d'un clic.
 - **Travailler un passage** : ralentir de 50 à 150 % sans changer la hauteur, boucler, transposer la grille et
   le son, capodastre.
@@ -51,9 +53,10 @@ partition de chanson. La ligne en cours s'allume et la page défile seule pendan
 - **D'où viennent les paroles**, dans cet ordre :
   1. **Votre ordinateur** : un fichier `.lrc`, `.srt` ou `.txt` du même nom à côté du morceau, ou les paroles
      écrites dans ses étiquettes. Rien n'est cherché ailleurs.
-  2. **En ligne, à votre demande** : **Obtenir les paroles → Chercher en ligne (LRCLIB)**. Seuls le titre,
-     l'artiste, l'album et la durée sont envoyés, jamais l'audio. Ces paroles s'affichent mais ne s'exportent
-     pas : elles appartiennent à leurs auteurs.
+  2. **En ligne, dans la base libre LRCLIB** : **Obtenir les paroles → Rechercher en ligne (LRCLIB)**, ou
+     proposées seules si vous l'avez permis (voir plus bas). Seuls le titre, l'artiste, l'album et la durée
+     sont envoyés, jamais l'audio. Ces paroles s'affichent mais ne s'exportent pas : elles appartiennent à
+     leurs auteurs.
   3. **Transcrites par l'IA, sur cet ordinateur** (whisper.cpp, livré avec le programme). Le modèle se
      télécharge une fois, à votre demande : 190 Mo (conseillé) ou 574 Mo (plus précis, plus lent). Le
      résultat est un brouillon à relire.
@@ -69,6 +72,31 @@ partition de chanson. La ligne en cours s'allume et la page défile seule pendan
 <p align="center">
   <img src="docs/images/localchords-lyrics-strip.png" width="800" alt="Vue Grille et paroles : la ligne en cours et la suivante au-dessus de la grille d'accords">
 </p>
+
+### Paroles trouvées pour vous (1.3.1)
+
+![Vue Grille et paroles d'un morceau sans paroles : une ligne discrète au-dessus de la grille annonce « Paroles trouvées » avec Utiliser, Voir les autres versions et Modifier la recherche](docs/images/localchords-lyrics-found.png)
+
+- **Le morceau est reconnu par ce qu'il dit de lui-même** : pour un lien, les informations musicales du site
+  (titre, artiste, album), sinon le titre de la vidéo nettoyé (« Artiste - Titre (Official Video) » donne
+  l'artiste et le titre) ; pour un fichier, ses étiquettes, puis son nom. Le nom de la chaîne n'est jamais
+  pris pour l'artiste, et ce qui reste deviné est présenté comme tel.
+- **Une ligne discrète au-dessus de la grille** (vue Grille et paroles) quand un morceau n'a pas de
+  paroles : **Rechercher les paroles · Transcrire avec l'IA · Importer**. La grille garde sa place ; la croix
+  masque la ligne pour ce morceau, et elle disparaît dès que les paroles sont là.
+- **Recherche automatique, si vous l'acceptez** : la première fois, LocalChords vous demande s'il peut
+  chercher seul les paroles des morceaux qui n'en ont pas. Votre réponse est gardée ; elle se change dans
+  **Menu → Rechercher automatiquement les paroles des morceaux**. La recherche se fait en arrière-plan, sans
+  rien bloquer, et n'envoie que le titre, l'artiste, l'album et la durée.
+- **Le bon résultat, ou le choix** : quand une version correspond nettement (titre, artiste, durée…),
+  **Paroles trouvées — Utiliser · Voir les autres versions** ; quand plusieurs se valent, une courte liste
+  pour choisir ; quand rien n'est fiable, rien n'est proposé plutôt que les paroles d'une autre chanson.
+  Rien ne remplace jamais des paroles déjà là. **Modifier la recherche** permet de corriger le titre ou
+  l'artiste, et la correction est gardée.
+- **Live ou reprise** : les horodatages du catalogue, faits pour la version studio, ne sont pas repris ;
+  seul le texte l'est. **Retirer les horodatages (garder le texte)**, dans le menu ☰ de la vue Paroles, les enlève d'une version déjà prise.
+- **Une chanson à vous** (générée, inédite) : aucun nom n'est inventé ; la ligne propose la transcription
+  sur votre PC, jamais lancée sans vous.
 
 **Exporter → Paroles et accords (PDF)** : une fiche A4 avec les accords au-dessus des mots et, au choix, les
 diagrammes en tête ou en annexe. Aussi en texte (paroles seules, ou grille avec paroles) et en
@@ -134,8 +162,8 @@ prenez **l'un des deux** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-v1.3-portable.exe` (environ 300 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.3-windows-x64.zip` (environ 300 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-v1.3.1-portable.exe` (environ 300 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.3.1-windows-x64.zip` (environ 300 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
 Même programme, mêmes résultats. Le dossier démarre en moins d'une seconde. L'exécutable unique se
 décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier temporaire de Windows, effacés
@@ -145,7 +173,7 @@ décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier tempor
 **Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
 programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 Pour vérifier le fichier, son empreinte SHA-256 figure dans `SHA256SUMS.txt` sur la page de la version
-(PowerShell : `Get-FileHash .\LocalChords-v1.3-portable.exe`).
+(PowerShell : `Get-FileHash .\LocalChords-v1.3.1-portable.exe`).
 
 Pour tout garder à côté du programme (clé USB), créez un fichier vide `LocalChords.portable` à côté de
 l'exécutable : voir [docs/PORTABLE.md](docs/PORTABLE.md). Pour désinstaller, supprimez le fichier ou le
@@ -232,6 +260,6 @@ par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. Les modèles de t
 ### Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md), notes de version : [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md), notes de version : [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
 Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
 [LICENCES-TIERS.md](LICENCES-TIERS.md).

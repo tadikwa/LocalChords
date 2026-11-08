@@ -106,8 +106,28 @@ def main():
     w.toggle_chords()
     items, positions = w.song.chords.all_items, w.song.positions
     write_lyrics_sheet(w.project, out / "paroles_et_accords.pdf", {}, items, positions)
-    w.lyrics.set_mode("grid")
+    # v1.3.1: the line over the grid when a song has none and a catalog version was found. The
+    # found record is made up here: nothing is asked of LRCLIB.
     w.project.set_lyrics(None)
+    w.lyrics._rename("Le long du canal", "Démo", "")
+    w._content_changed()
+    record = {
+        "trackName": "Le long du canal",
+        "artistName": "Démo",
+        "duration": w.project.duration,
+        "plainLyrics": "\n".join(x for x in WORDS if not x.startswith("[")),
+        "syncedLyrics": "[00:01.00]" + WORDS[1],
+    }
+    w.lyrics.suggestion = {"verdict": "sure", "candidates": [record], "synced": True}
+    w.toggle_chords()
+    w.lyrics.set_mode("strip")
+    w.lyrics._update_mode_actions()
+    w.lyrics._update_prompt()
+    w.resize(1600, 900)
+    settle()
+    w.grab().save(str(out / "lyrics_found_readme.png"))
+    w.toggle_chords()
+    w.lyrics.set_mode("grid")
     w.flush()
     w.close()
 

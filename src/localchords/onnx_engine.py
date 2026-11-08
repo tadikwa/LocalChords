@@ -57,8 +57,13 @@ def log_mel(y: np.ndarray) -> np.ndarray:
     window /= np.float32(np.sqrt(n_fft))  # normalized=True: frame_length ** -0.5
     padded = np.pad(np.asarray(y, dtype=np.float32), n_fft // 2, mode="reflect")
     bank = librosa.filters.mel(
-        sr=beats.SR, n_fft=n_fft, n_mels=beats.N_MELS, fmin=beats.FMIN, fmax=beats.FMAX,
-        htk=False, norm=None,
+        sr=beats.SR,
+        n_fft=n_fft,
+        n_mels=beats.N_MELS,
+        fmin=beats.FMIN,
+        fmax=beats.FMAX,
+        htk=False,
+        norm=None,
     ).astype(np.float32)
     frames = np.lib.stride_tricks.sliding_window_view(padded, n_fft)[::hop]
     out = np.empty((len(frames), beats.N_MELS), dtype=np.float32)
