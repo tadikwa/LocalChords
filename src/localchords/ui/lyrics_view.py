@@ -8,13 +8,23 @@ and chords, so a chord stays over its letter at any size, on screen as on paper.
 from __future__ import annotations
 
 import copy
+import math
 import time
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QPointF, QPropertyAnimation, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPen
+from PySide6.QtCore import (
+    QEasingCurve,
+    QObject,
+    QPointF,
+    QPropertyAnimation,
+    QRectF,
+    Qt,
+    QTimer,
+    Signal,
+)
+from PySide6.QtGui import QActionGroup, QColor, QFont, QFontMetricsF, QPainter, QPen
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -43,6 +53,81 @@ MODES = {
 }
 SIZES = (12, 48)
 MANUAL_SCROLL_PAUSE = 5.0  # seconds without following after the user scrolls by hand
+MOTIONS = {
+    "animated": "Animée (recommandée)",
+    "simple": "Simple : surbrillance seule",
+    "off": "Désactivée",
+}
+# The moving lyrics (docs/DESIGN.md): the line sung comes forward, the others step back by
+# distance, the words light up as they are sung. Everything is read from the player's clock.
+TRANSITION = 0.4  # seconds for a line to come forward
+FRAME = 1 / 30  # the lyrics repaint at most this often while the song plays
+JUMP = 0.5  # a position moved further than this between two ticks was a seek: no transition
+DIM = (1.0, 0.66, 0.56, 0.48)  # text opacity by distance from the line sung
+AWAY = 0.98  # the size of the other lines, in the lyrics alone (never under chords)
+UNSUNG = 0.6  # opacity of the words still to sing in the line sung
+
+
+def reduces_motion() -> bool:
+    """Whether Windows is set to show fewer animations (Accessibility, Visual effects)."""
+    try:
+        import ctypes
+
+        on = ctypes.c_int(1)
+        ok = ctypes.windll.user32.SystemParametersInfoW(0x1042, 0, ctypes.byref(on), 0)
+        return bool(ok) and not on.value  # SPI_GETCLIENTAREAANIMATION
+    except (AttributeError, OSError):
+        return False
+
+
+def default_motion(settings: dict) -> str:
+    chosen = settings.get("lyrics_motion")
+    if chosen in MOTIONS:
+        return chosen
+    return "simple" if reduces_motion() else "animated"
+
+
+def _ease(x: float) -> float:
+    x = min(max(x, 0.0), 1.0)
+    return 1 - (1 - x) ** 3
+
+
+def _mix(a: str, b: str, k: float, alpha: float = 1.0) -> QColor:
+    ca, cb = QColor(a), QColor(b)
+    out = QColor.fromRgbF(
+        ca.redF() + (cb.redF() - ca.redF()) * k,
+        ca.greenF() + (cb.greenF() - ca.greenF()) * k,
+        ca.blueF() + (cb.blueF() - ca.blueF()) * k,
+    )
+    out.setAlphaF(alpha)
+    return out
+
+
+def char_x(runs: list, chars: float, advance) -> float:
+    """Where a fractional character position falls on a laid-out line (pieces may be pushed
+    apart by chord names, so it is found piece by piece)."""
+    k = int(chars)
+    for x, piece, first in runs:
+        if first <= k < first + len(piece):
+            n = k - first
+            return x + advance(piece[:n]) + (chars - k) * advance(piece[n : n + 1])
+    x, piece, _first = runs[-1]
+    return x + advance(piece)
+
+
+def sung_pen(x: float, em: float, f: float, base: str = theme.TEXT) -> QPen:
+    """Text sung up to x: bright, a faint warm light on the word being sung (f in 0..1, -1 between
+    words), then the words to come, dimmer. One gradient pen: no layers, no clipping."""
+    from PySide6.QtGui import QBrush, QLinearGradient
+
+    glow = math.sin(math.pi * f) if f >= 0 else 0.0
+    g = QLinearGradient(QPointF(x - 0.15 * em, 0), QPointF(x + 0.45 * em, 0))
+    g.setColorAt(0.0, QColor(base))
+    g.setColorAt(0.25, _mix(base, theme.ACCENT_TEXT, 0.6 * glow))
+    g.setColorAt(1.0, _mix(base, base, 0, UNSUNG))
+    return QPen(QBrush(g), 1)
+
+
 NOT_EXPORTABLE = (
     "Paroles d'un catalogue en ligne : consultables ici, mais pas exportables. Saisissez, "
     "importez ou transcrivez vos propres paroles pour les exporter."
@@ -169,32 +254,75 @@ def paint(
     now_row=None,
     now_key=None,
     clip: QRectF | None = None,
+    look=None,
 ) -> None:
+    """look: the sheet when its lyrics move (row_alpha, row_scale, row_sung); None for the still
+    page and the PDF."""
     for ln in lines:
         if clip is not None and (ln.y + ln.h < clip.top() or ln.y > clip.bottom()):
             continue
-        if ln.kind == "section":
-            p.setFont(f.section)
-            p.setPen(QColor(colors["section"]))
-            p.drawText(QPointF(x0, ln.y + f.sm.ascent() + f.sm.height() * 0.2), ln.runs[0][1])
-            continue
-        for x, c in ln.chords:
-            approx = c["how"] in ("approx", "held")
-            if c["key"] == now_key:
-                color = colors["now"]
-            elif c["how"] == "manual":
-                color = colors["manual"]
-            else:
-                color = colors["approx"] if approx else colors["chord"]
-            p.setFont(f.approx if approx else f.chord)
-            p.setPen(QColor(color))
-            p.drawText(QPointF(x0 + x, ln.y + f.cm.ascent()), c["label"])
-        if ln.runs:
-            p.setFont(f.text)
-            p.setPen(QColor(colors["text_now"] if ln.row == now_row else colors["text"]))
-            base = ln.y + ln.chord_h + f.tm.ascent()
-            for x, piece, _ in ln.runs:
-                p.drawText(QPointF(x0 + x, base), piece)
+        scale = look.row_scale(ln.row) if look else 1.0
+        if scale != 1.0:  # around the line's left end and middle: it never moves off its place
+            p.save()
+            mid = ln.y + ln.h / 2
+            p.translate(x0, mid)
+            p.scale(scale, scale)
+            p.translate(-x0, -mid)
+        _paint_line(p, ln, f, colors, x0, now_row, now_key, look)
+        if scale != 1.0:
+            p.restore()
+
+
+def _paint_line(p, ln: Line, f: Fonts, colors, x0, now_row, now_key, look) -> None:
+    if ln.kind == "section":
+        p.setFont(f.section)
+        p.setPen(QColor(colors["section"]))
+        p.drawText(QPointF(x0, ln.y + f.sm.ascent() + f.sm.height() * 0.2), ln.runs[0][1])
+        return
+    for x, c in ln.chords:
+        approx = c["how"] in ("approx", "held")
+        if c["key"] == now_key:
+            color = colors["now"]
+        elif c["how"] == "manual":
+            color = colors["manual"]
+        else:
+            color = colors["approx"] if approx else colors["chord"]
+        p.setFont(f.approx if approx else f.chord)
+        p.setPen(QColor(color))
+        p.drawText(QPointF(x0 + x, ln.y + f.cm.ascent()), c["label"])
+    if not ln.runs:
+        return
+    p.setFont(f.text)
+    base = ln.y + ln.chord_h + f.tm.ascent()
+    sung = look.row_sung(ln.row) if look else None
+    lift = 0.0
+    if look is None:
+        p.setPen(QColor(colors["text_now"] if ln.row == now_row else colors["text"]))
+    elif sung is None:
+        p.setPen(_mix(theme.TEXT, theme.TEXT, 0, look.row_alpha(ln.row)))
+    else:
+        first = ln.runs[0][2]
+        end = ln.runs[-1][2] + len(ln.runs[-1][1])
+        chars, word, wf = sung
+        here = first <= word < end and wf > 0
+        if chars >= end:
+            p.setPen(QColor(theme.TEXT))
+        elif chars <= first:
+            p.setPen(_mix(theme.TEXT, theme.TEXT, 0, UNSUNG))
+        else:
+            x = x0 + char_x(ln.runs, chars, f.tm.horizontalAdvance)
+            p.setPen(sung_pen(x, f.size, wf if here else -1.0))
+        if here:  # the word being sung rises a little and settles back as it ends
+            lift = max(1.0, f.size * 0.06) * math.sin(math.pi * wf)
+    lifting = False
+    for k, (x, piece, start) in enumerate(ln.runs):
+        if lift:
+            following = ln.runs[k + 1][2] if k + 1 < len(ln.runs) else start + len(piece)
+            if start <= sung[1] < following:
+                lifting = True
+            elif lifting and ln.runs[k - 1][1].endswith(" "):  # a chord may cut a word in two
+                lifting = False
+        p.drawText(QPointF(x0 + x, base - (lift if lifting else 0.0)), piece)
 
 
 # The sheet --------------------------------------------------------------------------------------
@@ -229,6 +357,16 @@ class LyricsSheet(QWidget):
         self._drag: dict | None = None
         self._width = -1
         self.f = Fonts(self.size)
+        # The moving lyrics: on only when animated and the lines are timed.
+        self.motion = "animated"
+        self.timed = False
+        self.timing: dict[int, tuple[list, float | None]] = {}  # row: (word times, end)
+        self.playing = False
+        self._from_row: int | None = None  # the line sung before, while the new one comes in
+        self._since = 0.0
+        self._moving = False
+        self._painted_pos: float | None = None
+        self._t = 0.0
 
     def set_rows(self, rows: list[dict], size: int, chords_on: bool) -> None:
         self.rows, self.size, self.chords_on = rows, size, chords_on
@@ -252,10 +390,67 @@ class LyricsSheet(QWidget):
         if event.size().width() != self._width:
             self._relayout()
 
-    def set_now(self, row: int | None, key: str | None) -> None:
-        if (row, key) != (self.now_row, self.now_key):
-            self.now_row, self.now_key = row, key
+    def set_now(self, row: int | None, key: str | None, smooth: bool = False) -> None:
+        """smooth: the song played on into this line, so it comes in; after a seek it is there."""
+        if (row, key) == (self.now_row, self.now_key):
+            return
+        if row != self.now_row:
+            self._from_row = self.now_row if smooth else None
+            self._since = time.monotonic()
+        self.now_row, self.now_key = row, key
+        self.update()
+
+    # The moving lyrics, read by paint()
+    @property
+    def moves(self) -> bool:
+        return self.motion == "animated" and self.timed
+
+    def _progress(self) -> float:
+        """0 when the line sung has just changed, 1 once it has come in (and always when paused:
+        a still song shows no motion)."""
+        if self._from_row is None or not self.playing:
+            return 1.0
+        return _ease((time.monotonic() - self._since) / TRANSITION)
+
+    def _blend(self, value) -> float:
+        to = value(self.now_row)
+        k = self._progress()
+        return to if k >= 1.0 else value(self._from_row) + (to - value(self._from_row)) * k
+
+    def row_alpha(self, row: int) -> float:
+        def dim(around):
+            if around is None:
+                return DIM[1]
+            return DIM[min(abs(row - around), len(DIM) - 1)]
+
+        return self._blend(dim)
+
+    def row_scale(self, row: int) -> float:
+        if self.chords_on:  # under chords nothing moves: they stay where they are dragged
+            return 1.0
+        return self._blend(lambda around: 1.0 if row == around else AWAY)
+
+    def row_sung(self, row: int):
+        if row != self.now_row or row not in self.timing:
+            return None
+        words, end = self.timing[row]
+        return L.sung(self.rows[row]["text"], words, self._t, end)
+
+    def animate(self, position: float) -> None:
+        """Called at most FRAME apart while the song plays: repaints what moved, nothing more."""
+        if not self.moves:
+            return
+        moving = self._progress() < 1.0
+        if not moving and not self._moving and position == self._painted_pos:
+            return  # paused, or nothing new: no repaint
+        self._painted_pos = position
+        if moving or self._moving:  # the band and every line's light move: the visible part
             self.update()
+        elif self.now_row in self.timing:  # only the words lighting up
+            rect = self.row_rect(self.now_row)
+            if rect is not None:
+                self.update(rect.adjusted(0, -8, 0, 8).toAlignedRect())
+        self._moving = moving
 
     def row_rect(self, row: int | None) -> QRectF | None:
         mine = [ln for ln in self.lines if ln.row == row]
@@ -273,6 +468,8 @@ class LyricsSheet(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         p.fillRect(event.rect(), QColor(theme.BG))
+        moves = self.moves
+        self._t = self.player_position()
         for row, color, fill in (
             (self.now_row, theme.ACCENT, theme.SURFACE_2),
             (self.picked_row, theme.SELECT, None),
@@ -280,6 +477,15 @@ class LyricsSheet(QWidget):
             rect = self.row_rect(row)
             if rect is None:
                 continue
+            k = self._progress() if moves and fill else 1.0
+            before = self.row_rect(self._from_row) if k < 1.0 else None
+            if before is not None:  # the band slides from the line sung before
+                rect = QRectF(
+                    rect.left(),
+                    before.top() + (rect.top() - before.top()) * k,
+                    rect.width(),
+                    before.height() + (rect.height() - before.height()) * k,
+                )
             band = rect.adjusted(self.MARGIN * 0.4, -4, -self.MARGIN * 0.4, 4)
             if fill:
                 p.setPen(Qt.PenStyle.NoPen)
@@ -303,6 +509,7 @@ class LyricsSheet(QWidget):
             now_row=self.now_row,
             now_key=self.now_key,
             clip=QRectF(event.rect()),
+            look=self if moves else None,
         )
         if self._drag and self._drag["moved"]:
             target = self._drag.get("target")
@@ -465,10 +672,11 @@ class LyricsStrip(QWidget):
         self.setFixedHeight(64)
         self.now = ""
         self.next = ""
+        self.sung = None  # lyrics.sung for the line now, when its words are timed
 
-    def set_lines(self, now: str, next_: str) -> None:
-        if (now, next_) != (self.now, self.next):
-            self.now, self.next = now, next_
+    def set_lines(self, now: str, next_: str, sung=None) -> None:
+        if (now, next_, sung) != (self.now, self.next, self.sung):
+            self.now, self.next, self.sung = now, next_, sung
             self.update()
 
     def paintEvent(self, event):
@@ -482,11 +690,18 @@ class LyricsStrip(QWidget):
             (self.next, theme.app_font(14), theme.TEXT_2, 38),
         ):
             p.setFont(font)
-            p.setPen(QColor(color))
             m = QFontMetricsF(font)
-            p.drawText(
-                QPointF(16, y + m.ascent()), m.elidedText(text, Qt.TextElideMode.ElideRight, width)
-            )
+            shown = m.elidedText(text, Qt.TextElideMode.ElideRight, width)
+            p.setPen(QColor(color))
+            if self.sung and y == 8:  # compact: the words light up, nothing moves
+                chars, _word, f = self.sung
+                cut = len(shown) - 1 if shown != text else len(shown)  # the ellipsis
+                if chars < cut:
+                    k = int(chars)
+                    x = 16 + m.horizontalAdvance(shown[:k])
+                    x += (chars - k) * m.horizontalAdvance(shown[k : k + 1])
+                    p.setPen(sung_pen(x, m.height(), f))
+            p.drawText(QPointF(16, y + m.ascent()), shown)
         p.end()
 
 
@@ -754,6 +969,14 @@ class LyricsController(QObject):
         more.addAction("Texte plus grand", lambda: p.text_size.step(2))
         more.addAction("Texte plus petit", lambda: p.text_size.step(-2))
         more.addAction("Suivre la lecture", p.follow.toggle)
+        motion = more.addMenu("Animation des paroles")
+        group = QActionGroup(motion)
+        self.motion_actions = {}
+        for value, text in MOTIONS.items():
+            action = motion.addAction(text, lambda v=value: self.set_motion(v))
+            action.setCheckable(True)
+            group.addAction(action)
+            self.motion_actions[value] = action
         more.addSeparator()
         self.original_action = more.addAction("Revenir au texte d'origine", self.revert_original)
         self.previous_action = more.addAction(
@@ -803,7 +1026,9 @@ class LyricsController(QObject):
         self.timer.setInterval(200)
         self.timer.timeout.connect(self._poll)
         self.anim = QPropertyAnimation(p.scroll.verticalScrollBar(), b"value", self)
-        self.anim.setDuration(260)
+        self._last_pos = 0.0
+        self._frame = 0.0
+        self.set_motion(default_motion(settings), remember=False)
         # The suggestion from LRCLIB, looked for in the background when the user allowed it.
         self.lookup: transcribe.Task | None = None
         self.lookup_for = None  # the project it is for
@@ -816,6 +1041,24 @@ class LyricsController(QObject):
         for prompt in (self.prompt, p.prompt):
             prompt.close.clicked.connect(self.hide_prompt)
         self._update_mode_actions()
+
+    def set_motion(self, motion: str, remember: bool = True) -> None:
+        """Animated, simple (the line sung highlighted, as in 1.5) or off (no scrolling motion)."""
+        self.motion = motion
+        self.sheet.motion = motion
+        self.motion_actions[motion].setChecked(True)
+        if motion == "animated":
+            self.anim.setDuration(int(TRANSITION * 1000))
+            self.anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        else:
+            self.anim.setDuration(260)
+            self.anim.setEasingCurve(QEasingCurve.Type.Linear)
+        if remember:
+            self.w._remember("lyrics_motion", motion)
+        self.strip.set_lines(self.strip.now, self.strip.next)
+        self.sheet.update()
+        if self.w.project is not None:
+            self._update_hint()
 
     # Modes
     @property
@@ -874,6 +1117,20 @@ class LyricsController(QObject):
             for i, r in enumerate(self.rows)
             if r["kind"] == "line" and r["start"] is not None
         )
+        # The words' times, shifted like the lines: only those really timed light up one by one.
+        self.sheet.timing = {}
+        offset = float(lyr.get("offset") or 0) if lyr else 0.0
+        for j, (_start, r) in enumerate(self._starts):
+            x = lyr["lines"][self.rows[r]["line"]]
+            if not x.get("words"):
+                continue
+            if x.get("end") is not None:
+                end = x["end"] + offset
+            else:
+                end = self._starts[j + 1][0] if j + 1 < len(self._starts) else None
+            self.sheet.timing[r] = ([[c, t + offset] for c, t in x["words"]], end)
+        self.sheet.timed = bool(self._starts)
+        self.sheet._from_row = None
         self.sheet.set_rows(self.rows, p.text_size.value, self.mode == "sheet")
         p.stack.setCurrentWidget(p.scroll if lyr else p.empty)
         self._fill_empty()
@@ -987,6 +1244,11 @@ class LyricsController(QObject):
             )
         else:
             text = "Un clic sur une ligne lit depuis elle."
+        if self.motion == "animated" and L.timed(lyr) and not self.sheet.timing:
+            text += (
+                " Les mots s'éclairent un à un seulement avec un minutage mot à mot (LRC enrichi "
+                "ou transcription) : ces paroles sont minutées ligne par ligne."
+            )
         p.hint.setText(text)
         p.hint.show()
 
@@ -1184,9 +1446,21 @@ class LyricsController(QObject):
                 (x for x in self.w.project.segments() if x.start_beat <= beat < x.end_beat), None
             )
             self._key = L.chord_key(seg.start) if seg is not None and seg.chord != "N" else None
+        playing = self.w.player.playing
+        # Played on into the line: it comes in; after a seek or a loop's return it is just there.
+        smooth = playing and 0 <= position - self._last_pos < JUMP
+        self._last_pos = position
         changed = (k, self._key) != (self.sheet.now_row, self.sheet.now_key)
-        self.sheet.set_now(k, self._key)
-        if self.strip.isVisible():
+        if playing != self.sheet.playing:
+            self.sheet.playing = playing
+            self.sheet.update()
+        self.sheet.set_now(k, self._key, smooth)
+        now = time.monotonic()
+        frame = self.motion == "animated" and (not playing or now - self._frame >= FRAME)
+        if frame:
+            self._frame = now
+            self.sheet.animate(position)
+        if self.strip.isVisible() and (frame or changed or self.motion != "animated"):
             nxt = next(
                 (
                     r["text"]
@@ -1195,8 +1469,12 @@ class LyricsController(QObject):
                 ),
                 "",
             )
-            self.strip.set_lines(self.rows[k]["text"] if k is not None else "", nxt)
-        if changed and self.w.player.playing:
+            sung = None
+            if self.motion == "animated" and k in self.sheet.timing:
+                words, end = self.sheet.timing[k]
+                sung = L.sung(self.rows[k]["text"], words, position, end)
+            self.strip.set_lines(self.rows[k]["text"] if k is not None else "", nxt, sung)
+        if changed and playing:
             self._follow(k)
 
     def _manual(self) -> None:
@@ -1222,6 +1500,9 @@ class LyricsController(QObject):
             return
         target = max(0, int(rect.top() - view * 0.3))
         self.anim.stop()
+        if self.motion == "off":
+            bar.setValue(min(target, bar.maximum()))
+            return
         self.anim.setStartValue(bar.value())
         self.anim.setEndValue(min(target, bar.maximum()))
         self.anim.start()

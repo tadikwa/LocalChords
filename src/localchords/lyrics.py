@@ -88,11 +88,13 @@ def parse(text: str) -> list[dict]:
             elif line or (out and out[-1]["text"]):  # one break between stanzas, not a pile
                 out.append({"text": line, "start": None})
             continue
-        text_only, words = _word_times(line)
+        text_only, words, end = _word_times(line)
         for t in times:
             item = {"text": text_only, "start": round(t, 3)}
             if words:
                 item["words"] = words
+            if end is not None and end > t:
+                item["end"] = end
             out.append(item)
     starts = [x["start"] for x in out if x["start"] is not None]
     if starts != sorted(starts):
@@ -104,6 +106,8 @@ def parse(text: str) -> list[dict]:
             x["start"] = round(max(0.0, x["start"] + shift), 3)
             if x.get("words"):
                 x["words"] = [[c, round(max(0.0, t + shift), 3)] for c, t in x["words"]]
+            if x.get("end") is not None:
+                x["end"] = round(max(0.0, x["end"] + shift), 3)
     return out
 
 
@@ -121,10 +125,11 @@ def _sort_timed(lines: list[dict]) -> list[dict]:
     return [x for _, g in groups for x in g] + pending
 
 
-def _word_times(line: str) -> tuple[str, list[list]]:
-    """Enhanced LRC: the text without its <mm:ss.xx> tags, and [char, time] where a tag stood."""
+def _word_times(line: str) -> tuple[str, list[list], float | None]:
+    """Enhanced LRC: the text without its <mm:ss.xx> tags, [char, time] where a tag stood, and the
+    time of a tag after the last word (where the singing of the line ends), if there is one."""
     if "<" not in line:
-        return line, []
+        return line, [], None
     words, text, pos = [], "", 0
     for m in _WORD_TIME.finditer(line):
         text += line[pos : m.start()]
@@ -134,8 +139,9 @@ def _word_times(line: str) -> tuple[str, list[list]]:
     text += line[pos:]
     stripped = text.strip()
     lead = len(text) - len(text.lstrip())
+    end = next((t for c, t in reversed(words) if c - lead >= len(stripped)), None)
     words = [[max(0, c - lead), t] for c, t in words if c - lead < len(stripped)]
-    return stripped, words
+    return stripped, words, end if words else None
 
 
 def parse_srt(text: str) -> list[dict]:
@@ -260,6 +266,41 @@ def line_at(lyrics: dict, t: float) -> int | None:
     starts = [lyrics["lines"][i]["start"] + offset for i in idx]
     k = bisect_right(starts, t + 1e-3) - 1
     return idx[k] if k >= 0 else None
+
+
+WORD_MAX = 2.0  # a word lights up over at most this long: a longer wait before the next is a rest
+LAST_WORD = 1.0  # the last word of a line with no end known: its length is not known either
+
+
+def sung(text: str, words: list, t: float, end: float | None) -> tuple[float, int, float] | None:
+    """How far the singing has gone into a line at t, from its words' times (already shifted by
+    the offset): (characters sung, as a fraction; start of the word being sung; how far into it,
+    0..1, or -1 between words). None for a line without word times: nothing is made up.
+
+    A word lights from its start to the next word's, over at most WORD_MAX; the last one until
+    `end` (the line's end, else the next line's start), over at most LAST_WORD without one.
+    """
+    if not words or not text:
+        return None
+    points = sorted((min(max(0, int(c)), len(text)), float(w)) for c, w in words)
+    times, latest = [], float("-inf")
+    for _c, w in points:  # times edited by hand may go back: never light a word before its start
+        latest = max(latest, w)
+        times.append(latest)
+    if t < times[0]:
+        return float(points[0][0]), points[0][0], -1.0
+    i = bisect_right(times, t) - 1
+    first = points[i][0]
+    following = points[i + 1][0] if i + 1 < len(points) else len(text)
+    last = first + len(text[first:following].rstrip())  # the word, without the space after it
+    if i + 1 < len(points):
+        span = min(times[i + 1] - times[i], WORD_MAX)
+    else:
+        span = min(end - times[i], WORD_MAX) if end is not None else LAST_WORD
+    f = (t - times[i]) / max(span, 0.05)
+    if f >= 1.0:
+        return float(last), first, -1.0
+    return first + (last - first) * f, first, f
 
 
 def _by_start(lines: list[dict]) -> list[int]:
