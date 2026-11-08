@@ -1,8 +1,8 @@
 # État du projet
 
-Mis à jour le 2026-11-08 : v1.4 (Ma bibliothèque) en préparation sur la branche `feature/v1.4-library`.
-Dernière version publiée : v1.3.1 (<https://github.com/tadikwa/LocalChords/releases/tag/v1.3.1>). Les
-versions v1.1, v1.2, v1.2.1, v1.3 et v1.3.1 restent en ligne, inchangées.
+Mis à jour le 2026-11-08 : v1.4 (Ma bibliothèque) publiée
+(<https://github.com/tadikwa/LocalChords/releases/tag/v1.4>), dernière version. Les versions v1.1, v1.2,
+v1.2.1, v1.3 et v1.3.1 restent en ligne, inchangées.
 
 ## Où on en est
 
@@ -24,6 +24,9 @@ sans doublon, dates marquées estimées, audio retrouvé, fichiers `.lchords` id
 à la même date.
 Builds locaux vérifiés : auto-test du dossier et de l'exécutable unique (302 Mo), 18 étapes sur 18,
 sortie sans erreur.
+Binaires de la CI vérifiés avant publication : empreintes SHA256SUMS, auto-test du zip et de l'exécutable
+unique (18 étapes sur 18), FFmpeg LGPL v3 sans x264 ni x265, notices et sources tierces jointes. Après
+publication, les quatre fichiers téléchargés sans compte correspondent aux empreintes.
 
 **v1.3.1 :** ligne « Aucune parole disponible » au-dessus de la grille, reconnaissance du morceau par ses
 noms (informations musicales du lien, titre de vidéo nettoyé, étiquettes, nom du fichier ; jamais la chaîne
