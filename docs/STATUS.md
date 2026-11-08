@@ -1,10 +1,24 @@
 # État du projet
 
-Mis à jour le 2026-11-08 : v1.3 (paroles) publiée
-(<https://github.com/tadikwa/LocalChords/releases/tag/v1.3>), dernière version. Les versions v1.1, v1.2 et
-v1.2.1 restent en ligne, inchangées.
+Mis à jour le 2026-11-08 : v1.3.1 (paroles trouvées pour vous) publiée
+(<https://github.com/tadikwa/LocalChords/releases/tag/v1.3.1>), dernière version. Les versions v1.1, v1.2,
+v1.2.1 et v1.3 restent en ligne, inchangées.
 
 ## Où on en est
+
+**v1.3.1 :** ligne « Aucune parole disponible » au-dessus de la grille, reconnaissance du morceau par ses
+noms (informations musicales du lien, titre de vidéo nettoyé, étiquettes, nom du fichier ; jamais la chaîne
+pour l'artiste), recherche LRCLIB automatique seulement avec l'accord donné une fois (titre, artiste, album,
+durée), verdict sûr / à choisir / rien, horodatages écartés pour un live ou une reprise. Détail dans
+[TECHNIQUE.md](TECHNIQUE.md#identifier-le-morceau-et-proposer-ses-paroles-v131), notes dans
+[NOTES-v1.3.1.md](NOTES-v1.3.1.md). 710 tests passent. Auto-test avec une étape « invitation aux paroles ».
+Binaires de la CI vérifiés avant publication : empreintes SHA256SUMS, auto-test du zip sans modèle, puis du
+zip et de l'exécutable unique avec LRCLIB (20 résultats, verdict « sûr »).
+La CI a dû être relancée quatre fois : les téléchargements depuis github.com répondaient 503/504.
+`fetch_whisper.py` et `build_av_lgpl.py` réessaient désormais (5 fois, 30 s d'écart) ; ce n'est pas dans le
+tag v1.3.1.
+L'auto-test de la v1.3.1 fermait la fenêtre rouverte pendant le décodage de l'audio : Python plantait à la
+sortie (code 127 pour le dossier), après un rapport complet. Corrigé après le tag : il attend l'audio.
 
 **v1.3 :** paroles du morceau (fichier ou étiquettes, LRCLIB à la demande, transcription locale par
 whisper.cpp, ou saisie), quatre vues (`K`), accords posés sur les mots et déplaçables, synchronisation à la
@@ -42,6 +56,7 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
 | I. v1.2 | Diagrammes de guitare et de piano : suivent la lecture, épinglage au clic, capo, transposition, notation |
 | J. v1.2.1 | Accords du morceau (tous / à venir), positions partagées et enregistrées, fiche des accords en PDF |
 | K. v1.3 | Paroles : sources locales, LRCLIB, transcription locale ; vues, synchronisation, accords sur les mots, PDF |
+| L. v1.3.1 | Morceau reconnu par ses noms, recherche des paroles avec accord, ligne d'invitation au-dessus de la grille |
 | G. P2 | Liens, lots, comparaison de moteurs, progressions, transposition de l'audio. Non faits : sections, séparation de sources, GPU, avec leurs raisons dans DECISIONS.md |
 
 ## Limites connues
@@ -81,6 +96,13 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
   <https://github.com/tadikwa/LocalChords/releases>.
 
 ## Revue indépendante
+
+**v1.3.1 :** revue du diff entier, 6 constats, tous corrigés avec un test : un mot entre crochets
+(« [Acoustic] ») pris pour l'identifiant de la vidéo ; l'artiste du titre perdu quand le site donne le
+morceau sans artiste ; une recherche abandonnée qui marquait le morceau comme déjà cherché ; le nom du
+fichier gardé comme correction de l'utilisateur sans qu'il l'ait modifié ; une réponse en cours gardée après
+la désactivation de la recherche automatique ; un artiste contenu dans un nom plus long (« Adele » dans
+« Adele Givens ») compté comme le même.
 
 **v1.3 :** revue du diff entier par un agent séparé, 11 constats. Dix corrigés, avec des tests :
 - « Enregistrer une copie du projet » emportait les paroles du catalogue : la copie les laisse de côté,

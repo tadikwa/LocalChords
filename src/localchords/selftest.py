@@ -272,6 +272,7 @@ def run(audio_path: Path, out: Path) -> int:
             file=str(saved),
             recent=len(library.recent()),
         )
+        wait(lambda: window.audio_ready, 60)  # a decode left running crashes Python at exit
         window.close()
         report["ok"] = True
     except Exception:  # noqa: BLE001 - the report must say what broke

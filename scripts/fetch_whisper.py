@@ -13,6 +13,8 @@ import hashlib
 import io
 import shutil
 import sys
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -27,8 +29,16 @@ OUT = Path("vendor/whisper")
 
 
 def fetch(url: str, sha: str) -> bytes:
-    with urllib.request.urlopen(url, timeout=120) as r:
-        data = r.read()
+    for attempt in range(5):  # GitHub's downloads answer 503/504 now and then
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r:
+                data = r.read()
+            break
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if attempt == 4 or (isinstance(exc, urllib.error.HTTPError) and exc.code < 500):
+                raise
+            print(f"{url}: {exc}, nouvel essai dans 30 s")
+            time.sleep(30)
     got = hashlib.sha256(data).hexdigest()
     if got != sha:
         raise SystemExit(f"{url}: SHA-256 {got}, {sha} attendu")

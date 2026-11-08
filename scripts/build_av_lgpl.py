@@ -14,6 +14,8 @@ import json
 import subprocess
 import sys
 import tarfile
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -58,10 +60,25 @@ ROOT = Path(__file__).resolve().parent.parent
 WORK = ROOT / "build" / "av-lgpl"
 
 
+def download(url: str, target: Path) -> None:
+    """Whole or not at all, and again when GitHub answers 503/504 for a while."""
+    print("téléchargement", url, flush=True)
+    part = target.with_name(target.name + ".part")
+    for attempt in range(5):
+        try:
+            urllib.request.urlretrieve(url, part)
+            part.replace(target)
+            return
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if attempt == 4 or (isinstance(exc, urllib.error.HTTPError) and exc.code < 500):
+                raise
+            print(f"{exc}, nouvel essai dans 30 s", flush=True)
+            time.sleep(30)
+
+
 def fetch(url: str, target: Path, sha256: str) -> Path:
     if not target.exists():
-        print("téléchargement", url, flush=True)
-        urllib.request.urlretrieve(url, target)
+        download(url, target)
     digest = hashlib.sha256(target.read_bytes()).hexdigest()
     if digest != sha256:
         target.unlink()
@@ -87,8 +104,7 @@ def sources(target: Path) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     for name, url in archives.items():
         if not (folder / name).exists():  # named by commit: no digest to pin, GitHub builds the archive
-            print("téléchargement", url, flush=True)
-            urllib.request.urlretrieve(url, folder / name)
+            download(url, folder / name)
     sdist = WORK / f"av-{PYAV}.tar.gz"
     if not sdist.exists():
         raise SystemExit("Construire la roue d'abord : la source de PyAV vient de cette étape.")
