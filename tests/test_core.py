@@ -290,7 +290,7 @@ def test_decode_resamples_unicode_path(tmp_path):
     folder.mkdir()
     y = audio.decode(_wav(folder / "chanson d'été #1.wav"), 22050, channels=1)
     assert y.shape[1] == 1 and abs(len(y) - 22050) < 1200 and y.dtype == np.float32
-    assert audio.metadata(folder / "chanson d'été #1.wav")["title"] == "chanson d'été #1"
+    assert audio.metadata(folder / "chanson d'été #1.wav")["title"] == ""  # no tag: no title
 
 
 @pytest.mark.parametrize("data", [b"", b"this is not audio" * 100, b"RIFF\x00\x00\x00\x00WAVEfmt "])

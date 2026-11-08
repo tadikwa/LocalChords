@@ -86,8 +86,8 @@ def decode(
 
 
 def metadata(path: Path) -> dict:
-    """Title, artist, album, duration and lyrics as the file states them; the title falls back on
-    the file name."""
+    """Title, artist, album, duration and lyrics as the file states them, "" where it is silent
+    (identify.from_file falls back on the file's name)."""
     with _open(path) as container:
         tags = {k.lower(): v for k, v in container.metadata.items()}
         if container.streams.audio:
@@ -96,8 +96,9 @@ def metadata(path: Path) -> dict:
     # Lyrics: "lyrics" (MP4, Matroska), "lyrics-eng" (ID3 USLT), "unsyncedlyrics" (Vorbis).
     words = next((v for k, v in tags.items() if k.startswith(("lyrics", "unsyncedlyrics"))), "")
     return {
-        "title": tags.get("title") or path.stem,
+        "title": tags.get("title") or "",
         "artist": tags.get("artist") or "",
+        "album_artist": tags.get("album_artist") or "",
         "album": tags.get("album") or "",
         "duration": duration,
         "lyrics": words.strip(),

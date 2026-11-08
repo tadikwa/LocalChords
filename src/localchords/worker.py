@@ -83,6 +83,8 @@ def _download_job(url: str, folder: str, conn) -> None:
     try:
         import yt_dlp
 
+        from . import identify
+
         def hook(status):
             total = status.get("total_bytes") or status.get("total_bytes_estimate")
             if status.get("status") == "downloading" and total:
@@ -107,7 +109,8 @@ def _download_job(url: str, folder: str, conn) -> None:
             if info.get("entries"):
                 info = info["entries"][0]
             path = ydl.prepare_filename(info)
-        conn.send(("downloaded", path, info.get("webpage_url") or url))
+        # The site's music fields come along: the file's name alone would carry the video's title.
+        conn.send(("downloaded", path, info.get("webpage_url") or url, identify.keep(info)))
     except Exception as exc:  # noqa: BLE001 - whatever the site says goes to the user as it is
         text = str(exc).replace("ERROR: ", "")
         conn.send(("error", f"Le téléchargement a échoué : {text}", ""))

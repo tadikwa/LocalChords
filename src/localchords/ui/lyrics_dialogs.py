@@ -54,12 +54,25 @@ def _buttons(ok: str, dialog: QDialog) -> QDialogButtonBox:
 class SearchDialog(QDialog):
     """Candidates from LRCLIB, for the user to choose: none is taken for the right one."""
 
-    def __init__(self, title: str, artist: str, album: str, duration: float, parent=None):
+    def __init__(
+        self,
+        title: str,
+        artist: str,
+        album: str,
+        duration: float,
+        parent=None,
+        records: list[dict] | None = None,
+        version: bool = False,
+    ):
+        """records: candidates already found, best first, shown without asking again. version:
+        the recording is a live, a cover…, whose times are not the catalog's."""
         super().__init__(parent)
-        self.setWindowTitle("Chercher les paroles en ligne")
+        self.setWindowTitle("Rechercher les paroles en ligne")
         self.resize(760, 620)
         self.duration = duration
+        self.version = version
         self.choice: tuple[dict, bool] | None = None
+        self.query: tuple[str, str, str] | None = None  # the names the shown results answer
         self.task: transcribe.Task | None = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
@@ -117,12 +130,16 @@ class SearchDialog(QDialog):
         self.timer = QTimer(self)
         self.timer.setInterval(100)
         self.timer.timeout.connect(self._poll)
+        if records:
+            self.query = (title, artist, album)
+            self._fill(records, "Versions trouvées, la plus probable en premier : vérifiez")
 
     def search(self) -> None:
         if self.task is not None:
             return
         title, artist, album = (f.text().strip() for f in (self.title, self.artist, self.album))
         duration = self.duration
+        self.query = (title, artist, album)
 
         def work(_task):
             try:
@@ -145,12 +162,15 @@ class SearchDialog(QDialog):
         if task.error:
             self.status.setText(task.error)
             return
-        self.records = task.result or []
+        self._fill(task.result or [], "vérifiez qu'il s'agit bien du même enregistrement")
+
+    def _fill(self, records: list[dict], advice: str) -> None:
+        self.records = records
         self.results.clear()
         for r in self.records:
             self.results.addItem(QListWidgetItem(self._describe(r)))
         self.status.setText(
-            f"{len(self.records)} résultat(s) : vérifiez qu'il s'agit bien du même enregistrement."
+            f"{len(self.records)} résultat(s) : {advice}."
             if self.records
             else "Rien trouvé. Essayez sans l'album, ou une autre orthographe."
         )
@@ -193,7 +213,7 @@ class SearchDialog(QDialog):
             or "(morceau instrumental : pas de paroles)"
         )
         gap = self._gap(r)
-        loose = not r.get("syncedLyrics") or (gap is not None and gap > LOOSE_GAP)
+        loose = self.version or not r.get("syncedLyrics") or (gap is not None and gap > LOOSE_GAP)
         self.plain.setChecked(loose)
         self.plain.setEnabled(bool(r.get("syncedLyrics")))
 

@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import audio, export, lyrics_online, transcribe
+from .. import audio, export, identify, lyrics_online, transcribe
 from .. import lyrics as L
 from . import theme
 from .widgets import ElidedLabel, Stepper, fmt_time
@@ -491,6 +491,56 @@ class LyricsStrip(QWidget):
         p.end()
 
 
+class LyricsPrompt(QWidget):
+    """One thin line for a song without lyrics: what can be done, or what was found. The grid
+    keeps its room; the cross hides it for this song."""
+
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("bar")
+        row = QHBoxLayout(self)
+        row.setContentsMargins(16, 2, 8, 2)
+        row.setSpacing(2)
+        self.text = ElidedLabel()
+        self.text.setObjectName("caption")
+        row.addWidget(self.text, 1)
+        self.actions = QHBoxLayout()
+        self.actions.setSpacing(0)
+        row.addLayout(self.actions)
+        self.close = QToolButton()
+        self.close.setObjectName("step")
+        self.close.setIcon(theme.icon("close", size=12))
+        self.close.setToolTip("Masquer pour ce morceau")
+        self.close.setAccessibleName("Masquer l'invitation aux paroles pour ce morceau")
+        row.addWidget(self.close)
+        self.buttons: list[QPushButton] = []
+        self._fns: list = []
+        self.hide()
+
+    def show_state(self, text: str, actions: list[tuple[str, object]]) -> None:
+        self.text.set_full_text(text)
+        self._fns = [fn for _label, fn in actions]
+        if [b.text() for b in self.buttons] == [label for label, _fn in actions]:
+            return  # the same buttons: kept, so a click under way is not lost
+        while self.actions.count():
+            item = self.actions.takeAt(0)
+            if item.widget():
+                item.widget().hide()  # at once: deleteLater waits for the event loop
+                item.widget().deleteLater()
+        self.buttons = []
+        for i, (label, _fn) in enumerate(actions):
+            if i:
+                dot = QLabel("·")
+                dot.setObjectName("caption")
+                self.actions.addWidget(dot)
+            button = QPushButton(label)
+            button.setObjectName("link")
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.clicked.connect(lambda _c=False, i=i: self._fns[i]())
+            self.actions.addWidget(button)
+            self.buttons.append(button)
+
+
 # The page -----------------------------------------------------------------------------------------
 
 
@@ -558,6 +608,8 @@ class LyricsPage(QWidget):
             row.addWidget(w)
         layout.addWidget(bar)
         self.bar = bar
+        self.prompt = LyricsPrompt()
+        layout.addWidget(self.prompt)
 
         # A transcription under way.
         self.work = QWidget()
@@ -651,6 +703,8 @@ class LyricsController(QObject):
         self.strip.hide()
         layout = s.layout()
         layout.insertWidget(layout.indexOf(s.progress_bar) + 1, self.strip)
+        self.prompt = LyricsPrompt()  # over the grid, in the strip's place while there are none
+        layout.insertWidget(layout.indexOf(self.strip), self.prompt)
 
         settings = window.settings
         self.mode = settings.get("lyrics_mode", "grid")
@@ -680,7 +734,7 @@ class LyricsController(QObject):
         p.text_size.set_value(int(settings.get("lyrics_size", 20)))
         p.follow.setChecked(bool(settings.get("lyrics_follow", True)))
         get = p.get.menu()
-        get.addAction("Chercher en ligne (LRCLIB)…", self.search_online)
+        get.addAction("Rechercher en ligne (LRCLIB)…", self.search_online)
         get.addAction("Importer un fichier (.lrc, .srt, .txt)…", self.import_file)
         get.addAction("Transcrire avec l'IA, sur cet ordinateur…", self.transcribe)
         get.addAction("Saisir ou coller les paroles…", self.edit_text)
@@ -704,6 +758,9 @@ class LyricsController(QObject):
             "Revenir aux paroles précédentes", self.revert_previous
         )
         more.addAction("Remettre tous les accords à leur place", self.reset_anchors)
+        self.untime_action = more.addAction(
+            "Retirer les horodatages (garder le texte)", self.clear_times
+        )
         more.addSeparator()
         self.delete_action = more.addAction("Supprimer les paroles", self.delete)
 
@@ -745,6 +802,17 @@ class LyricsController(QObject):
         self.timer.timeout.connect(self._poll)
         self.anim = QPropertyAnimation(p.scroll.verticalScrollBar(), b"value", self)
         self.anim.setDuration(260)
+        # The suggestion from LRCLIB, looked for in the background when the user allowed it.
+        self.lookup: transcribe.Task | None = None
+        self.lookup_for = None  # the project it is for
+        self.suggestion: dict | None = None  # lyrics_online.suggest's answer, for self._project
+        self._looked: set[str] = set()  # songs already looked up in this session
+        self._has_grid = False
+        self.lookup_timer = QTimer(self)
+        self.lookup_timer.setInterval(150)
+        self.lookup_timer.timeout.connect(self._poll_lookup)
+        for prompt in (self.prompt, p.prompt):
+            prompt.close.clicked.connect(self.hide_prompt)
         self._update_mode_actions()
 
     # Modes
@@ -773,7 +841,13 @@ class LyricsController(QObject):
     def _update_mode_actions(self) -> None:
         for value, action in self.mode_actions.items():
             action.setChecked(value == self.mode)
-        self.button.setText(MODES[self.mode] if self.mode != "grid" else "Paroles")
+        project = self.w.project
+        found = bool(self._found or (self.suggestion and self.suggestion["verdict"] == "sure"))
+        if self.mode != "grid":
+            self.button.setText(MODES[self.mode])
+        else:  # the grid alone: the button says when lyrics wait to be used
+            waiting = found and project is not None and project.lyrics is None
+            self.button.setText("Paroles trouvées" if waiting else "Paroles")
 
     # Following the project
     def refresh(self, has_grid: bool) -> None:
@@ -785,8 +859,11 @@ class LyricsController(QObject):
             self.page.sync.setChecked(False)
             self.page.scroll.verticalScrollBar().setValue(0)
             self._found = None
+            self.suggestion = None
             if project is not None and project.lyrics is None:
                 self._found = self._local(project)
+            self._maybe_look_up()
+        self._has_grid = has_grid
         self.button.setVisible(has_grid)
         lyr = project.lyrics if project else None
         self.rows = export.lyric_rows(project) if lyr and has_grid else []
@@ -831,7 +908,10 @@ class LyricsController(QObject):
         for action in self.exports:
             action.setEnabled(ok)
             action.setToolTip("" if ok else (NOT_EXPORTABLE if lyr else "Pas de paroles."))
+        self.untime_action.setEnabled(L.timed(lyr))
         self._update_hint()
+        self._update_mode_actions()
+        self._update_prompt()
         self._beat = self._key = None
 
     def _local(self, project) -> tuple | None:
@@ -851,13 +931,23 @@ class LyricsController(QObject):
             if item.widget():
                 item.widget().deleteLater()
         choices = []
+        verdict = self.suggestion["verdict"] if self.suggestion else None
         if self._found:
             name = self._found[1]["name"]
             choices.append((f"Utiliser les paroles de « {name} »", self.use_found, True))
+        elif verdict == "sure":
+            choices.append(("Utiliser les paroles trouvées", self.use_suggestion, True))
+        elif verdict == "choose":
+            choices.append(("Choisir parmi les versions trouvées…", self.choose_suggestion, True))
+        free = not choices  # nothing found yet: searching first, or transcribing when it failed
         choices += [
-            ("Chercher en ligne (LRCLIB)…", self.search_online, not self._found),
+            ("Rechercher en ligne (LRCLIB)…", self.search_online, free and verdict != "none"),
+            (
+                "Transcrire avec l'IA, sur cet ordinateur…",
+                self.transcribe,
+                free and verdict == "none",
+            ),
             ("Importer un fichier…", self.import_file, False),
-            ("Transcrire avec l'IA, sur cet ordinateur…", self.transcribe, False),
             ("Saisir ou coller les paroles…", self.edit_text, False),
         ]
         for text, fn, primary in choices:
@@ -897,6 +987,184 @@ class LyricsController(QObject):
             text = "Un clic sur une ligne lit depuis elle."
         p.hint.setText(text)
         p.hint.show()
+
+    # The invitation, and the suggestion from LRCLIB
+    def identity(self, project) -> dict:
+        """What is known of the song: the names stored, and how they were found."""
+        a = project.audio
+        if "identity" not in a:  # a project from before 1.3.1: its names read again, as tags
+            who = identify.from_file(
+                {"title": a.get("title") or "", "artist": a.get("artist") or ""}, ""
+            )
+            return {**who, "album": a.get("album") or ""}
+        return {
+            "title": identify.clean_title(a.get("title") or ""),
+            "artist": a.get("artist") or "",
+            "album": a.get("album") or "",
+            **{k: v for k, v in a["identity"].items() if k not in ("title", "artist", "album")},
+        }
+
+    def _maybe_look_up(self, asked: bool = False) -> None:
+        """Ask LRCLIB in the background, only when allowed, for a song without lyrics that names
+        its title and artist; once per song and session unless asked."""
+        project = self.w.project
+        if project is None or project.lyrics is not None or self._found:
+            return
+        if self.w.settings.get("lyrics_auto") is not True:
+            return
+        who = self.identity(project)
+        key = self._song_key(project)
+        if not identify.searchable(who) or (key in self._looked and not asked):
+            return
+        self._looked.add(key)
+        duration = project.duration
+
+        def work(_task):
+            try:
+                found = lyrics_online.search(who["title"], who["artist"], who["album"], duration)
+            except lyrics_online.OnlineError as exc:
+                raise transcribe.TranscribeError(str(exc)) from exc
+            return lyrics_online.suggest(found, who, duration)
+
+        self.suggestion = None
+        self.lookup_for = project
+        self.lookup = transcribe.run(work)
+        self.lookup_timer.start()
+
+    @staticmethod
+    def _song_key(project) -> str:
+        return project.audio.get("fingerprint") or project.audio.get("path") or ""
+
+    def _poll_lookup(self) -> None:
+        task = self.lookup
+        if task is None or not task.done:
+            return
+        self.lookup_timer.stop()
+        self.lookup = None
+        if self.lookup_for is not self.w.project or self.w.settings.get("lyrics_auto") is not True:
+            # Another song since, or no longer allowed: dropped, and asked again on its return.
+            self._looked.discard(self._song_key(self.lookup_for))
+            self._update_prompt()
+            return
+        self.suggestion = (
+            {"verdict": "error", "error": task.error, "candidates": [], "synced": False}
+            if task.error
+            else task.result
+        )
+        self._fill_empty()
+        self._update_mode_actions()
+        self._update_prompt()
+
+    def allow_auto(self, on: bool) -> None:
+        """The user's answer, kept: whether songs without lyrics are looked up on LRCLIB."""
+        self.w._remember("lyrics_auto", bool(on))
+        action = getattr(self.w, "auto_lyrics_action", None)
+        if action is not None and action.isChecked() != bool(on):
+            action.blockSignals(True)
+            action.setChecked(bool(on))
+            action.blockSignals(False)
+        if on:
+            self._maybe_look_up(asked=True)
+        self._update_prompt()
+
+    def hide_prompt(self) -> None:
+        if self.w.project:
+            self.w.project.set_view(lyrics_prompt=False)
+            self.w.save_timer.start()
+        self._update_prompt()
+
+    def _prompt_state(self, full: bool) -> tuple[str, list] | None:
+        """(text, [(action, fn)]) for the invitation; None where the page already says it."""
+        project = self.w.project
+        who = self.identity(project)
+        name = f"« {who['title']} »" + (f" ({who['artist']})" if who["artist"] else "")
+        verdict = self.suggestion["verdict"] if self.suggestion else None
+        search = ("Rechercher les paroles", self.search_online)
+        transcribe_ = ("Transcrire avec l'IA", self.transcribe)
+        import_ = ("Importer", self.import_file)
+        if self.task is not None:  # a transcription: the page has its bar, the grid this line
+            if full:
+                return None
+            return (self.page.work_text.text(), [("Annuler", self.cancel)])
+        if self._found:
+            if full:
+                return None
+            return (
+                f"Paroles trouvées sur cet ordinateur : « {self._found[1]['name']} »",
+                [("Utiliser", self.use_found), ("Autres choix", lambda: self.set_mode("lyrics"))],
+            )
+        if self.lookup is not None and self.lookup_for is project:
+            return (f"Recherche des paroles de {name} sur LRCLIB…", [])
+        if verdict == "sure":
+            best = self.suggestion["candidates"][0]
+            how = "synchronisées" if self.suggestion["synced"] else "texte seul"
+            if best.get("syncedLyrics") and not self.suggestion["synced"]:
+                how += " (autre version : les horodatages du catalogue ne tomberaient pas juste)"
+            return (
+                f"Paroles trouvées : {best.get('artistName')} – {best.get('trackName')} · {how}",
+                [
+                    ("Utiliser", self.use_suggestion),
+                    ("Voir les autres versions", self.choose_suggestion),
+                    ("Modifier la recherche", self.search_online),
+                ],
+            )
+        if verdict == "choose":
+            n = len(self.suggestion["candidates"])
+            return (
+                f"{n} version{'s' if n > 1 else ''} possible{'s' if n > 1 else ''} pour {name} "
+                "sur LRCLIB : à vous de choisir",
+                [
+                    ("Choisir…", self.choose_suggestion),
+                    ("Modifier la recherche", self.search_online),
+                ],
+            )
+        if self.w.settings.get("lyrics_auto") is None and identify.searchable(who):
+            return (
+                "Rechercher automatiquement les paroles des morceaux sur LRCLIB ? Seuls le titre, "
+                "l'artiste, l'album et la durée sont envoyés, jamais l'audio.",
+                [
+                    ("Autoriser", lambda: self.allow_auto(True)),
+                    ("Non merci", lambda: self.allow_auto(False)),
+                ],
+            )
+        if verdict == "none":  # better none than another song's: the transcription comes first
+            return (
+                f"Aucune parole fiable trouvée sur LRCLIB pour {name}",
+                [transcribe_, ("Modifier la recherche", self.search_online), import_],
+            )
+        if verdict == "error":
+            return (f"Recherche des paroles impossible : {self.suggestion['error']}", [search])
+        if full:
+            return None  # the page lists the same choices, larger
+        unknown = "" if identify.searchable(who) else " (morceau non identifié)"
+        return (f"Aucune parole disponible{unknown}", [search, transcribe_, import_])
+
+    def _update_prompt(self) -> None:
+        project = self.w.project
+        show = bool(
+            project is not None
+            and project.lyrics is None
+            and self._has_grid
+            and (project.view.get("lyrics_prompt", True) or self.task is not None)
+        )
+        for prompt, full in ((self.prompt, False), (self.page.prompt, True)):
+            here = show and (self.full_page if full else self.mode == "strip")
+            state = self._prompt_state(full) if here else None
+            if state:
+                prompt.show_state(*state)
+            prompt.setVisible(bool(state))
+
+    def use_suggestion(self) -> None:
+        sug = self.suggestion
+        if not (sug and sug["candidates"] and self.w.project) or self.w.project.lyrics:
+            return  # lyrics there already are never replaced by a suggestion
+        record, synced = sug["candidates"][0], sug["synced"]
+        self._replace(
+            lyrics_online.lines_of(record, synced), lyrics_online.source_of(record, synced)
+        )
+
+    def choose_suggestion(self) -> None:
+        self.search_online(self.suggestion["candidates"] if self.suggestion else None)
 
     # Playback
     def tick(self, position: float, beat: int) -> None:
@@ -1097,25 +1365,45 @@ class LyricsController(QObject):
             return
         self._replace(lines, {"kind": "file", "name": Path(path).name, "exportable": True})
 
-    def search_online(self) -> None:
+    def search_online(self, records: list[dict] | None = None) -> None:
+        """The search dialog, on the names known, or on the candidates already found."""
         from .lyrics_dialogs import SearchDialog
 
         project = self.w.project
         if not project or not self._may_replace():
             return
-        a = project.audio
+        who = self.identity(project)
+        shown = (
+            who["title"] or Path(project.audio.get("path", "")).stem,
+            who["artist"],
+            who["album"],
+        )
         dialog = SearchDialog(
-            a.get("title") or Path(a.get("path", "")).stem,
-            a.get("artist") or "",
-            a.get("album") or "",
+            *shown,
             project.duration,
             self.w,
+            records=records or None,
+            version=identify.is_version(who["title"], who.get("video_title", "")),
         )
-        if dialog.exec() and dialog.choice:
-            record, synced = dialog.choice
-            self._replace(
-                lyrics_online.lines_of(record, synced), lyrics_online.source_of(record, synced)
-            )
+        if not (dialog.exec() and dialog.choice):
+            return
+        if dialog.query and dialog.query != shown:
+            self._rename(*dialog.query)  # the names that found them: the user's correction
+        record, synced = dialog.choice
+        self._replace(
+            lyrics_online.lines_of(record, synced), lyrics_online.source_of(record, synced)
+        )
+
+    def _rename(self, title: str, artist: str, album: str) -> None:
+        """The song's names as the user corrected them, kept: never read again from the file."""
+        a = self.w.project.audio
+        a.update(title=title, artist=artist, album=album)
+        a["identity"] = {**(a.get("identity") or {}), "how": "user", "sure": True}
+        s = self.w.song
+        s.title.set_full_text(title)
+        s.subtitle.set_full_text(artist)
+        s.subtitle.setVisible(bool(artist))
+        self.w.setWindowTitle(f"{title} : LocalChords")
 
     def edit_text(self) -> None:
         from .lyrics_dialogs import LyricsEditor
@@ -1149,6 +1437,18 @@ class LyricsController(QObject):
             back = copy.deepcopy(lyr["previous"])
             back["previous"] = {k: v for k, v in copy.deepcopy(lyr).items() if k != "previous"}
             self._apply(back)
+
+    def clear_times(self) -> None:
+        """The words kept without their times: another performance, or times to redo by hand."""
+        if not (self.w.project and L.timed(self.w.project.lyrics)):
+            return
+        lyr = self._copy()
+        for x in lyr["lines"]:
+            x["start"] = None
+            x.pop("words", None)
+            x.pop("end", None)
+        lyr["offset"] = 0.0
+        self._apply(lyr)
 
     def delete(self) -> None:
         answer = QMessageBox.question(
@@ -1187,6 +1487,7 @@ class LyricsController(QObject):
         p.work_text.setText("Transcription en cours, sur cet ordinateur…")
         p.work_bar.setValue(0)
         p.work.show()
+        self._update_prompt()
         self.timer.start()
 
     def _poll(self) -> None:
@@ -1200,11 +1501,14 @@ class LyricsController(QObject):
             f"Transcription en cours, sur cet ordinateur : {task.status} "
             f"{round(task.progress * 100)} % · {fmt_time(elapsed)}"
         )
+        if self.prompt.isVisible():
+            self._update_prompt()
         if not task.done:
             return
         self.timer.stop()
         self.task = None
         p.work.hide()
+        self._update_prompt()
         if task.error:
             if not task.cancelled:
                 self.w._alert(task.error)

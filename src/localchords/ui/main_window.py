@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, audio, engines, export, library, voicings, worker
+from .. import __version__, audio, engines, export, identify, library, voicings, worker
 from .. import lyrics as L
 from ..chords import key_name, parse, spell_tonic, symbol
 from ..player import Player, device_sample_rate
@@ -565,6 +565,7 @@ class MainWindow(QMainWindow):
         self.loader.finished.connect(self._audio_loaded)
         self.loop_marks: list[float | None] = [None, None]
         self.pending_source_url: str | None = None
+        self.pending_info: dict | None = None  # what yt-dlp read on the site, for the next file
         self.download_job: worker.Job | None = None
         self.batch_job: worker.Job | None = None
         self.batch_queue: list[Path] = []
@@ -696,6 +697,17 @@ class MainWindow(QMainWindow):
         self.bass_action.setChecked(bool(self.settings.get("show_bass", True)))
         self.bass_action.toggled.connect(self._bass_changed)
         menu.addAction(self.bass_action)
+        self.auto_lyrics_action = QAction(
+            "Rechercher automatiquement les paroles des morceaux", self, checkable=True
+        )
+        self.auto_lyrics_action.setChecked(self.settings.get("lyrics_auto") is True)
+        self.auto_lyrics_action.setToolTip(
+            "Pour un morceau sans paroles dont le titre et l'artiste sont connus : seuls le titre, "
+            "l'artiste, l'album et la durée sont envoyés à LRCLIB (lrclib.net), jamais l'audio."
+        )
+        self.auto_lyrics_action.toggled.connect(lambda on: self.lyrics.allow_auto(on))
+        menu.addAction(self.auto_lyrics_action)
+        menu.setToolTipsVisible(True)
         menu.addSeparator()
         menu.addAction("Raccourcis clavier", self.show_shortcuts)
         menu.addAction("À propos de LocalChords", self.show_about)
@@ -830,6 +842,7 @@ class MainWindow(QMainWindow):
                     self._alert(message[1])
                 else:
                     self.pending_source_url = message[2]
+                    self.pending_info = message[3] if len(message) > 3 else None
                     self.open_audio(Path(message[1]))
                 return
 
@@ -912,6 +925,7 @@ class MainWindow(QMainWindow):
     def _project_for(self, path: Path) -> tuple[Project, Path, bool]:
         """(project, its file, whether it was already analyzed) for a recording."""
         source_url, self.pending_source_url = self.pending_source_url, None
+        site, self.pending_info = self.pending_info, None
         fingerprint = audio.fingerprint(path)
         saved = library.project_path(fingerprint)
         if saved.exists():
@@ -931,16 +945,22 @@ class MainWindow(QMainWindow):
         info = audio.metadata(path)
         # Lyrics found beside the recording or in its tags: on this computer, so used at once.
         found = L.find_local(path, info.get("lyrics") or "")
+        # Who and what it is: the site's music fields, else the tags, else the name. Stored once:
+        # a project already known keeps what it has, corrections included.
+        who = identify.from_info(site) if site else identify.from_file(info, path.stem)
         project = Project(
             {
                 "path": str(path),
-                "title": info["title"],
-                "artist": info["artist"],
-                "album": info.get("album") or "",
-                "duration": float(info["duration"] or 0.0),
+                "title": who["title"] or path.stem,
+                "artist": who["artist"],
+                "album": who["album"],
+                "duration": float(info["duration"] or (site or {}).get("duration") or 0.0),
                 "fingerprint": fingerprint,
                 "waveform": None,
                 "source_url": source_url,
+                "identity": {
+                    k: who[k] for k in ("how", "sure", "video_title", "channel") if k in who
+                },
             },
             {"beats": [], "segments": []},
             lyrics=L.new(*found) if found else None,

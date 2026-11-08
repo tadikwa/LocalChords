@@ -47,7 +47,10 @@ changé : `analysis` n'est jamais modifié.
     "duration": 196.3,        // secondes
     "fingerprint": "…",       // taille + premier et dernier Mo : retrouve un morceau déplacé
     "waveform": "…",          // 3000 octets de crêtes, en base64
-    "source_url": null        // la page d'origine, pour un lien importé
+    "source_url": null,       // la page d'origine, pour un lien importé
+    "album": "…",
+    "identity": {"how": "music", "sure": true,   // v1.3.1 : comment le titre et l'artiste ont été trouvés
+                 "video_title": "…", "channel": "…"}  // indices d'un lien, jamais pris pour l'artiste
   },
   "analysis": {               // tel que le moteur l'a écrit
     "engine": {"name": "model", "generator": {…}, "requested": "model"},
@@ -182,6 +185,50 @@ Ancres, décalage et corrections de lignes passent par la pile d'annulation du p
 
 **Vues** : grille seule, grille et paroles (deux lignes sous la barre de lecture), paroles seules, paroles et
 accords ; `K` alterne. La vue suit la lecture, sauf 5 s après un défilement à la main.
+
+## Identifier le morceau et proposer ses paroles (v1.3.1)
+
+**Qui chante quoi** (`identify.py`, sans rien écouter), lu une fois à la création du projet et gardé dans
+`audio.identity` (`how`, `sure`) :
+
+1. **Un lien** : les champs musicaux que yt-dlp lit sur le site (`track`, `artist`/`artists`, `album`,
+   `duration` ; `identify.keep` ne garde que ces valeurs simples). À défaut, le titre de la vidéo, coupé à
+   son tiret s'il y en a exactement un (« Artiste - Titre »), sans « (Official Video) », « [clip officiel] »,
+   « lyrics »… ni l'identifiant `[xxxxxxxxxxx]`. La chaîne n'est jamais prise pour l'artiste : elle sert
+   seulement à confirmer un titre coupé (chaîne de l'artiste, « Artiste - Topic », « ArtisteVEVO »).
+2. **Un fichier** : ses étiquettes (titre, artiste, artiste de l'album, album), puis son nom.
+3. Ce qui reste deviné (titre coupé, nom de fichier) est marqué `sure: false` ; un morceau sans artiste
+   (une chanson générée, par exemple) n'est **jamais** cherché tout seul.
+
+Les noms corrigés dans **Rechercher les paroles** sont enregistrés (`how: "user"`) et jamais relus depuis le
+fichier : un projet existant garde ce qu'il a.
+
+**La suggestion** (`lyrics_online.suggest`) ne part que si l'utilisateur l'a permis (réglage
+`lyrics_auto` : demandé à la première occasion, puis **Menu → Rechercher automatiquement les paroles des
+morceaux**), pour un morceau sans paroles, sans paroles locales, avec un titre et un artiste, une fois par
+morceau et par session, dans un fil à part. Elle envoie à `lrclib.net/api/search` le titre, l'artiste,
+l'album et la durée, comme la recherche à la main ; jamais l'audio, ni le nom du fichier, ni l'adresse de la
+vidéo.
+
+Chaque résultat reçoit une note de 0 à 1 : titre 0,5 et artiste 0,35 (ressemblance après repliement des
+accents et de la ponctuation ; un artiste crédité avec d'autres, « A & B », « A feat. B », compte comme le
+même), durée +0,1 à −0,1 (à 2, 5, 15 s près), album +0,03, horodatage +0,02, et −0,2 quand l'un est un
+live, une reprise, un remix… et pas l'autre. La durée seule ne suffit jamais.
+
+- **sûr** (≥ 0,85, durée à 5 s près, aucune autre version au texte différent à moins de 0,06) : « Paroles
+  trouvées — Utiliser · Voir les autres versions · Modifier la recherche » ;
+- **à choisir** (≥ 0,6) : la liste courte des versions, dans la fenêtre de recherche ;
+- **rien** (aucune ≥ 0,6, ou instrumentaux seulement) : rien n'est proposé ; la transcription locale passe
+  en premier, jamais lancée seule.
+
+Les horodatages du catalogue ne sont gardés que pour la même version, à 3 s près ; pour un live ou une
+reprise, seul le texte est proposé, et **Retirer les horodatages** (menu « Autres actions sur les paroles ») enlève ceux d'une version déjà
+prise. Une suggestion ne remplace jamais des paroles déjà là. Les paroles du catalogue restent
+`exportable: false`, corrigées ou non.
+
+**Le bandeau** (`LyricsPrompt`) : une ligne sous la barre de lecture en vue Grille et paroles, en haut de la
+page dans les vues Paroles, tant que le morceau n'a pas de paroles. La croix le masque pour ce morceau
+(`view.lyrics_prompt`).
 
 ## Reconstruire
 

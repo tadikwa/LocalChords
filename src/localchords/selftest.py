@@ -14,7 +14,7 @@ def run(audio_path: Path, out: Path) -> int:
     import os
     import sys
 
-    from . import library, lyrics, lyrics_online, transcribe
+    from . import identify, library, lyrics, lyrics_online, transcribe
     from .ui.main_window import MainWindow, app_instance
     from .ui.pdf import write_chord_sheet, write_lyrics_sheet, write_pdf
 
@@ -231,11 +231,28 @@ def run(audio_path: Path, out: Path) -> int:
             )
         # LRCLIB only when asked: otherwise the self-test sends nothing. Only a count is kept.
         if os.environ.get("LOCALCHORDS_SELFTEST_ONLINE") == "1":
-            found = lyrics_online.search("Hello", "", "", 0.0)
-            step("recherche LRCLIB", isinstance(found, list), results=len(found))
-        window.lyrics.set_mode("grid")
+            found = lyrics_online.search("Hello", "Adele", "", 0.0)
+            who = identify.from_info({"title": "Adele - Hello (Official Music Video)"})
+            verdict = lyrics_online.suggest(found, who, 0.0)["verdict"]
+            step("recherche LRCLIB", isinstance(found, list), results=len(found), verdict=verdict)
         project.set_lyrics(None)
+        window.lyrics.set_mode("strip")
         window._content_changed()
+        # v1.3.1: a song without lyrics gets its line over the grid; names read, a made-up record
+        # judged, nothing sent.
+        who = identify.from_info(
+            {"title": "Personne - Chanson inventée (Official Video) [aBcD3fGh1jK]"}
+        )
+        record = {"trackName": "Chanson inventée", "artistName": "Personne", "plainLyrics": "la la"}
+        suggestion = lyrics_online.suggest([record], who, 0.0)
+        step(
+            "invitation aux paroles",
+            window.lyrics.prompt.isVisible()
+            and (who["artist"], who["title"]) == ("Personne", "Chanson inventée")
+            and suggestion["verdict"] == "sure",
+            verdict=suggestion["verdict"],
+        )
+        window.lyrics.set_mode("grid")
 
         window.flush()
         saved = window.project_file

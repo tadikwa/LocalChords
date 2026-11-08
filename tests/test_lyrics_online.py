@@ -93,3 +93,73 @@ def test_a_non_json_answer_is_an_error_not_a_crash():
 def test_a_title_is_required():
     with pytest.raises(O.OnlineError):
         O.search("  ", "", "", 0, opener({}))
+
+
+# Choosing a suggestion among the candidates ------------------------------------------------------
+
+
+def rec(i, title="Chanson inventée", artist="Personne", duration=181.0, synced=True, text="A"):
+    return {
+        "id": i,
+        "trackName": title,
+        "artistName": artist,
+        "albumName": "",
+        "duration": duration,
+        "instrumental": False,
+        "plainLyrics": f"{text} une ligne\n{text} une autre",
+        "syncedLyrics": f"[00:01.00]{text} une ligne\n[00:03.00]{text} une autre"
+        if synced
+        else None,
+    }
+
+
+WHO = {"title": "Chanson inventée", "artist": "Personne", "album": "", "how": "tags", "sure": True}
+
+
+def test_a_convincing_match_is_offered_synced():
+    s = O.suggest([rec(1, duration=240.0, text="B"), rec(2)], WHO, 181.5)
+    assert s["verdict"] == "sure" and s["candidates"][0]["id"] == 2 and s["synced"]
+
+
+def test_the_same_lyrics_twice_is_no_ambiguity_but_two_versions_are():
+    twins = O.suggest([rec(1), rec(2, duration=182.0)], WHO, 181.0)
+    assert twins["verdict"] == "sure"
+    rivals = O.suggest([rec(1, synced=False), rec(2, text="Autres paroles")], WHO, 0.0)
+    assert rivals["verdict"] == "choose" and len(rivals["candidates"]) == 2
+
+
+def test_a_duration_alone_proves_nothing():
+    s = O.suggest([rec(1, title="Rien à voir", artist="Quelqu'un d'autre")], WHO, 181.0)
+    assert s["verdict"] == "none" and s["candidates"] == []
+
+
+def test_nothing_found_or_only_instrumentals_suggest_nothing():
+    assert O.suggest([], WHO, 181.0)["verdict"] == "none"
+    assert O.suggest([{**rec(1), "instrumental": True}], WHO, 181.0)["verdict"] == "none"
+
+
+def test_a_live_keeps_the_words_not_the_studio_times():
+    live = {**WHO, "title": "Chanson inventée (Live)"}
+    s = O.suggest([rec(1)], live, 181.0)
+    assert s["candidates"] and not s["synced"] and s["verdict"] == "choose"
+    studio_for_a_cover = O.suggest([rec(1, title="Chanson inventée (Live)")], WHO, 181.0)
+    assert studio_for_a_cover["verdict"] != "sure" and not studio_for_a_cover["synced"]
+
+
+def test_a_far_duration_is_another_recording():
+    s = O.suggest([rec(1, duration=260.0)], WHO, 181.0)
+    assert s["verdict"] == "choose" and not s["synced"]
+
+
+def test_a_guessed_title_read_backwards_is_still_found():
+    backwards = {"title": "Personne", "artist": "Chanson inventée", "album": "", "how": "title"}
+    assert O.suggest([rec(1)], backwards, 181.0)["verdict"] == "sure"
+    sure = {**backwards, "sure": True}
+    assert O.suggest([rec(1)], sure, 181.0)["verdict"] == "none"  # names that are sure stay so
+
+
+def test_one_artist_is_not_another_with_a_longer_name():
+    assert O._like("Personne", "Personne & Ami", True) >= 0.85
+    assert O._like("Personne", "Personne Inconnue", True) < 0.85
+    s = O.suggest([rec(1, artist="Personne Inconnue")], WHO, 181.0)
+    assert s["verdict"] != "sure"
