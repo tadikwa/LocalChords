@@ -25,22 +25,36 @@ def opener(routes, seen=None):
             if prefix in url:
                 if isinstance(answer, Exception):
                     raise answer
-                return Response(answer if isinstance(answer, bytes) else json.dumps(answer)
-                                .encode())
+                return Response(
+                    answer if isinstance(answer, bytes) else json.dumps(answer).encode()
+                )
         raise urllib.error.HTTPError(url, 404, "nf", None, None)
+
     return open_
 
 
-REC = {"id": 7, "trackName": "Chanson inventée", "artistName": "Personne", "albumName": "",
-       "duration": 181.0, "instrumental": False, "plainLyrics": "Une ligne\nUne autre",
-       "syncedLyrics": "[00:01.00]Une ligne\n[00:03.00]Une autre"}
+REC = {
+    "id": 7,
+    "trackName": "Chanson inventée",
+    "artistName": "Personne",
+    "albumName": "",
+    "duration": 181.0,
+    "instrumental": False,
+    "plainLyrics": "Une ligne\nUne autre",
+    "syncedLyrics": "[00:01.00]Une ligne\n[00:03.00]Une autre",
+}
 COVER = {**REC, "id": 8, "duration": 240.0, "syncedLyrics": None}
 
 
 def test_search_sends_only_the_names_and_ranks_by_duration():
     seen = []
-    found = O.search("Chanson inventée", "Personne", "", 180.4,
-                     opener({"/get?": REC, "/search?": [COVER, REC]}, seen))
+    found = O.search(
+        "Chanson inventée",
+        "Personne",
+        "",
+        180.4,
+        opener({"/get?": REC, "/search?": [COVER, REC]}, seen),
+    )
     assert [r["id"] for r in found] == [7, 8]
     assert all("lrclib.net/api/" in u and ua.startswith("LocalChords/") for u, ua in seen)
     assert "duration=180" in seen[0][0]
@@ -57,12 +71,15 @@ def test_nothing_found_is_an_empty_list():
     assert O.search("Rien", "Personne", "", 100, opener({})) == []
 
 
-@pytest.mark.parametrize("error, words", [
-    (urllib.error.HTTPError("u", 429, "busy", {"Retry-After": "30"}, None), "30 s"),
-    (urllib.error.HTTPError("u", 503, "down", None, None), "503"),
-    (urllib.error.URLError("offline"), "connexion"),
-    (TimeoutError(), "connexion"),
-])
+@pytest.mark.parametrize(
+    "error, words",
+    [
+        (urllib.error.HTTPError("u", 429, "busy", {"Retry-After": "30"}, None), "30 s"),
+        (urllib.error.HTTPError("u", 503, "down", None, None), "503"),
+        (urllib.error.URLError("offline"), "connexion"),
+        (TimeoutError(), "connexion"),
+    ],
+)
 def test_errors_are_explained(error, words):
     with pytest.raises(O.OnlineError, match=words):
         O.search("Titre", "", "", 0, opener({"/search?": error}))

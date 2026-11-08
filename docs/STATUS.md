@@ -1,10 +1,18 @@
 # État du projet
 
-Mis à jour le 2026-11-07 : v1.2.1 publiée (<https://github.com/tadikwa/LocalChords/releases/tag/v1.2.1>,
-binaires de la CI vérifiés par empreinte SHA-256, FFmpeg LGPL v3 sans libx264 ni libx265, auto-test complet
-réussi sur ce PC avec le zip et l'exécutable unique). La v1.2 reste en ligne, inchangée.
+Mis à jour le 2026-11-08 : v1.3 (paroles) terminée sur la branche `feature/v1.3-lyrics`, en cours de
+vérification avant publication. La v1.2.1 reste la dernière version publiée
+(<https://github.com/tadikwa/LocalChords/releases/tag/v1.2.1>), inchangée.
 
 ## Où on en est
+
+**v1.3 :** paroles du morceau (fichier ou étiquettes, LRCLIB à la demande, transcription locale par
+whisper.cpp, ou saisie), quatre vues (`K`), accords posés sur les mots et déplaçables, synchronisation à la
+main, export PDF, texte et `.lrc` réservé aux paroles exportables. Détail dans
+[TECHNIQUE.md](TECHNIQUE.md#les-paroles-v13), mesures de transcription dans
+[BENCHMARKS.md](BENCHMARKS.md#transcription-des-paroles-v13), notes dans [NOTES-v1.3.md](NOTES-v1.3.md).
+668 tests passent. Auto-test (`--self-test`) avec une étape « paroles et accords » ; captures sur des paroles écrites pour la
+démo (`scripts/screenshot_lyrics.py`).
 
 **v1.2.1 :** section « Accords du morceau » sous la grille (tous les accords, ou ceux à venir), une position
 par accord partagée par le panneau, les cartes et la fiche, et l'export « Fiche des accords (PDF) ». Détail
@@ -31,10 +39,16 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
 | H. v1.1 | Bouton « Son transposé » visible, ONNX à la place de torch, exécutable unique, mode portable |
 | I. v1.2 | Diagrammes de guitare et de piano : suivent la lecture, épinglage au clic, capo, transposition, notation |
 | J. v1.2.1 | Accords du morceau (tous / à venir), positions partagées et enregistrées, fiche des accords en PDF |
+| K. v1.3 | Paroles : sources locales, LRCLIB, transcription locale ; vues, synchronisation, accords sur les mots, PDF |
 | G. P2 | Liens, lots, comparaison de moteurs, progressions, transposition de l'audio. Non faits : sections, séparation de sources, GPU, avec leurs raisons dans DECISIONS.md |
 
 ## Limites connues
 
+- Paroles transcrites : un brouillon (environ un mot sur trois faux avec le modèle conseillé, sur 12 chansons
+  libres) ; pas mesuré sur des morceaux du commerce. Modèles de 190 et 574 Mo à télécharger.
+- Paroles en ligne : LRCLIB seulement, et pas d'export de ces paroles (droits des auteurs).
+- Placement des accords : sur le mot le plus proche quand la transcription donne les mots, sinon réparti
+  dans la ligne (« approx ») ; à vérifier à l'œil, les accords se déplacent à la main.
 - Pas de mesure sur des morceaux du commerce, ni de comparaison avec Chordify.
 - Le moteur ne sort pas 9, 11, 13, 6 ni add9 (réduits), et a du mal avec sus et ° sur son synthétique.
 - Une seule longueur de mesure par morceau ; hors 4 temps, validé seulement sur signaux construits.

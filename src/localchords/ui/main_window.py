@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__, audio, engines, export, library, voicings, worker
+from .. import lyrics as L
 from ..chords import key_name, parse, spell_tonic, symbol
 from ..player import Player, device_sample_rate
 from ..project import EXTENSION, Project, ProjectError, decode_waveform
@@ -48,6 +49,7 @@ from . import theme
 from .diagrams import ChordPanel, Positions
 from .dialogs import ChordEditor, RhythmDialog, SheetDialog, ShortcutsDialog
 from .grid import ChordGrid
+from .lyrics_view import LyricsController
 from .pdf import write_chord_sheet, write_pdf
 from .songchords import UPCOMING, Item, SongChords, chord_key
 from .waveform import Waveform
@@ -585,6 +587,7 @@ class MainWindow(QMainWindow):
         self.drop_hint.hide()
 
         self._wire()
+        self.lyrics = LyricsController(self)
         self.song.panel.set_mode(self.settings.get("diagram_mode", "guitar"))
         self.song.panel.set_state(self.settings.get("diagram_panel", "full"), emit=False)
         if self.song.panel.state != "hidden":
@@ -735,6 +738,7 @@ class MainWindow(QMainWindow):
         shortcut("Shift+P", lambda: s.panel.step("piano", -1))
         shortcut("Escape", self.follow_playback)
         shortcut("Shift+D", self.toggle_pin)
+        shortcut("K", lambda: self.lyrics.toggle_mode())
 
     # Opening -----------------------------------------------------------------------------------
     def choose_file(self) -> None:
@@ -917,6 +921,8 @@ class MainWindow(QMainWindow):
             except ProjectError:
                 pass  # a damaged save doesn't stop a new analysis, which replaces it
         info = audio.metadata(path)
+        # Lyrics found beside the recording or in its tags: on this computer, so used at once.
+        found = L.find_local(path, info.get("lyrics") or "")
         project = Project(
             {
                 "path": str(path),
@@ -928,6 +934,7 @@ class MainWindow(QMainWindow):
                 "source_url": source_url,
             },
             {"beats": [], "segments": []},
+            lyrics=L.new(*found) if found else None,
         )
         return project, saved, False
 
@@ -1235,7 +1242,7 @@ class MainWindow(QMainWindow):
         s.waveform.set_project(project if has_grid else None)
         s.waveform.invalidate()
         if has_grid and self.job is None:
-            s.middle.setCurrentWidget(s.scroll)
+            s.middle.setCurrentWidget(self.lyrics.middle_page())
         elif not has_grid and self.job is None:
             path = Path(project.audio.get("path", ""))
             self.job_path, self.job_engine = (
@@ -1258,6 +1265,7 @@ class MainWindow(QMainWindow):
         self._update_song_chords()
         self._update_facts()
         self._update_loop_display()
+        self.lyrics.refresh(has_grid)
         s.undo.setEnabled(project.can_undo)
         s.redo.setEnabled(project.can_redo)
         self._last_beat = None
@@ -1374,9 +1382,12 @@ class MainWindow(QMainWindow):
         key = project.key()
         latin = bool(project.view.get("latin"))
         shift = project.sounding_shift()
-        s.key_button.setText(
-            f"Tonalité : {key_name(key['label'] if key else None, shift, latin=latin)}"
-        )
+        # What sounds; with a capo, the shapes the hands play are named apart.
+        label = key["label"] if key else None
+        text = f"Tonalité : {key_name(label, int(project.view['transpose']), latin=latin)}"
+        if key and project.view["capo"]:
+            text += f" · formes {key_name(label, shift, latin=latin)}"
+        s.key_button.setText(text)
         menu = QMenu(self)
         if key:
             s.key_button.setToolTip(self._key_tooltip(key))
@@ -1545,6 +1556,7 @@ class MainWindow(QMainWindow):
             self._update_play_icon()
         s.time.setText(f"{fmt_time(position)} / {fmt_time(self.project.duration)}")
         beat = self.project.beat_at(position)
+        self.lyrics.tick(position, beat)
         if beat == self._last_beat:
             return
         self._last_beat = beat
@@ -1738,6 +1750,8 @@ class MainWindow(QMainWindow):
 
     # Corrections -------------------------------------------------------------------------------
     def edit_selected(self) -> None:
+        if self.lyrics.tap():  # Enter times the chosen line while the lyrics are being synced
+            return
         if not self.project or not self.project.grid():
             return
         selection = self.song.grid.selection
@@ -1943,6 +1957,7 @@ class MainWindow(QMainWindow):
         self._stop_job()
         self._cancel_download()
         self.cancel_batch()
+        self.lyrics.cancel()
         self.player.pause()
         self.player.close_device()
         library.save_settings(self.settings)

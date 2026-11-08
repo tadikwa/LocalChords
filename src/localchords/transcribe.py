@@ -5,7 +5,7 @@ only when asked, from Hugging Face, checked by SHA-256, and kept in the data fol
 included), never in the folder a one-file build unpacks itself into. Nothing is sent anywhere: the
 audio is decoded here, written to a temporary WAV and read by the engine.
 
-docs/LYRICS.md gives the measurements behind the choice of models and settings.
+docs/BENCHMARKS.md gives the measurements behind the choice of models and settings.
 """
 
 from __future__ import annotations
@@ -51,11 +51,18 @@ MODELS = [
     },
 ]
 DEFAULT_MODEL = "small-q5_1"
-LANGUAGES = {"auto": "Détection automatique", "fr": "Français", "en": "Anglais",
-             "es": "Espagnol", "de": "Allemand", "it": "Italien", "pt": "Portugais"}
+LANGUAGES = {
+    "auto": "Détection automatique",
+    "fr": "Français",
+    "en": "Anglais",
+    "es": "Espagnol",
+    "de": "Allemand",
+    "it": "Italien",
+    "pt": "Portugais",
+}
 RATE = 16_000
 SPACE_MARGIN_MB = 200
-# Phrases the models invent over music or silence, learnt from subtitles (docs/LYRICS.md).
+# Phrases the models invent over music or silence, learnt from subtitles.
 INVENTED = re.compile(
     r"sous-titr|amara\.org|merci d'avoir regard|abonnez-vous|thanks? (you )?for watching"
     r"|subscribe|transcribed by|www\.|\.com\b",
@@ -183,8 +190,10 @@ def download(model_id: str, task: Task, opener=urllib.request.urlopen) -> Path:
         raise TranscribeError(f"Le téléchargement a échoué : {exc}") from exc
     if got != info["size"] or digest.hexdigest() != info["sha256"]:
         part.unlink(missing_ok=True)
-        raise TranscribeError("Le fichier reçu ne correspond pas au modèle attendu (SHA-256) : "
-                              "il a été supprimé. Réessayez.")
+        raise TranscribeError(
+            "Le fichier reçu ne correspond pas au modèle attendu (SHA-256) : "
+            "il a été supprimé. Réessayez."
+        )
     os.replace(part, target)
     return target
 
@@ -200,10 +209,25 @@ def threads() -> int:
 def command(model: Path, wav: Path, out: Path, language: str) -> list[str]:
     folder = engine_dir()
     return [
-        str(folder / "whisper-cli.exe"), "-m", str(model), "-f", str(wav), "-l", language,
+        str(folder / "whisper-cli.exe"),
+        "-m",
+        str(model),
+        "-f",
+        str(wav),
+        "-l",
+        language,
         # -mc 0: no previous text as context, which is what makes the models loop on songs.
         # No voice detector: Silero, made for speech, finds no speech in most sung songs.
-        "-t", str(threads()), "-ojf", "-of", str(out), "-pp", "-np", "-sns", "-mc", "0",
+        "-t",
+        str(threads()),
+        "-ojf",
+        "-of",
+        str(out),
+        "-pp",
+        "-np",
+        "-sns",
+        "-mc",
+        "0",
     ]
 
 
@@ -242,8 +266,13 @@ def _run_engine(cmd: list[str], task: Task) -> None:
         flags = subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
     tail: list[str] = []
     try:
-        process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                                   stdin=subprocess.DEVNULL, creationflags=flags)
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            creationflags=flags,
+        )
     except OSError as exc:
         raise TranscribeError(f"Le moteur de transcription n'a pas démarré : {exc}") from exc
     task._process = process
@@ -261,8 +290,9 @@ def _run_engine(cmd: list[str], task: Task) -> None:
     if task.cancelled:
         raise TranscribeError("Transcription annulée.")
     if process.returncode:
-        raise TranscribeError("La transcription a échoué : " + (" ".join(tail[-3:]) or
-                                                                 f"code {process.returncode}"))
+        raise TranscribeError(
+            "La transcription a échoué : " + (" ".join(tail[-3:]) or f"code {process.returncode}")
+        )
 
 
 def lines_from(data: dict, y: np.ndarray) -> list[dict]:

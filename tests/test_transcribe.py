@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -24,24 +25,45 @@ def loud(seconds=30):
 
 
 def test_lines_from_keeps_word_starts_and_accents():
-    data = {"transcription": [segment(" Été doré", 1000, 2500, [
-        token("[_BEG_]", 1000), token(" Ét", 1000), token("é", 1200), token(" doré", 1700)])]}
+    data = {
+        "transcription": [
+            segment(
+                " Été doré",
+                1000,
+                2500,
+                [
+                    token("[_BEG_]", 1000),
+                    token(" Ét", 1000),
+                    token("é", 1200),
+                    token(" doré", 1700),
+                ],
+            )
+        ]
+    }
     (line,) = T.lines_from(data, loud())
     assert line == {"text": "Été doré", "start": 1.0, "end": 2.5, "words": [[0, 1.0], [4, 1.7]]}
 
 
 def test_loops_credits_and_words_in_silence_are_dropped():
     y = loud()
-    y[int(20 * RATE):] = 0  # silence from 20 s
-    same = [segment(" Encore toi", i * 1000, i * 1000 + 900, [token(" Encore", i * 1000),
-                                                             token(" toi", i * 1000 + 400)])
-            for i in range(8)]
-    data = {"transcription": [
-        *same,
-        segment(" Sous-titres réalisés par la communauté", 9000, 10000, []),
-        segment(" la la la la la la la la la la la la la la la la", 11000, 15000, []),
-        segment(" Plus personne", 21000, 23000, [token(" Plus", 21000)]),
-    ]}
+    y[int(20 * RATE) :] = 0  # silence from 20 s
+    same = [
+        segment(
+            " Encore toi",
+            i * 1000,
+            i * 1000 + 900,
+            [token(" Encore", i * 1000), token(" toi", i * 1000 + 400)],
+        )
+        for i in range(8)
+    ]
+    data = {
+        "transcription": [
+            *same,
+            segment(" Sous-titres réalisés par la communauté", 9000, 10000, []),
+            segment(" la la la la la la la la la la la la la la la la", 11000, 15000, []),
+            segment(" Plus personne", 21000, 23000, [token(" Plus", 21000)]),
+        ]
+    }
     lines = T.lines_from(data, y)
     assert [x["text"] for x in lines] == ["Encore toi"] * 3
 
@@ -49,8 +71,14 @@ def test_loops_credits_and_words_in_silence_are_dropped():
 def test_download_checks_size_and_hash_and_can_be_cancelled(tmp_path, monkeypatch):
     monkeypatch.setenv("LOCALCHORDS_DATA", str(tmp_path))
     blob = b"modele" * 1000
-    fake = {"id": "fake", "file": "ggml-fake.bin", "size": len(blob),
-            "sha256": hashlib.sha256(blob).hexdigest(), "label": "", "note": ""}
+    fake = {
+        "id": "fake",
+        "file": "ggml-fake.bin",
+        "size": len(blob),
+        "sha256": hashlib.sha256(blob).hexdigest(),
+        "label": "",
+        "note": "",
+    }
     monkeypatch.setattr(T, "MODELS", [fake])
 
     class R(io.BytesIO):
@@ -98,8 +126,11 @@ def test_task_reports_errors_instead_of_raising():
 
 
 @pytest.mark.slow
-def test_engine_on_an_instrumental_writes_no_words(tmp_path):
+def test_engine_on_an_instrumental_writes_no_words(tmp_path, monkeypatch):
     """The demo song has no voice: a model run over it must not invent lyrics."""
+    bench = Path(__file__).parents[1] / "work" / "lyrics-bench" / "models"  # kept out of git
+    if not T.installed_models() and bench.is_dir():
+        monkeypatch.setattr(T, "models_dir", lambda: bench)
     if not (T.engine_ready() and T.installed_models()):
         pytest.skip("moteur ou modèle absent")
     import wave

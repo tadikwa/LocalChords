@@ -204,14 +204,17 @@ def to_lrc(lyrics: dict, title: str = "", artist: str = "") -> str:
 
 
 def to_text(lyrics: dict) -> str:
-    return "\n".join(f"[{x['text']}]" if x.get("section") else x["text"]
-                     for x in lyrics["lines"]) + "\n"
+    return (
+        "\n".join(f"[{x['text']}]" if x.get("section") else x["text"] for x in lyrics["lines"])
+        + "\n"
+    )
 
 
 def to_editor(lines: list[dict]) -> str:
     """What the text editor shows: a time before each timed line, as in LRC."""
     return "\n".join(
-        f"[{x['text']}]" if x.get("section")
+        f"[{x['text']}]"
+        if x.get("section")
         else (stamp(x["start"]) + " " + x["text"] if x["start"] is not None else x["text"])
         for x in lines
     )
@@ -273,11 +276,18 @@ def checked(d) -> dict | None:
     """Lyrics read from a project file, completed, or None if they are not lyrics."""
 
     def line_ok(x):
-        return (isinstance(x, dict) and isinstance(x.get("text"), str)
-                and (x.get("start") is None or isinstance(x["start"], int | float)))
+        return (
+            isinstance(x, dict)
+            and isinstance(x.get("text"), str)
+            and (x.get("start") is None or isinstance(x["start"], int | float))
+        )
 
-    if not (isinstance(d, dict) and isinstance(d.get("source"), dict)
-            and isinstance(d.get("lines"), list) and all(map(line_ok, d["lines"]))):
+    if not (
+        isinstance(d, dict)
+        and isinstance(d.get("source"), dict)
+        and isinstance(d.get("lines"), list)
+        and all(map(line_ok, d["lines"]))
+    ):
         return None
     d.setdefault("original", copy.deepcopy(d["lines"]))
     if not isinstance(d.get("offset"), int | float):
@@ -298,8 +308,10 @@ def replaced(old: dict | None, lines: list[dict], source: dict) -> dict:
 
 
 def edited(lyrics: dict) -> bool:
-    return lyrics["lines"] != lyrics["original"] or bool(lyrics.get("anchors")) or bool(
-        lyrics.get("offset")
+    return (
+        lyrics["lines"] != lyrics["original"]
+        or bool(lyrics.get("anchors"))
+        or bool(lyrics.get("offset"))
     )
 
 
@@ -379,22 +391,24 @@ def sheet(lyrics: dict, chords: list[tuple[float, float, str]], duration: float)
         if any(c["char"] == 0 or abs(c["time"] - a) < HELD_GAP for c in row["chords"]):
             continue
         sounding = [c for c in real if c[0] < a - 1e-3 and c[1] > a + HELD_GAP]
-        if sounding:
+        if sounding and chord_key(sounding[-1][0]) not in anchors:  # placed by hand: shown there
             s, e, label = sounding[-1]
             row["chords"].append(
                 {"label": label, "time": s, "end": e, "key": chord_key(s), "char": 0, "how": "held"}
             )
     out = []
     if intro:
-        out.append({"kind": "chords", "line": None, "text": "", "start": real[0][0],
-                    "chords": intro})
+        out.append(
+            {"kind": "chords", "line": None, "text": "", "start": real[0][0], "chords": intro}
+        )
     for row in rows:
         row["chords"].sort(key=lambda c: (c["char"], c["time"]))
         out.append(row)
         if row["line"] in gaps:
             g = gaps[row["line"]]
-            out.append({"kind": "chords", "line": None, "text": "", "start": g[0]["time"],
-                        "chords": g})
+            out.append(
+                {"kind": "chords", "line": None, "text": "", "start": g[0]["time"], "chords": g}
+            )
     return out
 
 
@@ -428,9 +442,10 @@ def layout(
 ) -> list[dict]:
     """A row as visual lines: [{runs: [(x, text, first char)], chords: [(x, index in chords)]}].
 
-    The text is cut where words start and where chords stand; a piece under a chord wider than
-    itself is widened, so names never overlap and stay over their letter at any font or window
-    width. Lines wrap between words.
+    The text is cut where words start and where chords stand. The words flow on as written; a
+    piece is pushed right only when its chord name would run into the name before it, so names
+    never overlap and stay over their letter at any font or window width. Lines wrap between
+    words.
     """
     cuts = sorted({0, len(text), *word_starts(text), *(min(c["char"], len(text)) for c in chords)})
     at: dict[int, list[int]] = {}
@@ -443,21 +458,23 @@ def layout(
         piece = text[a:b] if b is not None else ""
         pieces.append((a, piece, at.get(a, [])))
     lines: list[dict] = [{"runs": [], "chords": []}]
-    x = 0.0
+    x = free = 0.0  # where the text goes on; where the next chord name may start
     for a, piece, names in pieces:
         labels = sum(chord_w(chords[n]["label"]) for n in names) + gap * len(names)
-        need = max(text_w(piece), labels)
+        start = max(x, free) if names else x
         breakable = a == 0 or text[a - 1] == " " or not piece
-        if x > 0 and breakable and x + max(text_w(piece.rstrip()), labels) > width:
+        if x > 0 and breakable and start + max(text_w(piece.rstrip()), labels) > width:
             lines.append({"runs": [], "chords": []})
-            x = 0.0
-        cx = x
+            x = free = start = 0.0
+        cx = start
         for n in names:
             lines[-1]["chords"].append((cx, n))
             cx += chord_w(chords[n]["label"]) + gap
+        if names:
+            free = cx
         if piece:
-            lines[-1]["runs"].append((x, piece, a))
-        x += need
+            lines[-1]["runs"].append((start, piece, a))
+        x = start + text_w(piece)
     return lines
 
 

@@ -93,8 +93,17 @@ def lay_out(rows: list[dict], width: float, f: Fonts, chords_on: bool) -> list[L
         kind = row["kind"]
         chords = row["chords"] if chords_on else []
         if kind == "section":
-            out.append(Line(r, kind, [(0.0, row["text"].upper(), 0)], [], f.sm.height() * 1.4,
-                            0.0, f.size * 0.9))  # fmt: skip
+            out.append(
+                Line(
+                    r,
+                    kind,
+                    [(0.0, row["text"].upper(), 0)],
+                    [],
+                    f.sm.height() * 1.4,
+                    0.0,
+                    f.size * 0.9,
+                )
+            )
         elif kind == "break":
             out.append(Line(r, kind, [], [], f.size * 0.6, 0.0, 0.0))
         elif kind == "chords":
@@ -109,8 +118,17 @@ def lay_out(rows: list[dict], width: float, f: Fonts, chords_on: bool) -> list[L
                 lines[-1].append((x, c))
                 x += w + f.gap * 2
             for k, placed in enumerate(lines):
-                out.append(Line(r, kind, [], placed, f.chord_h + f.size * 0.3, f.chord_h,
-                                f.size * 0.25 if k == 0 else 0.0))  # fmt: skip
+                out.append(
+                    Line(
+                        r,
+                        kind,
+                        [],
+                        placed,
+                        f.chord_h + f.size * 0.3,
+                        f.chord_h,
+                        f.size * 0.25 if k == 0 else 0.0,
+                    )
+                )
         else:
             visual = L.layout(row["text"], chords, width, f.tm.horizontalAdvance, f.chord_w, f.gap)
             for k, v in enumerate(visual):
@@ -142,8 +160,17 @@ SCREEN_COLORS = {
 }
 
 
-def paint(p: QPainter, lines: list[Line], f: Fonts, colors: dict, *, x0: float = 0.0,
-          now_row=None, now_key=None, clip: QRectF | None = None) -> None:  # fmt: skip
+def paint(
+    p: QPainter,
+    lines: list[Line],
+    f: Fonts,
+    colors: dict,
+    *,
+    x0: float = 0.0,
+    now_row=None,
+    now_key=None,
+    clip: QRectF | None = None,
+) -> None:
     for ln in lines:
         if clip is not None and (ln.y + ln.h < clip.top() or ln.y > clip.bottom()):
             continue
@@ -213,8 +240,9 @@ class LyricsSheet(QWidget):
     def _relayout(self) -> None:
         self.f = Fonts(self.size)
         self._width = self.width()
-        self.lines = lay_out(self.rows, max(120.0, self.width() - 2 * self.MARGIN), self.f,
-                             self.chords_on)  # fmt: skip
+        self.lines = lay_out(
+            self.rows, max(120.0, self.width() - 2 * self.MARGIN), self.f, self.chords_on
+        )
         bottom = stack(self.lines, self.MARGIN * 0.6)
         # Room under the last line, so that it can still come up to where the eye reads.
         self.setMinimumHeight(int(bottom + 240))
@@ -246,8 +274,10 @@ class LyricsSheet(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         p.fillRect(event.rect(), QColor(theme.BG))
-        for row, color, fill in ((self.now_row, theme.ACCENT, theme.SURFACE_2),
-                                 (self.picked_row, theme.SELECT, None)):  # fmt: skip
+        for row, color, fill in (
+            (self.now_row, theme.ACCENT, theme.SURFACE_2),
+            (self.picked_row, theme.SELECT, None),
+        ):
             rect = self.row_rect(row)
             if rect is None:
                 continue
@@ -265,8 +295,16 @@ class LyricsSheet(QWidget):
         colors = dict(SCREEN_COLORS)
         if not self.chords_on:
             colors["text"] = theme.TEXT_2
-        paint(p, self.lines, self.f, colors, x0=self.MARGIN, now_row=self.now_row,
-              now_key=self.now_key, clip=QRectF(event.rect()))  # fmt: skip
+        paint(
+            p,
+            self.lines,
+            self.f,
+            colors,
+            x0=self.MARGIN,
+            now_row=self.now_row,
+            now_key=self.now_key,
+            clip=QRectF(event.rect()),
+        )
         if self._drag and self._drag["moved"]:
             target = self._drag.get("target")
             if target:
@@ -311,8 +349,12 @@ class LyricsSheet(QWidget):
             return super().mousePressEvent(event)
         self.interacted.emit()
         chord = self._chord_at(event.position()) if self.chords_on else None
-        self._drag = {"chord": chord, "start": event.position(), "pos": event.position(),
-                      "moved": False}  # fmt: skip
+        self._drag = {
+            "chord": chord,
+            "start": event.position(),
+            "pos": event.position(),
+            "moved": False,
+        }
 
     def mouseMoveEvent(self, event):
         pos = event.position()
@@ -330,7 +372,9 @@ class LyricsSheet(QWidget):
         else:
             ln = self._line_at(pos.y())
             timed = ln is not None and self._start_of(ln.row) is not None
-            self.setCursor(Qt.CursorShape.PointingHandCursor if timed else Qt.CursorShape.ArrowCursor)
+            self.setCursor(
+                Qt.CursorShape.PointingHandCursor if timed else Qt.CursorShape.ArrowCursor
+            )
 
     def mouseReleaseEvent(self, event):
         drag, self._drag = self._drag, None
@@ -378,10 +422,13 @@ class LyricsSheet(QWidget):
         menu = QMenu(self)
         chord = self._chord_at(pos) if self.chords_on else None
         if chord is not None:
-            menu.addAction(f"Aller à {chord['label']} ({fmt_time(chord['time'])})",
-                           lambda: self.seekRequested.emit(chord["time"]))  # fmt: skip
-            reset = menu.addAction("Replacer automatiquement",
-                                   lambda: self.chordReset.emit(chord["key"]))  # fmt: skip
+            menu.addAction(
+                f"Aller à {chord['label']} ({fmt_time(chord['time'])})",
+                lambda: self.seekRequested.emit(chord["time"]),
+            )
+            reset = menu.addAction(
+                "Replacer automatiquement", lambda: self.chordReset.emit(chord["key"])
+            )
             reset.setEnabled(chord["how"] == "manual")
             menu.addSeparator()
             hint = menu.addAction("Glissez le nom de l'accord sur un mot pour le déplacer")
@@ -393,13 +440,19 @@ class LyricsSheet(QWidget):
                 return
             line, start = row["line"], row["start"]
             if start is not None:
-                menu.addAction(f"Lire depuis cette ligne ({fmt_time(start)})",
-                               lambda: self.seekRequested.emit(start))  # fmt: skip
-            menu.addAction(f"Faire commencer la ligne ici ({fmt_time(self.player_position())})",
-                           lambda: self.lineAction.emit(line, "here"))  # fmt: skip
-            for text, action in (("Commencer 0,1 s plus tôt", "earlier"),
-                                 ("Commencer 0,1 s plus tard", "later"),
-                                 ("Retirer l'horodatage de la ligne", "clear")):  # fmt: skip
+                menu.addAction(
+                    f"Lire depuis cette ligne ({fmt_time(start)})",
+                    lambda: self.seekRequested.emit(start),
+                )
+            menu.addAction(
+                f"Faire commencer la ligne ici ({fmt_time(self.player_position())})",
+                lambda: self.lineAction.emit(line, "here"),
+            )
+            for text, action in (
+                ("Commencer 0,1 s plus tôt", "earlier"),
+                ("Commencer 0,1 s plus tard", "later"),
+                ("Retirer l'horodatage de la ligne", "clear"),
+            ):
                 item = menu.addAction(text, lambda a=action: self.lineAction.emit(line, a))
                 item.setEnabled(start is not None)
         menu.exec(event.globalPos())
@@ -425,13 +478,16 @@ class LyricsStrip(QWidget):
         p.setPen(QColor(theme.BORDER))
         p.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
         width = self.width() - 32
-        for text, font, color, y in ((self.now or "…", theme.app_font(20, 600), theme.TEXT, 8),
-                                     (self.next, theme.app_font(14), theme.TEXT_2, 38)):  # fmt: skip
+        for text, font, color, y in (
+            (self.now or "…", theme.app_font(20, 600), theme.TEXT, 8),
+            (self.next, theme.app_font(14), theme.TEXT_2, 38),
+        ):
             p.setFont(font)
             p.setPen(QColor(color))
             m = QFontMetricsF(font)
-            p.drawText(QPointF(16, y + m.ascent()),
-                       m.elidedText(text, Qt.TextElideMode.ElideRight, width))  # fmt: skip
+            p.drawText(
+                QPointF(16, y + m.ascent()), m.elidedText(text, Qt.TextElideMode.ElideRight, width)
+            )
         p.end()
 
 
@@ -472,11 +528,15 @@ class LyricsPage(QWidget):
             "Mode synchronisation : choisissez une ligne, lancez la lecture, puis appuyez sur "
             "Entrée au début de chaque ligne chantée."
         )
-        self.offset = Stepper("Décalage", -200, 200, 0,
-                              lambda v: f"{v / 10:+.1f} s" if v else "0 s",
-                              "Avancer ou retarder toutes les paroles d'un coup")  # fmt: skip
-        self.text_size = Stepper("Texte", *SIZES, 20, str,
-                                 "Taille du texte (Ctrl + molette)")  # fmt: skip
+        self.offset = Stepper(
+            "Décalage",
+            -200,
+            200,
+            0,
+            lambda v: f"{v / 10:+.1f} s" if v else "0 s",
+            "Avancer ou retarder toutes les paroles d'un coup",
+        )
+        self.text_size = Stepper("Texte", *SIZES, 20, str, "Taille du texte (Ctrl + molette)")
         self.follow = QPushButton("Suivre")
         self.follow.setCheckable(True)
         self.follow.setToolTip("Faire défiler les paroles avec la lecture")
@@ -486,8 +546,15 @@ class LyricsPage(QWidget):
         self.more.setMenu(QMenu(self.more))
         self.more.setToolTip("Autres actions sur les paroles")
         self.more.setAccessibleName("Autres actions sur les paroles")
-        for w in (self.get, self.edit, self.sync, self.offset, self.text_size, self.follow,
-                  self.more):  # fmt: skip
+        for w in (
+            self.get,
+            self.edit,
+            self.sync,
+            self.offset,
+            self.text_size,
+            self.follow,
+            self.more,
+        ):
             row.addWidget(w)
         layout.addWidget(bar)
         self.bar = bar
@@ -633,8 +700,9 @@ class LyricsController(QObject):
         more.addAction("Suivre la lecture", p.follow.toggle)
         more.addSeparator()
         self.original_action = more.addAction("Revenir au texte d'origine", self.revert_original)
-        self.previous_action = more.addAction("Revenir aux paroles précédentes",
-                                              self.revert_previous)  # fmt: skip
+        self.previous_action = more.addAction(
+            "Revenir aux paroles précédentes", self.revert_previous
+        )
         more.addAction("Remettre tous les accords à leur place", self.reset_anchors)
         more.addSeparator()
         self.delete_action = more.addAction("Supprimer les paroles", self.delete)
@@ -654,7 +722,9 @@ class LyricsController(QObject):
         self.exports = [
             export_menu.addAction("Paroles et accords (PDF)…", self.export_pdf),
             export_menu.addAction("Grille avec paroles (.txt)…", self.export_grid_text),
-            export_menu.addAction("Paroles synchronisées (.lrc)…", lambda: self.export_lyrics("lrc")),
+            export_menu.addAction(
+                "Paroles synchronisées (.lrc)…", lambda: self.export_lyrics("lrc")
+            ),
             export_menu.addAction("Paroles (.txt)…", lambda: self.export_lyrics("txt")),
         ]
         export_menu.setToolTipsVisible(True)
@@ -721,9 +791,10 @@ class LyricsController(QObject):
         lyr = project.lyrics if project else None
         self.rows = export.lyric_rows(project) if lyr and has_grid else []
         self._starts = sorted(
-            (r["start"], i) for i, r in enumerate(self.rows)
+            (r["start"], i)
+            for i, r in enumerate(self.rows)
             if r["kind"] == "line" and r["start"] is not None
-        )  # fmt: skip
+        )
         self.sheet.set_rows(self.rows, p.text_size.value, self.mode == "sheet")
         p.stack.setCurrentWidget(p.scroll if lyr else p.empty)
         self._fill_empty()
@@ -743,9 +814,10 @@ class LyricsController(QObject):
             p.badge.setText("Brouillon" if kind == "transcription" else "Non exportables")
             p.badge.setVisible(kind in ("transcription", "catalog"))
             p.badge.setToolTip(
-                "Transcription automatique : vérifiez et corrigez le texte." if kind ==
-                "transcription" else NOT_EXPORTABLE
-            )  # fmt: skip
+                "Transcription automatique : vérifiez et corrigez le texte."
+                if kind == "transcription"
+                else NOT_EXPORTABLE
+            )
             p.offset.set_value(round(float(lyr.get("offset") or 0) * 10))
         else:
             p.origin.set_full_text("")
@@ -802,17 +874,25 @@ class LyricsController(QObject):
             p.hint.hide()
             return
         if p.sync.isChecked():
-            text = ("Synchronisation : cliquez la ligne à minuter, lancez la lecture, puis Entrée "
-                    "au début de chaque ligne chantée. Ctrl + Z annule.")  # fmt: skip
+            text = (
+                "Synchronisation : cliquez la ligne à minuter, lancez la lecture, puis Entrée "
+                "au début de chaque ligne chantée. Ctrl + Z annule."
+            )
         elif not L.timed(lyr):
-            text = ("Ces paroles n'ont pas d'horodatage : elles ne suivent pas la lecture. "
-                    "« Synchroniser » permet de les minuter ligne par ligne.")  # fmt: skip
+            text = (
+                "Ces paroles n'ont pas d'horodatage : elles ne suivent pas la lecture. "
+                "« Synchroniser » permet de les minuter ligne par ligne."
+            )
         elif self.mode == "sheet" and export.approximate(self.rows):
-            text = ("En italique gris : accord placé approximativement dans la ligne. Glissez un "
-                    "nom d'accord sur le bon mot pour le corriger ; l'harmonie ne change pas.")  # fmt: skip
+            text = (
+                "En italique gris : accord placé approximativement dans la ligne. Glissez un "
+                "nom d'accord sur le bon mot pour le corriger ; l'harmonie ne change pas."
+            )
         elif self.mode == "sheet":
-            text = "Glissez un nom d'accord sur un autre mot pour le déplacer ; un clic sur une " \
-                   "ligne lit depuis elle."
+            text = (
+                "Glissez un nom d'accord sur un autre mot pour le déplacer ; un clic sur une "
+                "ligne lit depuis elle."
+            )
         else:
             text = "Un clic sur une ligne lit depuis elle."
         p.hint.setText(text)
@@ -830,14 +910,21 @@ class LyricsController(QObject):
             k = self._starts[i][1] if i >= 0 else None
         if beat != self._beat:
             self._beat = beat
-            seg = next((x for x in self.w.project.segments() if x.start_beat <= beat < x.end_beat),
-                       None)  # fmt: skip
+            seg = next(
+                (x for x in self.w.project.segments() if x.start_beat <= beat < x.end_beat), None
+            )
             self._key = L.chord_key(seg.start) if seg is not None and seg.chord != "N" else None
         changed = (k, self._key) != (self.sheet.now_row, self.sheet.now_key)
         self.sheet.set_now(k, self._key)
         if self.strip.isVisible():
-            nxt = next((r["text"] for r in self.rows[(k + 1 if k is not None else 0):]
-                        if r["kind"] == "line"), "")  # fmt: skip
+            nxt = next(
+                (
+                    r["text"]
+                    for r in self.rows[(k + 1 if k is not None else 0) :]
+                    if r["kind"] == "line"
+                ),
+                "",
+            )
             self.strip.set_lines(self.rows[k]["text"] if k is not None else "", nxt)
         if changed and self.w.player.playing:
             self._follow(k)
@@ -847,8 +934,13 @@ class LyricsController(QObject):
 
     def _follow(self, row: int | None) -> None:
         p = self.page
-        if (row is None or not p.follow.isChecked() or not self.full_page
-                or time.monotonic() < self._manual_until or self.sheet._drag):  # fmt: skip
+        if (
+            row is None
+            or not p.follow.isChecked()
+            or not self.full_page
+            or time.monotonic() < self._manual_until
+            or self.sheet._drag
+        ):
             return
         rect = self.sheet.row_rect(row)
         if rect is None:
@@ -922,8 +1014,14 @@ class LyricsController(QObject):
         if on and not self.full_page:
             self.set_mode(self.last_mode)
         if on and self.picked is None and self.w.project and self.w.project.lyrics:
-            first = next((i for i, x in enumerate(self.w.project.lyrics["lines"])
-                          if x["text"] and not x.get("section")), None)  # fmt: skip
+            first = next(
+                (
+                    i
+                    for i, x in enumerate(self.w.project.lyrics["lines"])
+                    if x["text"] and not x.get("section")
+                ),
+                None,
+            )
             self._pick(first)
         self._update_hint()
 
@@ -943,8 +1041,14 @@ class LyricsController(QObject):
         if self.picked >= len(lyr["lines"]):
             return True
         self._line_action(self.picked, "here")
-        nxt = next((i for i in range(self.picked + 1, len(lyr["lines"]))
-                    if lyr["lines"][i]["text"] and not lyr["lines"][i].get("section")), None)  # fmt: skip
+        nxt = next(
+            (
+                i
+                for i in range(self.picked + 1, len(lyr["lines"]))
+                if lyr["lines"][i]["text"] and not lyr["lines"][i].get("section")
+            ),
+            None,
+        )
         self._pick(nxt)
         if nxt is None:
             self.page.sync.setChecked(False)
@@ -965,10 +1069,11 @@ class LyricsController(QObject):
         if not lyr or not L.edited(lyr):
             return True
         answer = QMessageBox.question(
-            self.w, "Remplacer les paroles",
+            self.w,
+            "Remplacer les paroles",
             "Ces paroles ont été corrigées. Les remplacer ? Elles resteront accessibles avec "
             "« Revenir aux paroles précédentes » et Ctrl + Z.",
-        )  # fmt: skip
+        )
         return answer == QMessageBox.StandardButton.Yes
 
     def use_found(self) -> None:
@@ -980,8 +1085,9 @@ class LyricsController(QObject):
         if not self.w.project or not self._may_replace():
             return
         start = str(Path(self.w.project.audio.get("path", "")).parent)
-        path, _ = QFileDialog.getOpenFileName(self.w, "Importer des paroles", start,
-                                              "Paroles (*.lrc *.srt *.txt)")  # fmt: skip
+        path, _ = QFileDialog.getOpenFileName(
+            self.w, "Importer des paroles", start, "Paroles (*.lrc *.srt *.txt)"
+        )
         if not path:
             return
         try:
@@ -998,13 +1104,18 @@ class LyricsController(QObject):
         if not project or not self._may_replace():
             return
         a = project.audio
-        dialog = SearchDialog(a.get("title") or Path(a.get("path", "")).stem,
-                              a.get("artist") or "", a.get("album") or "", project.duration,
-                              self.w)  # fmt: skip
+        dialog = SearchDialog(
+            a.get("title") or Path(a.get("path", "")).stem,
+            a.get("artist") or "",
+            a.get("album") or "",
+            project.duration,
+            self.w,
+        )
         if dialog.exec() and dialog.choice:
             record, synced = dialog.choice
-            self._replace(lyrics_online.lines_of(record, synced),
-                          lyrics_online.source_of(record, synced))  # fmt: skip
+            self._replace(
+                lyrics_online.lines_of(record, synced), lyrics_online.source_of(record, synced)
+            )
 
     def edit_text(self) -> None:
         from .lyrics_dialogs import LyricsEditor
@@ -1039,9 +1150,11 @@ class LyricsController(QObject):
             self._apply(back)
 
     def delete(self) -> None:
-        answer = QMessageBox.question(self.w, "Supprimer les paroles",
-                                      "Supprimer les paroles de ce morceau ? Ctrl + Z les "
-                                      "rétablit.")  # fmt: skip
+        answer = QMessageBox.question(
+            self.w,
+            "Supprimer les paroles",
+            "Supprimer les paroles de ce morceau ? Ctrl + Z les rétablit.",
+        )
         if answer == QMessageBox.StandardButton.Yes:
             self._apply(None)
 
@@ -1056,8 +1169,11 @@ class LyricsController(QObject):
         if not path.is_file():
             self.w._alert("Le fichier audio est introuvable : il faut l'écouter pour transcrire.")
             return
-        dialog = TranscribeDialog(self.w.settings.get("whisper_model", transcribe.DEFAULT_MODEL),
-                                  self.w.settings.get("whisper_language", "auto"), self.w)  # fmt: skip
+        dialog = TranscribeDialog(
+            self.w.settings.get("whisper_model", transcribe.DEFAULT_MODEL),
+            self.w.settings.get("whisper_language", "auto"),
+            self.w,
+        )
         if not dialog.exec() or not self._may_replace():
             return
         model, language = dialog.model, dialog.language
@@ -1079,8 +1195,10 @@ class LyricsController(QObject):
             return
         elapsed = time.monotonic() - self.task_info["began"]
         p.work_bar.setValue(int(task.progress * 1000))
-        p.work_text.setText(f"Transcription en cours, sur cet ordinateur : {task.status} "
-                            f"{round(task.progress * 100)} % · {fmt_time(elapsed)}")  # fmt: skip
+        p.work_text.setText(
+            f"Transcription en cours, sur cet ordinateur : {task.status} "
+            f"{round(task.progress * 100)} % · {fmt_time(elapsed)}"
+        )
         if not task.done:
             return
         self.timer.stop()
@@ -1102,8 +1220,10 @@ class LyricsController(QObject):
             "exportable": True,
         }
         if not result["lines"]:
-            self.w._alert("Aucune parole reconnue : le morceau est peut-être instrumental, ou la "
-                          "voix trop couverte par la musique.")  # fmt: skip
+            self.w._alert(
+                "Aucune parole reconnue : le morceau est peut-être instrumental, ou la "
+                "voix trop couverte par la musique."
+            )
             return
         project, file = self.task_target
         if project is self.w.project:
@@ -1133,18 +1253,26 @@ class LyricsController(QObject):
         return Path(path) if path else None
 
     def export_lyrics(self, kind: str) -> None:
-        path = self._save_path("Exporter les paroles", f".{kind}",
-                               "LRC (*.lrc)" if kind == "lrc" else "Texte (*.txt)")  # fmt: skip
+        path = self._save_path(
+            "Exporter les paroles", f".{kind}", "LRC (*.lrc)" if kind == "lrc" else "Texte (*.txt)"
+        )
         if path:
             project = self.w.project
-            text = (L.to_lrc(project.lyrics, project.audio.get("title") or "",
-                             project.audio.get("artist") or "")
-                    if kind == "lrc" else L.to_text(project.lyrics))  # fmt: skip
+            text = (
+                L.to_lrc(
+                    project.lyrics,
+                    project.audio.get("title") or "",
+                    project.audio.get("artist") or "",
+                )
+                if kind == "lrc"
+                else L.to_text(project.lyrics)
+            )
             self._write(path, text)
 
     def export_grid_text(self) -> None:
-        path = self._save_path("Exporter la grille avec les paroles", " - paroles et accords.txt",
-                               "Texte (*.txt)")  # fmt: skip
+        path = self._save_path(
+            "Exporter la grille avec les paroles", " - paroles et accords.txt", "Texte (*.txt)"
+        )
         if path:
             self._write(path, export.to_text_with_lyrics(self.w.project))
 
@@ -1167,12 +1295,14 @@ class LyricsController(QObject):
             return
         options = dialog.options()
         self.w._remember("lyrics_pdf", options)
-        path = self._save_path("Exporter les paroles et accords", " - paroles et accords.pdf",
-                               "PDF (*.pdf)")  # fmt: skip
+        path = self._save_path(
+            "Exporter les paroles et accords", " - paroles et accords.pdf", "PDF (*.pdf)"
+        )
         if path:
             try:
-                write_lyrics_sheet(project, path, options, self.w.song.chords.all_items,
-                                   self.w.song.positions)  # fmt: skip
+                write_lyrics_sheet(
+                    project, path, options, self.w.song.chords.all_items, self.w.song.positions
+                )
             except OSError as exc:
                 self.w._alert(f"Export impossible : {exc.strerror or exc}")
 

@@ -60,7 +60,9 @@ def align(ref: list[str], hyp: list[str]) -> tuple[int, list[tuple[int, int]]]:
     d[0, :] = np.arange(m + 1)
     for i in range(1, n + 1):
         for j in range(1, m + 1):
-            d[i, j] = min(d[i - 1, j] + 1, d[i, j - 1] + 1, d[i - 1, j - 1] + (ref[i - 1] != hyp[j - 1]))
+            d[i, j] = min(
+                d[i - 1, j] + 1, d[i, j - 1] + 1, d[i - 1, j - 1] + (ref[i - 1] != hyp[j - 1])
+            )
     pairs, i, j = [], n, m
     while i and j:
         if d[i, j] == d[i - 1, j - 1] + (ref[i - 1] != hyp[j - 1]):
@@ -115,11 +117,34 @@ def run(cmd: list[str]) -> tuple[float, int, str]:
     return time.perf_counter() - start, peak, err
 
 
-def whisper_cpp(engine: Path, model: Path, wav: Path, lang: str, out: Path, vad: Path | None,
-                threads: int, dtw: str | None, flags: set[str] = frozenset()):
+def whisper_cpp(
+    engine: Path,
+    model: Path,
+    wav: Path,
+    lang: str,
+    out: Path,
+    vad: Path | None,
+    threads: int,
+    dtw: str | None,
+    flags: set[str] = frozenset(),
+):
     """flags: "fb" keeps the temperature fallback, "mc0" drops the previous text as context."""
-    cmd = [str(engine / "whisper-cli.exe"), "-m", str(model), "-f", str(wav), "-l", lang,
-           "-t", str(threads), "-ojf", "-of", str(out), "-np", "-sns"]
+    cmd = [
+        str(engine / "whisper-cli.exe"),
+        "-m",
+        str(model),
+        "-f",
+        str(wav),
+        "-l",
+        lang,
+        "-t",
+        str(threads),
+        "-ojf",
+        "-of",
+        str(out),
+        "-np",
+        "-sns",
+    ]
     if "fb" not in flags:
         cmd.append("-nf")
     if "mc0" in flags:
@@ -139,19 +164,26 @@ def whisper_cpp(engine: Path, model: Path, wav: Path, lang: str, out: Path, vad:
                 if text.startswith(" ") and cur:
                     cur = None
                 continue
-            start = (t.get("t_dtw", -1) * 10 if dtw and t.get("t_dtw", -1) >= 0
-                     else t["offsets"]["from"]) / 1000
+            start = (
+                t.get("t_dtw", -1) * 10 if dtw and t.get("t_dtw", -1) >= 0 else t["offsets"]["from"]
+            ) / 1000
             if cur is None or text.startswith(" "):
                 cur = {"w": text.strip(), "start": start}
                 words.append(cur)
             else:
                 cur["w"] += text
-        segments.append({"start": s["offsets"]["from"] / 1000, "end": s["offsets"]["to"] / 1000,
-                         "text": s["text"], "words": words})
+        segments.append(
+            {
+                "start": s["offsets"]["from"] / 1000,
+                "end": s["offsets"]["to"] / 1000,
+                "text": s["text"],
+                "words": words,
+            }
+        )
     return seconds, peak, segments
 
 
-FW = r'''
+FW = r"""
 import json, sys
 from faster_whisper import WhisperModel
 model, wav, lang, threads, vad = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5] == "1"
@@ -161,7 +193,7 @@ segs, info = m.transcribe(wav, language=lang, vad_filter=vad, word_timestamps=Tr
 out = [{"start": s.start, "end": s.end, "text": s.text,
         "words": [{"w": w.word.strip(), "start": w.start} for w in (s.words or [])]} for s in segs]
 print(json.dumps(out))
-'''
+"""
 
 
 def faster_whisper(model: str, wav: Path, lang: str, threads: int, vad: bool):
@@ -266,13 +298,28 @@ def main() -> None:
                     out = args.out / "raw" / config.replace(":", "_").replace("+", "_") / song
                     out.parent.mkdir(parents=True, exist_ok=True)
                     seconds, peak, segments = whisper_cpp(
-                        args.engine, args.models / f"ggml-{base}.bin", wav, lang, out,
-                        vad_model if vad else None, args.threads, dtw, set(opts))
+                        args.engine,
+                        args.models / f"ggml-{base}.bin",
+                        wav,
+                        lang,
+                        out,
+                        vad_model if vad else None,
+                        args.threads,
+                        dtw,
+                        set(opts),
+                    )
                 else:
                     seconds, peak, segments = faster_whisper(base, wav, lang, args.threads, vad)
-                r = {"config": config, "song": song, "lang": lang, "duration": duration,
-                     "seconds": seconds, "rtf": seconds / duration, "peak_mb": peak / 2**20,
-                     **score(args.data, song, segments)}
+                r = {
+                    "config": config,
+                    "song": song,
+                    "lang": lang,
+                    "duration": duration,
+                    "seconds": seconds,
+                    "rtf": seconds / duration,
+                    "peak_mb": peak / 2**20,
+                    **score(args.data, song, segments),
+                }
                 print(json.dumps(r), flush=True)
                 with results_file.open("a", encoding="utf-8") as f:
                     f.write(json.dumps(r) + "\n")

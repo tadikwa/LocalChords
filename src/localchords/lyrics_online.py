@@ -2,7 +2,7 @@
 database with no key. Only the title, artist, album and duration are sent, never the audio.
 
 LRCLIB states no licence for the lyrics it serves: they are shown, attributed and kept in the
-project, never exported (lyrics.exportable). docs/LYRICS.md explains why no other catalog is used.
+project, never exported (lyrics.exportable). docs/TECHNIQUE.md says why.
 """
 
 from __future__ import annotations
@@ -38,8 +38,8 @@ def _get(path: str, params: dict, opener=urllib.request.urlopen) -> object | Non
         if exc.code == 429:
             wait = exc.headers.get("Retry-After") if exc.headers else None
             raise OnlineError(
-                "LRCLIB reçoit trop de demandes" + (f" : réessayez dans {wait} s." if wait else
-                                                    " : réessayez dans un moment.")
+                "LRCLIB reçoit trop de demandes"
+                + (f" : réessayez dans {wait} s." if wait else " : réessayez dans un moment.")
             ) from exc
         raise OnlineError(f"LRCLIB a répondu par une erreur ({exc.code}).") from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
@@ -50,15 +50,28 @@ def _get(path: str, params: dict, opener=urllib.request.urlopen) -> object | Non
         raise OnlineError("LRCLIB a renvoyé une réponse illisible.") from exc
 
 
-def search(title: str, artist: str = "", album: str = "", duration: float = 0.0,
-           opener=urllib.request.urlopen) -> list[dict]:
+def search(
+    title: str,
+    artist: str = "",
+    album: str = "",
+    duration: float = 0.0,
+    opener=urllib.request.urlopen,
+) -> list[dict]:
     """Candidates, the closest in duration first. Nothing here says one is the right one."""
     if not title.strip():
         raise OnlineError("Indiquez au moins le titre du morceau.")
     found: dict[int, dict] = {}
     if artist and 1 <= duration <= 3600:
-        exact = _get("get", {"track_name": title, "artist_name": artist, "album_name": album,
-                             "duration": round(duration)}, opener)
+        exact = _get(
+            "get",
+            {
+                "track_name": title,
+                "artist_name": artist,
+                "album_name": album,
+                "duration": round(duration),
+            },
+            opener,
+        )
         if isinstance(exact, dict) and "id" in exact:
             found[exact["id"]] = exact
     hits = _get("search", {"track_name": title, "artist_name": artist}, opener)
@@ -67,8 +80,11 @@ def search(title: str, artist: str = "", album: str = "", duration: float = 0.0,
     for r in hits if isinstance(hits, list) else []:
         if isinstance(r, dict) and "id" in r:
             found.setdefault(r["id"], r)
-    out = [r for r in found.values() if r.get("plainLyrics") or r.get("syncedLyrics")
-           or r.get("instrumental")]
+    out = [
+        r
+        for r in found.values()
+        if r.get("plainLyrics") or r.get("syncedLyrics") or r.get("instrumental")
+    ]
 
     def gap(r):
         return abs(float(r.get("duration") or 0) - duration) if duration else 0.0
@@ -82,8 +98,11 @@ def lines_of(record: dict, synced: bool = True) -> list[dict]:
         return L.parse(record["syncedLyrics"])
     if record.get("plainLyrics"):
         return L.parse(record["plainLyrics"])
-    return [{**x, "start": None} for x in L.parse(record.get("syncedLyrics") or "")
-            if x["text"] or x.get("section")]
+    return [
+        {**x, "start": None}
+        for x in L.parse(record.get("syncedLyrics") or "")
+        if x["text"] or x.get("section")
+    ]
 
 
 def source_of(record: dict, synced: bool) -> dict:

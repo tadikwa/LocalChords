@@ -21,6 +21,9 @@ exactes de la distribution sont dans `requirements-lock.txt`.
 | [pretty_midi](https://github.com/craffel/pretty-midi), [pydub](https://github.com/jiaaro/pydub) | Dépendances des modèles | MIT | |
 | [sounddevice](https://github.com/spatialaudio/python-sounddevice) / PortAudio | Sortie audio | MIT | Seule `libportaudio64bit.dll` est livrée : les variantes ASIO (SDK Steinberg, autre licence) sont retirées. |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Import de liens | Unlicense | L'usage qui en est fait reste sous la responsabilité de l'utilisateur et des conditions de chaque site. |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) b5454 (avec ggml) | Transcription des paroles (v1.3) | MIT | `whisper-cli.exe` et ses DLL, dans `_internal/whisper`, lancés comme un programme à part. Archive officielle vérifiée par SHA-256 (`scripts/fetch_whisper.py`). Texte : `licences/whisper.cpp-MIT.txt`. |
+| Modèles [Whisper](https://github.com/openai/whisper) d'OpenAI, convertis par ggml (`small-q5_1`, `large-v3-turbo-q5_0`) | Reconnaissance de la voix (v1.3) | MIT | **Pas livrés** : téléchargés à la demande depuis [huggingface.co/ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp), taille et SHA-256 vérifiés. Texte : `licences/openai-whisper-MIT.txt`. |
+| Visual C++ Redistributable (msvcp140, vcruntime140, vcruntime140_1, vcomp140) | Bibliothèques d'exécution de whisper.cpp | Licence Microsoft, redistribuables | Copiés du système au moment de la construction, comme le permet Microsoft. |
 
 scikit-learn, h5py, einops et rotary-embedding-torch ne sont plus livrés depuis la v1.1 (ils servaient
 au chemin torch).
@@ -67,3 +70,10 @@ courantes, vérifiées par le programme comme les autres.
 
 La v1.2.1 (accords du morceau, fiche PDF) n'ajoute non plus aucune dépendance : la fiche est écrite par
 `QPdfWriter`, qui fait déjà partie de Qt (LGPL v3, voir plus haut).
+
+La v1.3 (paroles) ajoute whisper.cpp et ses DLL (environ 12 Mo), rien d'autre dans le programme. Les
+modèles de voix ne sont téléchargés que par ceux qui veulent transcrire. La recherche en ligne passe par
+[LRCLIB](https://lrclib.net), une base ouverte et gratuite dont l'API publique est faite pour ça, sans clé
+ni compte : seuls le titre, l'artiste, l'album et la durée sont envoyés, jamais l'audio, et seulement quand
+l'utilisateur lance la recherche. Les paroles qui en viennent ne sont pas les nôtres : LocalChords les
+affiche pour jouer, mais refuse de les exporter. Aucun catalogue n'est aspiré.

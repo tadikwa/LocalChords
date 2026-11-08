@@ -45,8 +45,10 @@ def test_plain_text_keeps_one_break_between_stanzas():
 
 
 def test_srt():
-    srt = ("1\n00:00:01,500 --> 00:00:03,000\nPremière <i>ligne</i>\n\n"
-           "2\n00:01:02,250 --> 00:01:04,000\nSeconde\nsuite\n")
+    srt = (
+        "1\n00:00:01,500 --> 00:00:03,000\nPremière <i>ligne</i>\n\n"
+        "2\n00:01:02,250 --> 00:01:04,000\nSeconde\nsuite\n"
+    )
     lines = L.parse(srt)
     assert lines == [
         {"text": "Première ligne", "start": 1.5, "end": 3.0},
@@ -64,8 +66,14 @@ def test_lrc_round_trip_applies_offset():
     lyr = L.new(L.parse("[00:10.00]Un\n[Pont]\nsans heure\n[00:12.34]Deux\n"), {"kind": "file"})
     lyr["offset"] = 0.5
     text = L.to_lrc(lyr, "T", "A")
-    assert text.splitlines() == ["[ti:T]", "[ar:A]", "[00:10.50]Un", "[Pont]", "sans heure",
-                                 "[00:12.84]Deux"]
+    assert text.splitlines() == [
+        "[ti:T]",
+        "[ar:A]",
+        "[00:10.50]Un",
+        "[Pont]",
+        "sans heure",
+        "[00:12.84]Deux",
+    ]
     assert [x["start"] for x in L.parse(text)] == [10.5, None, None, 12.84]
 
 
@@ -81,8 +89,9 @@ def test_line_at_follows_the_clock_with_offset():
 
 
 def test_editor_round_trip_keeps_word_times_only_on_unchanged_lines():
-    before = L.parse("[00:05.00]<00:05.00>Lune <00:05.80>pâle\n"
-                     "[00:08.00]<00:08.00>Mer <00:08.50>grise\n")
+    before = L.parse(
+        "[00:05.00]<00:05.00>Lune <00:05.80>pâle\n[00:08.00]<00:08.00>Mer <00:08.50>grise\n"
+    )
     text = L.to_editor(before).replace("Mer grise", "Mer bleue")
     after = L.from_editor(text, before)
     assert after[0]["words"] == before[0]["words"]
@@ -106,8 +115,14 @@ def test_catalog_lyrics_are_never_exportable():
 # Chords over words -----------------------------------------------------------------------------
 
 SONG = "[00:04.00]Le vent tourne au coin de la rue\n[00:08.00]\n[00:10.00]et je reste là\n"
-CHORDS = [(0.0, 4.0, "C"), (4.0, 6.0, "Am"), (6.0, 8.0, "F"), (8.0, 10.0, "G"),
-          (10.0, 14.0, "C"), (14.0, 16.0, None)]
+CHORDS = [
+    (0.0, 4.0, "C"),
+    (4.0, 6.0, "Am"),
+    (6.0, 8.0, "F"),
+    (8.0, 10.0, "G"),
+    (10.0, 14.0, "C"),
+    (14.0, 16.0, None),
+]
 
 
 def rows_of(lyr, chords=CHORDS, duration=16.0):
@@ -116,12 +131,17 @@ def rows_of(lyr, chords=CHORDS, duration=16.0):
 
 def test_chords_go_over_the_line_sung_when_they_start():
     rows = rows_of(L.new(L.parse(SONG), {"kind": "file"}))
-    kinds = [(r["kind"], r["text"], [(c["label"], c["char"], c["how"]) for c in r["chords"]])
-             for r in rows]
+    kinds = [
+        (r["kind"], r["text"], [(c["label"], c["char"], c["how"]) for c in r["chords"]])
+        for r in rows
+    ]
     assert kinds == [
         ("chords", "", [("C", 0, "approx")]),  # the intro, before any word
-        ("line", "Le vent tourne au coin de la rue",
-         [("Am", 0, "approx"), ("F", 15, "approx")]),  # F halfway: "au", by proportion only
+        (
+            "line",
+            "Le vent tourne au coin de la rue",
+            [("Am", 0, "approx"), ("F", 15, "approx")],
+        ),  # F halfway: "au", by proportion only
         ("chords", "", [("G", 0, "approx")]),  # the timed empty line: a gap with no words
         ("line", "et je reste là", [("C", 0, "approx")]),
     ]
@@ -132,7 +152,9 @@ def test_word_times_place_chords_exactly():
     rows = rows_of(L.new(L.parse(text), {"kind": "file"}), [(4.0, 6.0, "Am"), (6.0, 9.0, "F")])
     (line,) = [r for r in rows if r["kind"] == "line"]
     assert [(c["label"], c["char"], c["how"]) for c in line["chords"]] == [
-        ("Am", 0, "word"), ("F", 8, "word")]  # F lands on "tourne", begun at 5.90
+        ("Am", 0, "word"),
+        ("F", 8, "word"),
+    ]  # F lands on "tourne", begun at 5.90
 
 
 def test_manual_anchor_moves_the_chord_but_not_its_time():
@@ -148,7 +170,9 @@ def test_a_chord_still_sounding_when_a_line_begins_is_shown_at_its_start():
     rows = L.sheet(lyr, [(0.0, 3.0, "C"), (3.0, 9.0, "G"), (9.0, 12.0, "D")], 12.0)
     second = [r for r in rows if r["text"] == "deux mots ici"][0]
     assert [(c["label"], c["char"], c["how"]) for c in second["chords"]] == [
-        ("G", 0, "held"), ("D", 5, "approx")]
+        ("G", 0, "held"),
+        ("D", 5, "approx"),
+    ]
 
 
 def test_untimed_lyrics_get_no_chords_rather_than_invented_places():
@@ -169,6 +193,12 @@ def test_layout_widens_a_word_under_a_long_chord_name_and_keeps_names_apart():
     (x0, i0), (x1, i1) = line["chords"]
     assert x1 >= x0 + mono("Cmaj7/G") + 5  # never overlapping
     assert dict((first, x) for x, _, first in line["runs"])[3] == x1  # D stays over "oui"
+
+
+def test_layout_leaves_no_hole_after_a_chord_when_the_next_word_has_none():
+    text = "le long du canal"
+    (line,) = L.layout(text, [{"label": "A/C#", "char": 0}], 1000, mono, mono, 5)
+    assert [x for x, _, _ in line["runs"]] == [0.0, 30.0, 80.0, 110.0]  # as written
 
 
 def test_layout_wraps_between_words_and_never_loses_text():
@@ -250,8 +280,11 @@ def test_find_local_prefers_a_side_file_then_the_tags(tmp_path):
     assert source["kind"] == "embedded" and lines[0]["text"] == "Dans les tags"
     (tmp_path / "Ma chanson.txt").write_bytes("Écrit à côté\n".encode("cp1252"))
     lines, source = L.find_local(song, "Dans les tags\n")
-    assert (source["kind"], source["name"], lines[0]["text"]) == ("file", "Ma chanson.txt",
-                                                                  "Écrit à côté")
+    assert (source["kind"], source["name"], lines[0]["text"]) == (
+        "file",
+        "Ma chanson.txt",
+        "Écrit à côté",
+    )
     (tmp_path / "Ma chanson.lrc").write_text("[00:01.00]Synchronisé\n", encoding="utf-8")
     lines, source = L.find_local(song)
     assert source["name"] == "Ma chanson.lrc" and lines[0]["start"] == 1.0
@@ -268,8 +301,9 @@ def test_lyrics_tag_is_read_from_the_recording(tmp_path):
         c.metadata["title"] = "Essai"
         c.metadata["LYRICS"] = "Première ligne\nDeuxième ligne"
         s = c.add_stream("flac", rate=44100, layout="mono")
-        frame = av.AudioFrame.from_ndarray(np.zeros((1, 4410), dtype=np.int16), format="s16",
-                                           layout="mono")
+        frame = av.AudioFrame.from_ndarray(
+            np.zeros((1, 4410), dtype=np.int16), format="s16", layout="mono"
+        )
         frame.rate = 44100
         for packet in s.encode(frame):
             c.mux(packet)
