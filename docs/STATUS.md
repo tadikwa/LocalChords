@@ -1,10 +1,29 @@
 # État du projet
 
-Mis à jour le 2026-11-08 : v1.3.1 (paroles trouvées pour vous) publiée
-(<https://github.com/tadikwa/LocalChords/releases/tag/v1.3.1>), dernière version. Les versions v1.1, v1.2,
-v1.2.1 et v1.3 restent en ligne, inchangées.
+Mis à jour le 2026-11-08 : v1.4 (Ma bibliothèque) en préparation sur la branche `feature/v1.4-library`.
+Dernière version publiée : v1.3.1 (<https://github.com/tadikwa/LocalChords/releases/tag/v1.3.1>). Les
+versions v1.1, v1.2, v1.2.1, v1.3 et v1.3.1 restent en ligne, inchangées.
 
 ## Où on en est
+
+**v1.4 :** la page d'accueil devient une bibliothèque : index SQLite (`catalog.db`) reconstruit à partir des
+projets `.lchords`, qui restent la référence et ne sont pas modifiés ; recherche, filtres, tris, favoris,
+collections (glisser-déposer, ordre), genres et étiquettes, liste ou cartes ; audio référencé ou conservé
+(copie au choix, sans doublon) ; recherche des fichiers déplacés dans un dossier choisi, empreinte vérifiée ;
+liens déjà importés rouverts sans téléchargement ; sauvegarde et restauration de la bibliothèque (zip, plan
+avant d'écrire, rien d'écrasé sans accord, paroles du catalogue seulement sur demande). Suppressions
+séparées, toutes confirmées, vers la Corbeille ; l'audio d'origine n'est jamais supprimé. Migration : dates
+d'avant la 1.4 marquées estimées (« ≈ »). Détail dans [TECHNIQUE.md](TECHNIQUE.md#la-bibliothèque-v14),
+notes dans [NOTES-v1.4.md](NOTES-v1.4.md), étude d'installateur dans
+[INSTALLER-ETUDE.md](INSTALLER-ETUDE.md) (Inno Setup conseillé, rien de construit).
+765 tests passent (dont 42 sur l'index et la sauvegarde, et ceux de la page). Mille morceaux synthétiques : la page se rafraîchit en moins d'une
+seconde (test). Auto-test avec une étape « bibliothèque ». Captures sur huit morceaux synthétiques inventés
+(`scripts/library_screenshots.py`).
+Migration vérifiée sur une copie des données réelles de ce PC (3 projets v1.3.1) : deux lancements, 3 morceaux
+sans doublon, dates marquées estimées, audio retrouvé, fichiers `.lchords` identiques octet pour octet et
+à la même date.
+Builds locaux vérifiés : auto-test du dossier et de l'exécutable unique (302 Mo), 18 étapes sur 18,
+sortie sans erreur.
 
 **v1.3.1 :** ligne « Aucune parole disponible » au-dessus de la grille, reconnaissance du morceau par ses
 noms (informations musicales du lien, titre de vidéo nettoyé, étiquettes, nom du fichier ; jamais la chaîne
@@ -57,6 +76,7 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
 | J. v1.2.1 | Accords du morceau (tous / à venir), positions partagées et enregistrées, fiche des accords en PDF |
 | K. v1.3 | Paroles : sources locales, LRCLIB, transcription locale ; vues, synchronisation, accords sur les mots, PDF |
 | L. v1.3.1 | Morceau reconnu par ses noms, recherche des paroles avec accord, ligne d'invitation au-dessus de la grille |
+| M. v1.4 | Bibliothèque : index SQLite, favoris, collections, étiquettes, audio conservé, sauvegarde et restauration |
 | G. P2 | Liens, lots, comparaison de moteurs, progressions, transposition de l'audio. Non faits : sections, séparation de sources, GPU, avec leurs raisons dans DECISIONS.md |
 
 ## Limites connues
@@ -96,6 +116,22 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
   <https://github.com/tadikwa/LocalChords/releases>.
 
 ## Revue indépendante
+
+**v1.4 :** revue du diff entier par un agent séparé, 10 constats. Neuf corrigés, avec des tests :
+- un projet v1.3 ouvert avant que l'index ne l'ait lu était daté « ajouté aujourd'hui » : sa date de
+  création sert, marquée estimée ;
+- une date d'ouverture estimée venue d'une sauvegarde devenait réelle à la restauration ;
+- une sauvegarde sans les paroles du catalogue réécrivait les projets à la date du jour : ils gardent la leur ;
+- un projet illisible partait tel quel dans une telle sauvegarde, paroles du catalogue comprises : il reste
+  dehors, et la fin de la sauvegarde le dit ;
+- l'estimation de la taille de l'audio attendait un disque débranché à chaque morceau : une fois par disque ;
+- un `catalog.json` mal formé dans une sauvegarde faisait planter la restauration : refusé avec un message ;
+- un index verrouillé ou occupé était pris pour un index endommagé : il n'est plus touché ;
+- le morceau ouvert pouvait être réenregistré par-dessus un projet que la restauration venait d'écrire ;
+- la restauration proposait « Annuler » pendant l'écriture : plus de bouton une fois commencée.
+
+Laissé : un index de secours en mémoire (index illisible, cas rare) partage une connexion SQLite entre la
+fenêtre et le fil de lecture des projets ; il ne sert qu'à la session en cours.
 
 **v1.3.1 :** revue du diff entier, 6 constats, tous corrigés avec un test : un mot entre crochets
 (« [Acoustic] ») pris pour l'identifiant de la vidéo ; l'artiste du titre perdu quand le site donne le

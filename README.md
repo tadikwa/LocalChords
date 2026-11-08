@@ -20,13 +20,17 @@ ou 11, 64 bits, gratuit, hors ligne)
 </p>
 
 Les captures viennent du programme (celles des accords du morceau et de la fiche : version 1.2.1, celles des
-paroles : version 1.3, celle des paroles trouvées : version 1.3.1, lancées depuis les sources, rendu hors
-écran), sur un morceau de démonstration
+paroles : version 1.3, celle des paroles trouvées : version 1.3.1, celles de la bibliothèque : version 1.4,
+lancées depuis les sources, rendu hors écran), sur un morceau de démonstration
 synthétique créé pour l'occasion (`scripts/demo_audio.py`) et des paroles écrites pour lui
-(`scripts/screenshot_lyrics.py`) : aucun enregistrement ni aucune parole du commerce.
+(`scripts/screenshot_lyrics.py`) : aucun enregistrement ni aucune parole du commerce. Les morceaux de la
+bibliothèque sont huit morceaux synthétiques aux titres et artistes inventés, analysés par le programme dans
+un dossier temporaire (`scripts/library_screenshots.py`).
 
 ## Fonctionnalités
 
+- **Ma bibliothèque** : tous vos morceaux analysés sur la page d'accueil, avec recherche, favoris,
+  collections, tris et filtres, et une sauvegarde complète dans un seul fichier.
 - **Reconnaissance des accords** sur votre PC : majeurs, mineurs, septièmes, sus, diminués, augmentés et
   renversements (`D/F♯`), avec la tonalité, le tempo et la mesure.
 - **Grille synchronisée** : l'accord en cours s'allume, le suivant est annoncé, un clic place la lecture.
@@ -42,6 +46,64 @@ synthétique créé pour l'occasion (`scripts/demo_audio.py`) et des paroles éc
 - **Fiche des accords en PDF** à imprimer, avec les diagrammes.
 - **Exporter** en texte, ChordPro ou PDF ; notation C D E ou Do ré mi, dièses ou bémols.
 - **Hors ligne**, sans compte ; un mode portable garde tout à côté du programme.
+
+## Ma bibliothèque (1.4)
+
+![La bibliothèque en liste : huit morceaux de démonstration avec titre, artiste, genre, année, durée, tonalité, tempo, nombre d'accords, paroles, état de l'audio et dates ; Favoris, Récemment ouverts, Derniers ajouts et deux collections à gauche](docs/images/localchords-library.png)
+
+Nouveau en 1.4 : la page d'accueil devient votre bibliothèque. Chaque morceau analysé y reste, avec ses
+informations : titre, artiste, genre, année, durée, tonalité, tempo, nombre d'accords, paroles, état de
+l'audio, dates d'ajout et de dernière ouverture. Ce qui n'est pas connu s'affiche « — » ou « Non
+renseigné », jamais deviné.
+
+- **Ouvrir** : double-clic ou `Entrée`. **Chercher** : `Ctrl + F`, sur le titre, l'artiste, l'album, le
+  genre et les étiquettes, sans tenir compte des accents. **Filtrer** par genre, étiquette ou état (avec
+  ou sans paroles, audio introuvable, audio conservé). **Trier** par titre, artiste, date d'ajout,
+  dernière ouverture, année, genre, tonalité ou tempo (clic sur une colonne, ou « Trier par »).
+- **Favoris** : l'étoile, dans la liste ou sur la page du morceau. **Récemment ouverts** et **Derniers
+  ajouts** se remplissent seuls.
+- **Collections** (« Nouvelle collection ») : ajoutez des morceaux par le clic droit ou en les glissant sur
+  la collection, remettez-les dans l'ordre (`Alt + ↑ ↓`), renommez, supprimez. Supprimer une collection ne
+  supprime aucun morceau.
+- **Genre et étiquettes** : le genre vient des étiquettes du fichier et se corrige ; ajoutez vos propres
+  étiquettes (« à travailler », « concert »…). Plusieurs morceaux à la fois : sélection avec `Ctrl` ou `Maj`.
+- **En liste ou en cartes** ; sur un écran étroit, les colonnes secondaires se cachent, et sur un écran
+  ultra-large le titre ne s'étire pas sans fin ([capture en 5120 × 1440](docs/images/localchords-library-5120.png)).
+
+<p align="center">
+  <img src="docs/images/localchords-library-cards.png" width="800" alt="La bibliothèque en cartes : chaque morceau avec son titre, son artiste, sa tonalité, son tempo, sa durée, son genre et son étoile">
+</p>
+
+### Les quatre notions
+
+| Notion | Ce que c'est | Où |
+|---|---|---|
+| **Projet sauvegardé** | l'analyse d'un morceau et vos corrections, enregistrées seules à chaque changement | un fichier `.lchords` par morceau, dans `%LOCALAPPDATA%\LocalChords\projects` |
+| **Audio référencé** | le fichier d'origine, là où il est sur votre PC : LocalChords note seulement son emplacement | votre dossier de musique, inchangé |
+| **Audio conservé** | une copie que LocalChords garde, sur votre demande (clic droit → Fichier audio → « Conserver une copie dans la bibliothèque », taille annoncée) : le morceau se joue même si l'original est déplacé ou sur un disque débranché | `%LOCALAPPDATA%\LocalChords\audio` |
+| **Sauvegarde de bibliothèque** | un seul fichier zip à garder ailleurs : projets, corrections, favoris, collections, étiquettes et préférences, et l'audio si vous le voulez (taille estimée avant) | où vous le choisissez (menu ☰ → « Sauvegarder la bibliothèque… ») |
+
+**Restaurer** (menu ☰ → « Restaurer une sauvegarde… ») montre d'abord ce qui va changer : un morceau déjà
+présent n'est pas dupliqué, rien n'est écrasé sans votre accord, et la version écartée est mise de côté.
+Les paroles venues de LRCLIB ne partent dans une sauvegarde que si vous le demandez : elles appartiennent à
+leurs auteurs, gardez cette sauvegarde pour vous.
+
+**Un fichier déplacé ?** Clic droit → Fichier audio → « Rechercher dans un dossier… », ou menu ☰ → « Retrouver les fichiers audio manquants… » : seul le dossier que vous choisissez
+(et ses sous-dossiers) est examiné, et un fichier n'est accepté que s'il s'agit bien du même
+enregistrement. Un disque débranché affiche « Disque absent » et rien n'est supprimé.
+
+**Supprimer, sans mauvaise surprise.** Retirer d'une collection, retirer des favoris, retirer de la
+bibliothèque (le projet reste ; « Retirés », à gauche, le rend), supprimer l'analyse, supprimer
+la copie conservée : chaque action est séparée et demande confirmation, et ce qui est supprimé va à la
+Corbeille. **Le fichier audio d'origine n'est jamais supprimé.**
+
+**Vos analyses d'avant la 1.4** apparaissent seules au premier lancement, sans nouvelle analyse et sans
+que vos fichiers `.lchords` soient modifiés. Leurs dates d'ajout et d'ouverture ne sont pas connues : elles
+s'affichent approchées (« ≈ »).
+
+<p align="center">
+  <img src="docs/images/localchords-library-collection.png" width="800" alt="Une collection, Répétition du jeudi : trois morceaux dans l'ordre choisi">
+</p>
 
 ## Paroles et accords
 
@@ -162,8 +224,8 @@ prenez **l'un des deux** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-v1.3.1-portable.exe` (environ 300 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.3.1-windows-x64.zip` (environ 300 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-v1.4-portable.exe` (environ 300 Mo) | le plus simple | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.4-windows-x64.zip` (environ 300 Mo) | un usage quotidien | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
 Même programme, mêmes résultats. Le dossier démarre en moins d'une seconde. L'exécutable unique se
 décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier temporaire de Windows, effacés
@@ -173,7 +235,7 @@ décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier tempor
 **Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
 programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 Pour vérifier le fichier, son empreinte SHA-256 figure dans `SHA256SUMS.txt` sur la page de la version
-(PowerShell : `Get-FileHash .\LocalChords-v1.3.1-portable.exe`).
+(PowerShell : `Get-FileHash .\LocalChords-v1.4-portable.exe`).
 
 Pour tout garder à côté du programme (clé USB), créez un fichier vide `LocalChords.portable` à côté de
 l'exécutable : voir [docs/PORTABLE.md](docs/PORTABLE.md). Pour désinstaller, supprimez le fichier ou le
@@ -260,6 +322,6 @@ par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. Les modèles de t
 ### Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md), notes de version : [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md), notes de version : [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
 Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
 [LICENCES-TIERS.md](LICENCES-TIERS.md).

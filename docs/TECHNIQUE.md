@@ -14,7 +14,9 @@ src/localchords/
   chords.py             étiquettes, orthographe des notes, saisie, transposition
   voicings.py           positions de guitare et dispositions de piano, vérifiées par leurs notes
   export.py             texte et ChordPro
-  library.py            dossiers utilisateur, réglages
+  library.py            dossiers utilisateur, réglages, audio conservé ou retrouvé
+  catalog.py            l'index de la bibliothèque (SQLite) : favoris, étiquettes, collections, dates
+  backup.py             sauvegarde et restauration de la bibliothèque (zip)
   player.py             lecture : PortAudio, ralenti WSOLA, boucle, hauteur
   selftest.py           le scénario complet, lancé dans le programme compilé
   ui/                   thème, grille, chronologie, dialogues, PDF, fenêtre, diagrammes
@@ -229,6 +231,58 @@ prise. Une suggestion ne remplace jamais des paroles déjà là. Les paroles du 
 **Le bandeau** (`LyricsPrompt`) : une ligne sous la barre de lecture en vue Grille et paroles, en haut de la
 page dans les vues Paroles, tant que le morceau n'a pas de paroles. La croix le masque pour ce morceau
 (`view.lyrics_prompt`).
+
+## La bibliothèque (v1.4)
+
+**Les projets restent la vérité.** Chaque morceau analysé est un `projects/<empreinte>.lchords`
+(format inchangé, version 2) qui se suffit à lui-même : la v1.4 n'y écrit rien de plus que la v1.3, sauf
+`audio.kept` quand l'utilisateur garde une copie, et `size`, `genre`, `year` pour un morceau nouveau. Une
+v1.3 relit un projet de la v1.4.
+
+**L'index** (`catalog.py`, `catalog.db`, SQLite de la bibliothèque standard de Python) range ce qu'il faut
+pour afficher et trier des centaines de morceaux sans rouvrir chaque projet (titre, artiste, durée,
+tonalité, tempo, nombre d'accords distincts, origine des paroles, état de l'audio), et garde seul ce
+qu'aucun projet ne contient : favoris, genre choisi, étiquettes, collections, dates d'ajout et
+d'ouverture, morceaux retirés.
+
+- **Mise à jour sans bloquer** : au démarrage, un fil à part (`Scanner`, sa propre connexion) relit
+  seulement les projets nouveaux ou modifiés (date et taille du fichier), marque ceux qui ont disparu
+  (`project_state = missing`, jamais oubliés : un projet peut revenir), puis vérifie l'audio, un disque à
+  la fois. Aucune analyse n'est relancée.
+- **Migration** : un projet d'avant la v1.4 entre dans l'index avec `added_estimated` et
+  `opened_estimated` : sa date de création et de modification de fichier, affichées « ≈ » et jamais comme
+  une date connue. Les dates réelles commencent à la v1.4 (`store(..., opened=True)` à chaque ouverture).
+- **Index endommagé** : il est mis de côté (`catalog-<date>.illisible`, jamais effacé) et remplacé par la
+  copie quotidienne la plus récente (`backups/catalog-<jour>.db`, 7 gardées), puis remis à jour d'après les
+  projets. Sans copie, il est reconstruit d'après les projets, sans les favoris ni les collections, et
+  l'utilisateur en est averti. Un dossier en lecture seule, ou un index d'une version plus récente, donne
+  un index en mémoire pour la session, signalé.
+- **États de l'audio** (`audio_state`) : `kept` (copie gardée par LocalChords), `ok` (l'original est là),
+  `offline` (le disque ou le partage réseau n'est pas branché), `missing`. Un disque débranché n'entraîne
+  jamais rien d'autre qu'un affichage « Disque absent ».
+
+**Audio référencé ou conservé.** Par défaut, un projet référence le fichier d'origine (`audio.path`).
+**Garder une copie** copie l'enregistrement dans `audio/<empreinte><ext>` (`audio.kept`, chemin relatif au
+dossier Data, donc portable) après avoir annoncé la taille ; l'original n'est ni déplacé ni effacé, et un
+morceau déjà copié ne l'est pas deux fois. `library.audio_file` préfère la copie quand elle existe.
+**Retrouver dans un dossier** cherche, dans le seul dossier choisi par l'utilisateur (jamais tous les
+disques) et ses sous-dossiers, les fichiers du même nom ou de la même taille, et n'accepte qu'un fichier de la même empreinte
+que l'enregistrement analysé.
+
+**Suppressions séparées**, chacune avec sa confirmation : retirer d'une collection, des favoris, du
+catalogue (`hidden`, le projet reste ; « Retirés » le rend), supprimer l'analyse (le projet va à la
+corbeille de Windows), supprimer la copie conservée (à la corbeille). Le fichier audio d'origine n'est
+jamais touché, et un lien déjà importé se rouvre depuis son projet sans nouveau téléchargement.
+
+**Sauvegarde de bibliothèque** (`backup.py`) : un zip privé avec les projets entiers, `catalog.json` (les
+données personnelles de l'index, par empreinte), les préférences et, au choix, l'audio (taille estimée
+avant d'écrire, enregistrements stockés sans recompression). Les paroles d'un catalogue en ligne peuvent
+être laissées de côté, et restent non exportables une fois restaurées. Le zip est écrit sous un autre nom
+puis renommé une fois complet et relu. **Restaurer** montre d'abord ce qui arrivera (nouveaux, identiques,
+différents, plus récents) ; un morceau identique est ignoré, un morceau différent garde la version de ce PC
+sauf choix contraire, et la version écartée va dans `restored/<date>/`, jamais effacée. Les favoris, étiquettes et
+collections fusionnent sans doublon ; l'audio revient en copies conservées, chacune vérifiée par son
+empreinte. Les noms lus dans le zip sont filtrés : rien ne s'écrit hors de son dossier.
 
 ## Reconstruire
 

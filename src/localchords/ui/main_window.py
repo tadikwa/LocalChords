@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QBoxLayout,
     QDialog,
     QFileDialog,
-    QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -42,6 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__, audio, engines, export, identify, library, voicings, worker
+from .. import catalog as C
 from .. import lyrics as L
 from ..chords import key_name, parse, spell_tonic, symbol
 from ..player import Player, device_sample_rate
@@ -50,6 +50,7 @@ from . import theme
 from .diagrams import ChordPanel, Positions
 from .dialogs import ChordEditor, RhythmDialog, SheetDialog, ShortcutsDialog
 from .grid import ChordGrid
+from .library_view import LibraryPage
 from .lyrics_view import LyricsController
 from .pdf import write_chord_sheet, write_pdf
 from .songchords import UPCOMING, Item, SongChords, chord_key
@@ -91,112 +92,6 @@ class GridScroll(QScrollArea):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.widget().set_view_height(self.viewport().height())
-
-
-class HomePage(QWidget):
-    openRequested = Signal()
-    linkRequested = Signal()
-    projectRequested = Signal(Path)
-
-    def __init__(self):
-        super().__init__()
-        self.setObjectName("page")
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(32, 32, 32, 32)
-        outer.addStretch(1)
-        column = QWidget()
-        column.setMaximumWidth(720)
-        column.setMinimumWidth(320)
-        layout = QVBoxLayout(column)
-        layout.setSpacing(16)
-        title = QLabel("LocalChords")
-        title.setObjectName("h1")
-        lead = QLabel(
-            "Glissez un morceau dans cette fenêtre : ses accords apparaissent en grille et "
-            "défilent avec la lecture."
-        )
-        lead.setObjectName("muted")
-        lead.setWordWrap(True)
-        self.open_button = QPushButton("Ouvrir un morceau…")
-        self.open_button.setObjectName("primary")
-        self.open_button.setToolTip("Ctrl + O")
-        self.open_button.clicked.connect(self.openRequested)
-        place = "Tout reste sur votre ordinateur."
-        if library.portable_dir() == library.data_dir():
-            place = "Mode portable : tout reste dans le dossier Data, à côté du programme."
-        formats = QLabel(f"MP3, WAV, FLAC, M4A, OGG, OPUS… {place}")
-        formats.setObjectName("caption")
-        self.link_button = QPushButton("Importer un lien…")
-        self.link_button.setToolTip(
-            "YouTube et autres sites, pour les contenus que vous avez le droit de télécharger"
-        )
-        self.link_button.clicked.connect(self.linkRequested)
-        row = QHBoxLayout()
-        row.addWidget(self.open_button)
-        row.addWidget(self.link_button)
-        row.addStretch()
-        layout.addWidget(title)
-        layout.addWidget(lead)
-        layout.addLayout(row)
-        layout.addWidget(formats)
-        self.batch_box = QWidget()
-        batch_row = QHBoxLayout(self.batch_box)
-        batch_row.setContentsMargins(0, 0, 0, 0)
-        self.batch_text = QLabel()
-        self.batch_text.setObjectName("muted")
-        self.batch_cancel = QPushButton("Arrêter")
-        batch_row.addWidget(self.batch_text, 1)
-        batch_row.addWidget(self.batch_cancel)
-        self.batch_box.hide()
-        layout.addWidget(self.batch_box)
-        self.recent_title = QLabel("Morceaux récents")
-        self.recent_title.setObjectName("h2")
-        layout.addSpacing(16)
-        layout.addWidget(self.recent_title)
-        self.recent_box = QVBoxLayout()
-        self.recent_box.setSpacing(6)
-        holder = QWidget()
-        holder.setLayout(self.recent_box)
-        self.scroll = QScrollArea()
-        self.scroll.setWidget(holder)
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.scroll.setMaximumHeight(420)
-        layout.addWidget(self.scroll)
-        wrap = QHBoxLayout()
-        wrap.addStretch(1)
-        wrap.addWidget(column, 3)
-        wrap.addStretch(1)
-        outer.addLayout(wrap)
-        outer.addStretch(2)
-        self.refresh()
-
-    def refresh(self) -> None:
-        while self.recent_box.count():
-            item = self.recent_box.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        items = library.recent()
-        self.recent_title.setVisible(bool(items))
-        self.scroll.setVisible(bool(items))
-        for path, info in items:
-            title = info.get("title") or Path(info.get("path", "")).stem
-            artist = info.get("artist")
-            duration = fmt_time(float(info.get("duration") or 0))
-            text = f"{title}    —    {artist}" if artist else title
-            source = info.get("path", "")
-            tail = f"    {duration}"
-            if not Path(source).exists():
-                tail += "    · audio introuvable"
-            b = QPushButton()
-            b.setObjectName("recent")
-            # A long title is shortened rather than widening the window; the tooltip has it whole.
-            b.setText(b.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, 520) + tail)
-            b.setToolTip(f"{text}\n{source}")
-            b.setMinimumWidth(1)
-            b.clicked.connect(lambda _=False, p=path: self.projectRequested.emit(p))
-            self.recent_box.addWidget(b)
-        self.recent_box.addStretch()
 
 
 class SongPage(QWidget):
@@ -273,12 +168,19 @@ class SongPage(QWidget):
         self.chords_button.setCheckable(True)
         self.chords_button.setToolTip("Accords du morceau : tous, ou ceux à venir (T)")
         self.chords_button.setAccessibleName("Accords du morceau")
+        self.star = QToolButton()
+        self.star.setCheckable(True)
+        self.star.setObjectName("star")
+        self.star.setIcon(theme.icon("star_line", theme.TEXT_2))
+        self.star.setToolTip("Ajouter aux favoris")
+        self.star.setAccessibleName("Favori")
         self.menu = QToolButton()
         self.menu.setIcon(theme.icon("menu"))
         self.menu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.menu.setToolTip("Plus d'options")
         self.menu.setAccessibleName("Plus d'options")
         for w in (
+            self.star,
             self.key_button,
             self.rhythm_button,
             self.undo,
@@ -578,7 +480,9 @@ class MainWindow(QMainWindow):
         self._positions_of = None  # the project the position choices were loaded from
 
         self.stack = QStackedWidget()
-        self.home = HomePage()
+        self.catalog, catalog_note = C.open_catalog(library.data_dir())
+        self._index_on_save = False  # opened before its first save: indexed then, as opened
+        self.home = LibraryPage(self.catalog, self.settings, self._remember)
         self.song = SongPage()
         self.stack.addWidget(self.home)
         self.stack.addWidget(self.song)
@@ -619,6 +523,10 @@ class MainWindow(QMainWindow):
         self._last_beat = None
         self._scroll_anim = QPropertyAnimation(self.song.scroll.verticalScrollBar(), b"value", self)
         self._scroll_anim.setDuration(180)
+        self.home.start_scan()
+        if catalog_note:
+            _log(catalog_note)
+            QTimer.singleShot(0, lambda: self._alert(catalog_note))
 
     # Wiring ------------------------------------------------------------------------------------
     def _wire(self) -> None:
@@ -630,6 +538,12 @@ class MainWindow(QMainWindow):
         self.home.linkRequested.connect(self.ask_link)
         self.home.batch_cancel.clicked.connect(self.cancel_batch)
         self.home.projectRequested.connect(self.open_project_file)
+        self.home.audioChanged.connect(self._library_audio_changed)
+        self.home.projectsReplaced.connect(self._projects_replaced)
+        self.home.settingsRestored.connect(self._settings_restored)
+        self.home.shortcutsRequested.connect(self.show_shortcuts)
+        self.home.aboutRequested.connect(self.show_about)
+        s.star.toggled.connect(self._star_toggled)
         s.home.clicked.connect(self.go_home)
         s.play.clicked.connect(self.toggle_play)
         s.back.clicked.connect(lambda: self.seek(0))
@@ -725,8 +639,8 @@ class MainWindow(QMainWindow):
         shortcut("Ctrl+Right", lambda: self.step_bar(1))
         shortcut("Home", lambda: self.seek(0))
         shortcut("End", lambda: self.seek(self.player.duration))
-        shortcut("Return", self.edit_selected)
-        shortcut("Enter", self.edit_selected)
+        shortcut("Return", self._enter)
+        shortcut("Enter", self._enter)
         shortcut("E", self.edit_selected)
         shortcut("A", lambda: self.set_loop_mark(0))
         shortcut("B", lambda: self.set_loop_mark(1))
@@ -806,6 +720,15 @@ class MainWindow(QMainWindow):
         if parts.scheme not in ("http", "https") or not parts.hostname:
             self._alert("Ce n'est pas une adresse web valide (http:// ou https://).")
             return
+        try:
+            known = self.catalog.find_url(url)
+        except Exception:  # noqa: BLE001 - an index that fails to read: download as before
+            known = None
+        if known:
+            file = library.data_dir() / "projects" / known["file"]
+            if file.exists():
+                self.open_project_file(file)
+                return
         folder = library.data_dir() / "downloads"
         folder.mkdir(exist_ok=True)
         self.download_job = worker.start_download(url, folder)
@@ -903,8 +826,11 @@ class MainWindow(QMainWindow):
                     project.replace_analysis(message[1])
                     try:
                         project.save(saved)
+                        self.catalog.store(saved, project)
                     except OSError as exc:
                         self.batch_errors.append(str(exc))
+                    except C.CatalogError as exc:
+                        _log(str(exc))
                 elif message[0] == "error":
                     self.batch_errors.append(f"{project.audio['title']} : {message[1]}")
                 self.batch_job.cancel()
@@ -943,6 +869,7 @@ class MainWindow(QMainWindow):
                 except OSError:
                     _log(f"{exc} Impossible de le mettre de côté.")
         info = audio.metadata(path)
+        site_year = (site or {}).get("release_year")
         # Lyrics found beside the recording or in its tags: on this computer, so used at once.
         found = L.find_local(path, info.get("lyrics") or "")
         # Who and what it is: the site's music fields, else the tags, else the name. Stored once:
@@ -958,6 +885,9 @@ class MainWindow(QMainWindow):
                 "fingerprint": fingerprint,
                 "waveform": None,
                 "source_url": source_url,
+                "size": path.stat().st_size,
+                "genre": info.get("genre") or (site or {}).get("genre") or "",
+                "year": C.year_of(info.get("date")) or C.year_of(site_year),
                 "identity": {
                     k: who[k] for k in ("how", "sure", "video_title", "channel") if k in who
                 },
@@ -1001,6 +931,16 @@ class MainWindow(QMainWindow):
         self.project = project
         self.project_file = file
         self.pinned_at = None
+        self._index_on_save = False
+        if file.exists():
+            self._index(file, project, opened=True)
+        else:
+            self._index_on_save = True
+        s0 = self.song.star
+        s0.blockSignals(True)
+        s0.setChecked(self._favorite(file))
+        s0.blockSignals(False)
+        self._show_star()
         project.view["latin"] = bool(self.settings.get("latin"))
         project.view["show_bass"] = bool(self.settings.get("show_bass", True))
         s = self.song
@@ -1034,7 +974,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(s)
         self.setWindowTitle(f"{project.audio.get('title') or ''} : LocalChords")
         self._content_changed(save=False)
-        self._load_audio(Path(project.audio.get("path", "")))
+        self._load_audio(library.audio_file(project.audio))
 
     def _load_audio(self, path: Path) -> None:
         self._set_transport_enabled(False)
@@ -1215,7 +1155,7 @@ class MainWindow(QMainWindow):
         """Run another engine beside the current grid, then let the user choose."""
         if not self.project or not self.project.analysis["segments"]:
             return
-        path = Path(self.project.audio.get("path", ""))
+        path = library.audio_file(self.project.audio)
         if not path.is_file():
             self._alert("Le fichier audio est introuvable : localisez-le d'abord.")
             return
@@ -1251,7 +1191,7 @@ class MainWindow(QMainWindow):
     def reanalyze(self, engine: str) -> None:
         if not self.project:
             return
-        path = Path(self.project.audio.get("path", ""))
+        path = library.audio_file(self.project.audio)
         if not path.is_file():
             self._alert("Le fichier audio est introuvable : localisez-le d'abord.")
             return
@@ -1273,7 +1213,7 @@ class MainWindow(QMainWindow):
         if has_grid and self.job is None:
             s.middle.setCurrentWidget(self.lyrics.middle_page())
         elif not has_grid and self.job is None:
-            path = Path(project.audio.get("path", ""))
+            path = library.audio_file(project.audio)
             self.job_path, self.job_engine = (
                 path,
                 self.settings.get("engine", engines.DEFAULT_ENGINE),
@@ -1879,6 +1819,81 @@ class MainWindow(QMainWindow):
             self.project.save(self.project_file)
         except OSError as exc:
             self._alert(f"La sauvegarde a échoué : {exc.strerror or exc}")
+            return
+        self._index(self.project_file, self.project, opened=self._index_on_save)
+        self._index_on_save = False
+
+    # The library -------------------------------------------------------------------------------
+    def _index(self, file: Path, project: Project, *, opened: bool = False) -> None:
+        """The library learns of a save; its own failure never stands in the song's way."""
+        try:
+            self.catalog.store(file, project, opened=opened)
+        except (C.CatalogError, OSError) as exc:
+            _log(str(exc))
+
+    def _favorite(self, file: Path) -> bool:
+        try:
+            song = self.catalog.song(file.stem)
+        except Exception:  # noqa: BLE001
+            song = None
+        return bool(song and song["favorite"])
+
+    def _show_star(self) -> None:
+        star = self.song.star
+        on = star.isChecked()
+        star.setIcon(
+            theme.icon("star", theme.ACCENT) if on else theme.icon("star_line", theme.TEXT_2)
+        )
+        star.setToolTip("Retirer des favoris" if on else "Ajouter aux favoris")
+
+    def _star_toggled(self, on: bool) -> None:
+        file = self.project_file
+        if file is None:
+            return
+        if not file.exists():  # not saved yet: the first save indexes it
+            self.save()
+        try:
+            if self.catalog.song(file.stem) is None:
+                self.catalog.store(file, self.project, opened=True)
+            self.catalog.set_favorite([file.stem], on)
+        except (C.CatalogError, OSError) as exc:
+            self.song.star.blockSignals(True)
+            self.song.star.setChecked(not on)
+            self.song.star.blockSignals(False)
+            self._alert(f"Le favori n'a pas pu être enregistré : {exc}")
+        self._show_star()
+
+    def _enter(self) -> None:
+        if self.stack.currentWidget() is self.home:
+            self.home.open_current()
+        else:
+            self.edit_selected()
+
+    def _library_audio_changed(self, file: Path, info: dict) -> None:
+        """A kept copy made or dropped, a file found again, from the library: the song in memory
+        follows, so that its next save does not undo it."""
+        if self.project is not None and self.project_file == file:
+            self.project.audio["path"] = info.get("path", self.project.audio.get("path"))
+            if info.get("kept"):
+                self.project.audio["kept"] = info["kept"]
+            else:
+                self.project.audio.pop("kept", None)
+
+    def _projects_replaced(self, files: list) -> None:
+        """Project files deleted or restored over: the song in memory is not saved over them."""
+        if self.project_file is not None and self.project_file in files:
+            self.project_file = None
+
+    def _settings_restored(self) -> None:
+        self.settings.clear()
+        self.settings.update(library.load_settings())
+        for action, key, default in (
+            (self.latin_action, "latin", False),
+            (self.bass_action, "show_bass", True),
+        ):
+            action.setChecked(bool(self.settings.get(key, default)))
+        self.auto_lyrics_action.setChecked(self.settings.get("lyrics_auto") is True)
+        self.home.refresh()
 
     def flush(self) -> None:
         """Save now whatever the timer was about to."""
@@ -1990,6 +2005,7 @@ class MainWindow(QMainWindow):
         self.player.pause()
         self.player.close_device()
         library.save_settings(self.settings)
+        self.catalog.close()
         super().closeEvent(event)
 
 

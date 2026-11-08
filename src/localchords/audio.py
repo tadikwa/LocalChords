@@ -102,6 +102,9 @@ def metadata(path: Path) -> dict:
         "album": tags.get("album") or "",
         "duration": duration,
         "lyrics": words.strip(),
+        "genre": (tags.get("genre") or "").strip(),
+        # ID3 v2.4 TDRC and Vorbis say date, ID3 v2.3 TYER year; catalog.year_of reads either.
+        "date": tags.get("date") or tags.get("year") or tags.get("originaldate") or "",
     }
 
 
