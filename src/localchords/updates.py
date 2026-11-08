@@ -249,7 +249,7 @@ def parse_sums(text: str) -> dict[str, str]:
 
 def expected_sha256(release: dict, asset: dict, opener=None) -> str:
     """The SHA-256 the file must have: listed in SHA256SUMS.txt, and equal to GitHub's digest
-    for the asset when it gives one. Any disagreement refuses the download."""
+    for the asset. A missing one, or any disagreement, refuses the download."""
     opener = opener or urllib.request.urlopen
     sums = release["assets"].get(SUMS)
     if sums is None:
@@ -265,7 +265,12 @@ def expected_sha256(release: dict, asset: dict, opener=None) -> str:
     listed = parse_sums(raw.decode("utf-8", "replace")).get(asset["name"])
     if listed is None:
         raise UpdateError(f"{asset['name']} n'est pas dans SHA256SUMS.txt : téléchargement refusé.")
-    if asset["sha256"] and asset["sha256"] != listed:
+    if not asset["sha256"]:
+        raise UpdateError(
+            "GitHub ne donne pas l'empreinte de ce fichier : impossible de la comparer à "
+            "SHA256SUMS.txt, téléchargement refusé."
+        )
+    if asset["sha256"] != listed:
         raise UpdateError(
             "Les sommes de contrôle publiées ne concordent pas : téléchargement refusé."
         )
@@ -306,6 +311,8 @@ def download(release: dict, kind: str, folder: Path, task, opener=None) -> dict:
         raise UpdateError(
             f"La version {release['tag']} ne propose pas de fichier pour cette installation."
         )
+    if asset["url"] != f"{RELEASES}/download/{release['tag']}/{asset['name']}":
+        raise UpdateError("Adresse de téléchargement inattendue : refusé.")  # a cache edited
     task.status = "Vérification des sommes de contrôle…"
     sha = expected_sha256(release, asset, opener)
     folder.mkdir(parents=True, exist_ok=True)
@@ -356,6 +363,32 @@ def download(release: dict, kind: str, folder: Path, task, opener=None) -> dict:
         raise
     _mark_from_internet(target, asset["url"])
     return ready
+
+
+def ready_ok(ready: dict) -> bool:
+    """A file kept in the settings as fetched: still named as one of ours, and still there."""
+    try:
+        path = Path(ready["path"])
+        name = ASSETS[ready["kind"]].format(tag=ready["tag"])
+        return (
+            parse_version(ready["tag"]) is not None
+            and re.fullmatch(r"[0-9a-f]{64}", ready["sha256"]) is not None
+            and path.name == name
+            and path.is_file()
+        )
+    except (KeyError, TypeError, OSError):
+        return False
+
+
+def clean_parts(folder: Path) -> None:
+    """Parts of our own files that a download stopped short left in folder."""
+    with contextlib.suppress(OSError):
+        for path in folder.glob("LocalChords-*.part"):
+            tag = re.search(r"v\d+(?:\.\d+)*", path.name)
+            names = {f"{n.format(tag=tag.group())}.part" for n in ASSETS.values()} if tag else ()
+            if path.name in names:
+                with contextlib.suppress(OSError):
+                    path.unlink()
 
 
 def clean_temp(current: str = __version__, keep: str | None = None) -> None:

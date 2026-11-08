@@ -7,9 +7,10 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QAction,
     QColor,
@@ -39,6 +40,11 @@ from . import theme
 from .widgets import ElidedLabel
 
 SAID = 6000  # ms a "nothing new" message stays
+
+CHANGED = (
+    "Le fichier téléchargé a changé depuis sa vérification : il a été supprimé, rien n'a été "
+    "lancé. Téléchargez-le à nouveau."
+)
 
 NOT_SIGNED = (
     "LocalChords n'est pas signé numériquement : Windows SmartScreen peut afficher un "
@@ -85,15 +91,26 @@ class UpdateBanner(QWidget):
         row.addWidget(self.bar)
         row.addLayout(self.buttons)
         row.addWidget(self.close_button)
+        self._shown: list = []
+        self.actions: dict = {}
         self.hide()
 
-    def show_state(self, text: str, actions: list, progress: float | None = None) -> None:
-        """actions: (label, fn) pairs, in order of importance."""
-        self.text.set_full_text(text)
-        self.text.setAccessibleName(text)
+    def show_state(
+        self, text: str, actions: list, progress: float | None = None, show: bool = True
+    ) -> None:
+        """actions: (label, fn) pairs, in order of importance. The same actions again keep their
+        buttons, so a click, the focus and a screen reader are not lost while progress moves."""
+        if text != self.text._full:
+            self.text.set_full_text(text)
+            self.text.setAccessibleName(text)
         self.bar.setVisible(progress is not None)
         if progress is not None:
             self.bar.setValue(int(progress * 1000))
+        if show:
+            self.show()
+        if actions == self._shown:
+            return
+        self._shown = list(actions)
         while self.buttons.count():
             widget = self.buttons.takeAt(0).widget()
             if widget is not None:
@@ -106,7 +123,11 @@ class UpdateBanner(QWidget):
             button.clicked.connect(fn)
             self.buttons.addWidget(button)
             self.actions[label] = button
-        self.show()
+
+    def hide_state(self) -> None:
+        """Hidden with nothing left to click if it shows again before a new state."""
+        self.show_state("", [], show=False)
+        self.hide()
 
 
 class SafeBrowser(QTextBrowser):
@@ -165,6 +186,7 @@ def notes_dialog(parent, release: dict) -> QDialog:
     layout = QVBoxLayout(dialog)
     layout.setContentsMargins(20, 18, 20, 14)
     title = QLabel(release["name"])
+    title.setTextFormat(Qt.TextFormat.PlainText)  # a name from the web: never read as HTML
     title.setObjectName("h1")
     layout.addWidget(title)
     when = f"Publiée le {release['published']} · " if release["published"] else ""
@@ -208,6 +230,8 @@ class UpdateController:
         self.task: transcribe.Task | None = None
         self._job = ""
         self._dismissed = None  # the version put off until the next start
+        self._quiet = False  # the strip closed during a download: back once it ends
+        self._manual = False
         self.timer = QTimer(window)
         self.timer.setInterval(100)
         self.timer.timeout.connect(self._poll)
@@ -238,7 +262,7 @@ class UpdateController:
     def _auto_changed(self, on: bool) -> None:
         self.w._remember("update_auto", on)
         if self.banner.isVisible() and self._job == "" and self.release is None:
-            self.banner.hide()  # the question asked at first start: answered here
+            self.banner.hide_state()  # the question asked at first start: answered here
 
     # At start ----------------------------------------------------------------------------------
     def start(self, delay_ms: int = 4000) -> None:
@@ -250,15 +274,14 @@ class UpdateController:
             return
         ready = self.settings.get("update_ready")
         if isinstance(ready, dict):
-            if (
-                updates.newer(str(ready.get("tag")), __version__)
-                and Path(str(ready.get("path"))).is_file()
-            ):
+            if updates.newer(str(ready.get("tag")), __version__) and updates.ready_ok(ready):
                 self._show_ready(ready)
                 return
             self.w._remember("update_ready", None)  # installed since, or the file is gone
         if self.kind == "installed":
             updates.clean_temp()
+        else:
+            updates.clean_parts(updates.destination(self.kind)[0])
         auto = self.settings.get("update_auto")
         if auto is None:
             self.banner.show_state(
@@ -272,23 +295,29 @@ class UpdateController:
     def _consent(self) -> None:
         self.w._remember("update_auto", True)
         self.sync()
+        self.banner.show_state("Recherche d'une nouvelle version…", [])
         self.check(manual=False)
 
     def _decline(self) -> None:
         self.w._remember("update_auto", False)
         self.sync()
-        self.banner.hide()
+        self.banner.hide_state()
 
     def later(self) -> None:
         """Out of sight until the next start; nothing is lost."""
         if self.release is not None:
             self._dismissed = self.release["tag"]
+        self._quiet = self._job == "fetch"
         self.banner.hide()
 
     # Looking -----------------------------------------------------------------------------------
     def check(self, manual: bool) -> None:
         if self.task is not None:
-            if manual:
+            if manual and self._job == "check":
+                self._manual = True  # its answer is said, as asked
+                self.banner.show_state("Recherche d'une nouvelle version…", [])
+            elif manual:
+                self._quiet = False
                 self.banner.show()
             return
         if manual:
@@ -303,7 +332,9 @@ class UpdateController:
         if task.error:
             if self._manual:
                 self._failed(task.error, self.check_again)
-            return  # not when starting: no network is no news
+            elif self.release is None:
+                self.banner.hide_state()  # not when starting: no network is no news
+            return
         found, cache = task.result
         self.w._remember("update_cache", cache)
         if found and (
@@ -315,14 +346,14 @@ class UpdateController:
             self.banner.show_state(f"LocalChords {__version__} est à jour.", [])
             QTimer.singleShot(SAID, self._hide_said)
         elif self.banner.isVisible() and self.release is None:
-            self.banner.hide()
+            self.banner.hide_state()
 
     def check_again(self) -> None:
         self.check(manual=True)
 
     def _hide_said(self) -> None:
         if self.task is None and self.release is None:
-            self.banner.hide()
+            self.banner.hide_state()
 
     def _offer(self, release: dict) -> None:
         self.release = release
@@ -344,7 +375,7 @@ class UpdateController:
         if self.release is not None:
             self.w._remember("update_skip", self.release["tag"])
         self.release = None
-        self.banner.hide()
+        self.banner.hide_state()
 
     # Fetching ----------------------------------------------------------------------------------
     def fetch(self) -> None:
@@ -365,6 +396,7 @@ class UpdateController:
         if folder is None:
             return
         self._job = "fetch"
+        self._quiet = False
         self.task = _run(lambda task: updates.download(release, self.kind, folder, task))
         self._downloading(0.0, "Vérification des sommes de contrôle…")
         self.timer.start()
@@ -402,6 +434,7 @@ class UpdateController:
             f"Téléchargement de LocalChords {name} : {status}",
             [("Annuler", self.cancel)],
             progress,
+            show=not self._quiet,
         )
 
     def cancel(self) -> None:
@@ -409,6 +442,7 @@ class UpdateController:
             self.task.cancel()
 
     def _fetched(self, task) -> None:
+        self._quiet = False
         if task.error:
             if task.cancelled:
                 self._offer(self.release)
@@ -494,20 +528,24 @@ class UpdateController:
         if box.clickedButton() is not yes:
             return
         path = Path(ready["path"])
-        if not updates.verified(path, ready["sha256"], ready.get("size")):
-            self.w._remember("update_ready", None)
-            path.unlink(missing_ok=True)
-            self._failed(
-                "Le fichier téléchargé a changé depuis sa vérification : il a été "
-                "supprimé. Téléchargez-le à nouveau.",
-                self.check_again,
-            )
+        if not self._intact(path, ready):
+            self._failed(CHANGED, self.check_again)
             return
         self.w._remember("update_ready", None if ready["kind"] != "installed" else ready)
         self.w.close()
         if self.w.isVisible():
             return
+        if not self._intact(path, ready):  # once more, as late as possible: closing takes time
+            QMessageBox.warning(None, "Mise à jour", CHANGED)
+            return
         launch(path)
+
+    def _intact(self, path: Path, ready: dict) -> bool:
+        if updates.verified(path, ready["sha256"], ready.get("size")):
+            return True
+        self.w._remember("update_ready", None)
+        path.unlink(missing_ok=True)
+        return False
 
     # Plumbing ----------------------------------------------------------------------------------
     def _failed(self, error: str, retry) -> None:
@@ -535,9 +573,14 @@ class UpdateController:
         self._job = ""
 
     def stop(self) -> None:
-        """On closing: a download in progress stops and leaves no part behind."""
-        if self.task is not None:
-            self.task.cancel()
+        """On closing: a download in progress stops and leaves no part behind (a part a
+        stalled connection keeps is removed at the next start)."""
+        task = self.task
+        if task is not None:
+            task.cancel()
+            until = time.monotonic() + 1.5
+            while not task.done and time.monotonic() < until:
+                time.sleep(0.02)
         self.timer.stop()
 
 

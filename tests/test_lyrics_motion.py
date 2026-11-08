@@ -27,6 +27,12 @@ def test_enhanced_lrc_keeps_the_end_of_the_last_word():
     assert "end" not in plain and "words" not in plain
 
 
+def test_a_line_sung_again_moves_its_words_with_it():
+    first, again = L.parse("[00:01.00][00:31.00]<00:01.00>Lune <00:01.80>pâle<00:02.40>\n")
+    assert first["words"] == [[0, 1.0], [5, 1.8]] and first["end"] == 2.4
+    assert again["words"] == [[0, 31.0], [5, 31.8]] and again["end"] == 32.4
+
+
 def test_sung_lights_each_word_from_its_start_to_the_next():
     text, words = "Lune pâle, été", [[0, 1.0], [5, 1.8], [11, 2.4]]
     assert L.sung(text, words, 0.5, 3.0) == (0.0, 0, -1.0)  # before: nothing lit

@@ -242,7 +242,35 @@ def test_checksums_must_exist_and_agree(tmp_path):
             Task(),
             GitHub(final="http://plain.example/x"),
         )
+    no_digest = answer(assets=[asset(PORTABLE, digest=None), asset("SHA256SUMS.txt")])
+    with pytest.raises(updates.UpdateError, match="empreinte"):  # both are required
+        updates.download(updates.release_of(no_digest), "portable", tmp_path, Task(), GitHub())
+    elsewhere = updates.release_of(answer())
+    elsewhere["assets"][PORTABLE]["url"] = "https://evil.example/" + PORTABLE  # a cache edited
+    with pytest.raises(updates.UpdateError, match="inattendue"):
+        updates.download(elsewhere, "portable", tmp_path, Task(), GitHub())
     assert list(tmp_path.iterdir()) == []
+
+
+def test_a_ready_file_from_the_settings_is_checked(tmp_path):
+    good = {"tag": TAG, "kind": "portable", "path": str(tmp_path / PORTABLE), "sha256": "a" * 64}
+    (tmp_path / PORTABLE).write_bytes(b"x")
+    assert updates.ready_ok(good)
+    for change in (
+        {"path": str(tmp_path / "other.exe")},
+        {"kind": "nothing"},
+        {"sha256": None},
+        {"tag": "nightly"},
+    ):
+        assert not updates.ready_ok({**good, **change})
+    assert not updates.ready_ok({"tag": TAG})
+
+
+def test_clean_parts_removes_only_our_parts(tmp_path):
+    for name in (PORTABLE + ".part", f"LocalChords-{TAG}-windows-x64.zip.part", "x.part", PORTABLE):
+        (tmp_path / name).write_bytes(b"x")
+    updates.clean_parts(tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == [PORTABLE, "x.part"]
 
 
 def test_clean_temp_removes_only_old_installers_from_its_own_folder(tmp_path, monkeypatch):
@@ -407,6 +435,60 @@ def test_a_cancelled_download_offers_again(app, online, monkeypatch, tmp_path):
     wait_idle(app, c)
     assert "Télécharger" in c.banner.actions
     assert not list((tmp_path / "prog").glob("*"))
+    window.close()
+
+
+def test_the_strip_during_a_download_keeps_its_button_and_stays_closed(
+    app, online, monkeypatch, tmp_path
+):
+    window = opened(app)
+    c = window.updates
+    c.check(manual=True)
+    wait_idle(app, c)
+    real = updates.download
+
+    def slow(release, kind, folder, task, opener=None):
+        for i in range(300):
+            if task.cancelled:
+                break
+            task.progress = i / 300
+            time.sleep(0.01)
+        return real(release, kind, folder, task, opener)
+
+    monkeypatch.setattr(updates, "download", slow)
+    c.banner.actions["Télécharger"].click()
+    cancel = c.banner.actions["Annuler"]
+    for _ in range(5):
+        c._poll()
+    assert c.banner.actions["Annuler"] is cancel  # the same button: a click is never lost
+    c.banner.close_button.click()
+    c._poll()
+    assert not c.banner.isVisible()  # closed means closed while it downloads
+    cancel.click()
+    wait_idle(app, c)
+    assert c.banner.isVisible() and "Télécharger" in c.banner.actions
+    window.close()
+
+
+def test_a_manual_check_during_the_automatic_one_says_its_answer(app, online, monkeypatch):
+    online.release = answer(tag="v1.0")
+    window = opened(app)
+    c = window.updates
+    c.check(manual=False)
+    c.check(manual=True)
+    wait_idle(app, c)
+    assert "à jour" in c.banner.text._full
+
+
+def test_consent_then_no_network_leaves_no_question(app, online):
+    online.release = urllib.error.URLError("offline")
+    window = opened(app)
+    c = window.updates
+    c._startup()
+    c.banner.actions["Oui, vérifier"].click()
+    assert "Oui, vérifier" not in c.banner.actions
+    wait_idle(app, c)
+    assert not c.banner.isVisible()
     window.close()
 
 

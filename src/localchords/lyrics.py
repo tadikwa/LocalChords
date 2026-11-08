@@ -91,10 +91,11 @@ def parse(text: str) -> list[dict]:
         text_only, words, end = _word_times(line)
         for t in times:
             item = {"text": text_only, "start": round(t, 3)}
+            later = t - times[0]  # a line sung again ([00:10][00:30]): its words move with it
             if words:
-                item["words"] = words
-            if end is not None and end > t:
-                item["end"] = end
+                item["words"] = [[c, round(w + later, 3)] for c, w in words]
+            if end is not None and end + later > t:
+                item["end"] = round(end + later, 3)
             out.append(item)
     starts = [x["start"] for x in out if x["start"] is not None]
     if starts != sorted(starts):
