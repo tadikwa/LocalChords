@@ -132,6 +132,8 @@ audio ; l'affichage se figeait à chaque tour de boucle ; une comparaison annul�
 .venv/Scripts/python.exe -m pytest -m "not slow"         # sans les moteurs
 .venv/Scripts/python.exe -m PyInstaller localchords.spec --noconfirm
 dist/LocalChords/LocalChords.exe --self-test <audio> <dossier>   # la preuve : voir report.json
+# avec un modèle dans <données>\models\whisper, l'auto-test transcrit aussi ;
+# LOCALCHORDS_SELFTEST_ONLINE=1 ajoute une recherche LRCLIB (seul le nombre de résultats est gardé)
 ```
 
 Depuis zéro : `scripts/build.ps1`. Données de test : `chordotomy evaluate tiny-aam --engine model` les
