@@ -22,6 +22,9 @@ emplacements ci-dessous.
 | Classique (par défaut) | `%LOCALAPPDATA%\LocalChords` | rien à faire |
 | Portable | dossier `Data` à côté de l'exécutable | créer un fichier vide `LocalChords.portable` à côté de l'exécutable |
 
+La version installée par `LocalChords-Setup` (depuis la v1.5) est toujours en mode classique :
+l'installateur ne pose pas de marqueur et refuse un dossier qui en contient un ([INSTALLATEUR.md](INSTALLATEUR.md)).
+
 Exemple sur une clé USB :
 
 ```
