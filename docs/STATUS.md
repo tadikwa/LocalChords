@@ -1,8 +1,30 @@
 # État du projet
 
-Mis à jour le 2026-11-11 : v1.6.1 (remise à zéro dans le mixage) publiée
-(<https://github.com/tadikwa/LocalChords/releases/tag/v1.6.1>), dernière version. Les versions v1.1 à
-v1.6 restent en ligne, inchangées ; le modèle de séparation reste un fichier de la publication v1.6.
+Mis à jour le 2026-11-11 : v1.7 (interface en français et en anglais) en cours de publication. Les
+versions v1.1 à v1.6.1 restent en ligne, inchangées ; le modèle de séparation reste un fichier de la
+publication v1.6.
+
+## v1.7
+
+Interface en français et en anglais, moteurs inchangés ; architecture et ajout d'une langue dans
+[LOCALISATION.md](LOCALISATION.md), notes dans [NOTES-v1.7.md](NOTES-v1.7.md). Outils natifs de Qt
+(`translate`, `pyside6-lupdate`, `.ts`, `pyside6-lrelease`, `.qm`, versionnés), français langue source,
+catalogue anglais complet (1 044 messages), pluriels réels, nombres à la manière de chaque langue,
+boutons de Qt traduits (`qtbase_fr.qm`). Réglage ☰ → Langue / Language (Automatique, Français, English),
+appliqué au prochain démarrage ; migration : un utilisateur existant reste en français, un nouveau suit
+Windows (anglais par défaut). Exports (fiches PDF, texte, ChordPro) dans la langue de l'interface ;
+données et noms d'accords jamais traduits ; seuls les genres et étiquettes proposés le sont
+(`catalog.shown`). Installateur bilingue (`[Languages]`, même AppId), lancé par la mise à jour dans la
+langue choisie. README.en.md avec captures anglaises, sous-titres anglais de la vidéo
+(`docs/video/LocalChords-presentation.en.srt`). `tests/test_i18n.py` (choix, migration, persistance,
+repli, catalogues complets et à jour, interface entière sans français en anglais, exports) ; les tests
+existants sont inchangés. Contrôle visuel en anglais à 800 px, 1280×800, 1920×1080 et 5120×1440, à 100,
+150 et 200 % ; revue indépendante : corrigés, le message de changement de langue jamais affiché, la
+langue de l'ancien programme transmise par la mise à jour, des genres saisis par l'utilisateur traduits
+par homonymie, des textes affichés relus par le code. Laissés : les listes de genres et d'étiquettes
+triées sur le nom français, et, en mode portable sur un dossier Data non inscriptible, le choix de
+langue initial écrit dans le dossier de ce PC (celui que le programme utilise alors de toute façon). L'autotest vérifie aussi que les catalogues
+sont dans le programme empaqueté (étape « langue »).
 
 ## v1.6.1
 

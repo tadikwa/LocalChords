@@ -49,6 +49,12 @@ def run(audio_path: Path, out: Path) -> int:
             data=str(library.data_dir()),
         )
         window.grab().save(str(out / "1_accueil.png"))
+        # The catalogues made it into the build: Qt's (qtbase_fr; there is no qtbase_en) and ours.
+        from . import i18n
+
+        loaded = len(getattr(app, "_translators", []))
+        step("langue", loaded == (1 if i18n.current() == "en" else 2), language=i18n.current(),
+             catalogues=loaded)  # fmt: skip
 
         started = time.perf_counter()
         window.open_path(audio_path)
