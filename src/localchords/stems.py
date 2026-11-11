@@ -101,6 +101,8 @@ def gains(settings: dict) -> list[float]:
 PRESETS = {
     # name: (label, levels by stem, stems absent from the mode make the preset unavailable)
     "original": ("Original", None),
+    # Every separated stem at 0 dB: the sum of the stems, not the recording ("original").
+    "all": ("Toutes les pistes", {}),
     "karaoke": ("Karaoké (sans voix)", {"vocals": 0}),
     "vocals": ("Voix seule", {"drums": 0, "bass": 0, "other": 0, "instrumental": 0}),
     "no_bass": ("Sans basse", {"bass": 0}),
@@ -110,7 +112,7 @@ PRESETS = {
 
 def presets_for(mode: str) -> list[str]:
     names = set(MODES[mode]["stems"])
-    return [k for k, (_, levels) in PRESETS.items() if levels is None or set(levels) & names]
+    return [k for k, (_, levels) in PRESETS.items() if not levels or set(levels) & names]
 
 
 def apply_preset(settings: dict, preset: str) -> dict:

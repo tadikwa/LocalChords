@@ -250,7 +250,7 @@ et le capo affichés dans le programme.
 
 ## Mixage : séparer les instruments (1.6)
 
-![Le panneau Mixage sous les accords du morceau : Original ou Mix personnalisé, les préréglages, et une ligne par piste (Voix, Batterie, Basse, Autres) avec son curseur, son niveau en dB et les boutons M et S ; la basse est coupée, la batterie à −9 dB](docs/images/localchords-mixer.png)
+![Le panneau Mixage sous les accords du morceau : Original ou Mix personnalisé, les préréglages, et une ligne par piste (Voix, Batterie, Basse, Autres) avec son curseur, son niveau en dB, l'icône de remise à 0 dB et les boutons M et S ; la basse est coupée, la batterie à −9 dB](docs/images/localchords-mixer.png)
 
 Le bouton **Mixage** de la barre du bas (ou `M`) ouvre le panneau. Rien n'est séparé tant que vous ne le
 demandez pas :
@@ -264,11 +264,13 @@ demandez pas :
 2. La séparation se fait **sur votre PC**, en arrière-plan : environ un cinquième de la durée du morceau
    sur un processeur récent à 8 cœurs, plus sur une machine modeste, et jusqu'à 3 Go de mémoire. Vous
    pouvez écouter, lire la grille et changer de morceau pendant ce temps ; **Annuler** arrête tout.
-3. Réglez chaque piste : **curseur** (tout à gauche : silence complet ; un double-clic remet le niveau
-   d'origine), **M** pour la couper, **S** pour l'écouter seule (les réglages des autres sont gardés).
-   **Original / Mix personnalisé** (ou `Maj + M`) compare d'un clic, sans craquement. Préréglages :
+3. Réglez chaque piste : **curseur** (tout à gauche : silence complet), **↶** à côté du niveau pour
+   remettre cette piste seule à 0 dB (ou un double-clic sur le curseur), **M** pour la couper, **S** pour
+   l'écouter seule (les réglages des autres sont gardés). **Original / Mix personnalisé** (ou `Maj + M`)
+   compare d'un clic, sans craquement. Préréglages : *Toutes les pistes* (toutes à 0 dB, sans M ni S),
    *Karaoké (sans voix)*, *Voix seule*, *Sans basse*, *Sans batterie*, et *Personnalisé* pour revenir à
-   votre réglage.
+   votre réglage. *Original* est l'enregistrement tel quel ; *Toutes les pistes* est la somme des pistes
+   séparées, presque identique mais pas tout à fait.
 
 Les pistes sont gardées : rouvrez le morceau, le mix revient tel que vous l'avez laissé, sans nouvelle
 séparation. Vitesse, transposition, boucles et volume général s'appliquent au mix. Le menu **⋯** du
@@ -417,6 +419,6 @@ de morceau) : on les supprime depuis le mixage. En mode portable, tout cela est 
 ### Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), mises à jour : [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md), séparation et mixage : [docs/SEPARATION.md](docs/SEPARATION.md), notes de version : [docs/NOTES-v1.6.md](docs/NOTES-v1.6.md), [docs/NOTES-v1.5.1.md](docs/NOTES-v1.5.1.md), [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), mises à jour : [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md), séparation et mixage : [docs/SEPARATION.md](docs/SEPARATION.md), notes de version : [docs/NOTES-v1.6.1.md](docs/NOTES-v1.6.1.md), [docs/NOTES-v1.6.md](docs/NOTES-v1.6.md), [docs/NOTES-v1.5.1.md](docs/NOTES-v1.5.1.md), [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
 Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
 [LICENCES-TIERS.md](LICENCES-TIERS.md).
