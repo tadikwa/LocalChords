@@ -118,6 +118,62 @@ def _download_job(url: str, folder: str, conn) -> None:
         conn.close()
 
 
+def _separate_job(path: str, mode: str, fingerprint: str, conn) -> None:
+    """Separate one recording's instruments and keep them in the cache (stems.py)."""
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115
+    _below_normal()  # the player and the window keep the processor first
+    try:
+        import time
+
+        from . import audio, separation, stems
+
+        model = stems.MODEL
+        started = time.perf_counter()
+        conn.send(("progress", 0.0, "Décodage de l'audio…"))
+        y = audio.decode(Path(path), model["samplerate"])
+        conn.send(("progress", 0.03, "Chargement du modèle…"))
+
+        def progress(f):
+            conn.send(("progress", 0.03 + 0.9 * f, "Séparation des instruments…"))
+
+        sources = separation.separate(
+            y,
+            [lambda: separation.session(stems.model_path())],
+            model["weights"],
+            model["segment"],
+            progress,
+        )
+        conn.send(("progress", 0.94, "Enregistrement des pistes…"))
+        layers = stems.arrange(mode, sources, y)
+        del sources
+        folder = stems.write(
+            stems.cache_dir(fingerprint, mode), layers, model["samplerate"], {"mode": mode}
+        )
+        seconds = time.perf_counter() - started
+        conn.send(("progress", 1.0, "Terminé"))
+        conn.send(("done", str(folder), seconds, len(y) / model["samplerate"]))
+    except MemoryError:
+        conn.send(("error", "Mémoire insuffisante pour séparer ce morceau.", ""))
+    except OSError as exc:
+        conn.send(("error", f"Impossible d'enregistrer les pistes : {exc.strerror or exc}", ""))
+    except Exception as exc:  # noqa: BLE001 - the interface must hear of any failure
+        expected = type(exc).__name__ in ("AudioError", "SeparationError")
+        text = str(exc) if expected else f"La séparation a échoué : {exc}"
+        conn.send(("error", text, "" if expected else traceback.format_exc()))
+    finally:
+        conn.close()
+
+
+def _below_normal() -> None:
+    if sys.platform == "win32":
+        import ctypes
+
+        kernel = ctypes.windll.kernel32
+        kernel.SetPriorityClass(kernel.GetCurrentProcess(), 0x4000)  # BELOW_NORMAL_PRIORITY_CLASS
+
+
 def _start(target, *args) -> Job:
     ctx = mp.get_context("spawn")
     ours, theirs = ctx.Pipe(duplex=False)
@@ -133,3 +189,7 @@ def start(path: Path, engine: str) -> Job:
 
 def start_download(url: str, folder: Path) -> Job:
     return _start(_download_job, url, str(folder))
+
+
+def start_separation(path: Path, mode: str, fingerprint: str) -> Job:
+    return _start(_separate_job, str(path), mode, fingerprint)

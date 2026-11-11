@@ -4,6 +4,18 @@ Mis à jour le 2026-11-11 : v1.5.1 (paroles animées et mises à jour assistées
 (<https://github.com/tadikwa/LocalChords/releases/tag/v1.5.1>), dernière version. Les versions v1.1 à v1.5
 restent en ligne, inchangées.
 
+## v1.6 en cours (branche `feature/v1.6-stem-mixer`)
+
+Séparation des instruments et mixage multipiste ; mesures et choix dans [SEPARATION.md](SEPARATION.md).
+Fait : modèle choisi (Demucs v4 htdemucs en ONNX, CPU, Karaoké 2 pistes et Musicien 4 pistes, pas de 6
+pistes), pipeline `separation.py` identique à PyTorch, cache FLAC `stems.py`, job `worker.start_separation`,
+mixage `player.Mix` (rampes, Original/Mix, arrondi des crêtes), tests `test_separation.py`,
+`test_mixer.py`. Reste : panneau Mixage et téléchargement du modèle dans l'interface, réglages par
+morceau, export du mix, gestion du cache, décision CUDA, docs, captures, build, publication.
+Reprise : les modèles ONNX sont dans `work/sep-bench/onnx` (htdemucs-0.onnx = `htdemucs.onnx` de la
+release), les morceaux de test libres dans `work/test-songs`, un dossier de données de test dans
+`work/v16-data` ; `work/sep-bench/jobrun.py musician <morceau>` refait une séparation mesurée.
+
 ## Où on en est
 
 **v1.5.1 :** paroles animées et mises à jour assistées. Paroles : bande de la ligne chantée qui glisse en

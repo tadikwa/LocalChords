@@ -160,9 +160,14 @@ def run(work: Callable[[Task], object]) -> Task:
 
 
 def download(model_id: str, task: Task, opener=urllib.request.urlopen) -> Path:
-    """Into a .part file, hashed as it comes, renamed only once its SHA-256 matches."""
     info = model_info(model_id)
-    folder = models_dir()
+    return fetch(HF + info["file"], models_dir() / info["file"], info, task, opener)
+
+
+def fetch(url: str, target: Path, info: dict, task: Task, opener=urllib.request.urlopen) -> Path:
+    """Into a .part file, hashed as it comes, renamed only once its size and SHA-256 match `info`.
+    Also downloads the separation models (stems.py)."""
+    folder = target.parent
     folder.mkdir(parents=True, exist_ok=True)
     free = library.free_mb(folder)
     if free and free < info["size"] / 2**20 + SPACE_MARGIN_MB:
@@ -170,10 +175,9 @@ def download(model_id: str, task: Task, opener=urllib.request.urlopen) -> Path:
             f"Pas assez de place dans {folder} : {free} Mo libres, "
             f"{info['size'] // 2**20 + SPACE_MARGIN_MB} Mo nécessaires."
         )
-    target = folder / info["file"]
     part = target.with_suffix(".part")
     digest = hashlib.sha256()
-    request = urllib.request.Request(HF + info["file"], headers={"User-Agent": USER_AGENT})
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     got = 0
     try:
         with opener(request, timeout=30) as response, part.open("wb") as f:
