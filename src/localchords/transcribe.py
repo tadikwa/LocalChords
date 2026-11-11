@@ -28,8 +28,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+from PySide6.QtCore import QT_TRANSLATE_NOOP
 
-from . import audio, library
+from . import audio, i18n, library
+from .i18n import translate
 from .lyrics_online import USER_AGENT
 
 # Pinned to a revision: the sizes and hashes below are this one's, a later upload would not match.
@@ -42,27 +44,31 @@ MODELS = [
         "file": "ggml-small-q5_1.bin",
         "size": 190_085_487,
         "sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
-        "label": "Standard (small, 190 Mo)",
-        "note": "Le meilleur compromis : rapide, correct en français et en anglais.",
+        "label": QT_TRANSLATE_NOOP("Transcribe", "Standard (small, 190 Mo)"),
+        "note": QT_TRANSLATE_NOOP(
+            "Transcribe", "Le meilleur compromis : rapide, correct en français et en anglais."
+        ),
     },
     {
         "id": "large-v3-turbo-q5_0",
         "file": "ggml-large-v3-turbo-q5_0.bin",
         "size": 574_041_195,
         "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
-        "label": "Précis (large-v3-turbo, 574 Mo)",
-        "note": "Moins d'erreurs sur le chant, deux à trois fois plus lent.",
+        "label": QT_TRANSLATE_NOOP("Transcribe", "Précis (large-v3-turbo, 574 Mo)"),
+        "note": QT_TRANSLATE_NOOP(
+            "Transcribe", "Moins d'erreurs sur le chant, deux à trois fois plus lent."
+        ),
     },
 ]
 DEFAULT_MODEL = "small-q5_1"
 LANGUAGES = {
-    "auto": "Détection automatique",
-    "fr": "Français",
-    "en": "Anglais",
-    "es": "Espagnol",
-    "de": "Allemand",
-    "it": "Italien",
-    "pt": "Portugais",
+    "auto": QT_TRANSLATE_NOOP("Transcribe", "Détection automatique"),
+    "fr": QT_TRANSLATE_NOOP("Transcribe", "Français"),
+    "en": QT_TRANSLATE_NOOP("Transcribe", "Anglais"),
+    "es": QT_TRANSLATE_NOOP("Transcribe", "Espagnol"),
+    "de": QT_TRANSLATE_NOOP("Transcribe", "Allemand"),
+    "it": QT_TRANSLATE_NOOP("Transcribe", "Italien"),
+    "pt": QT_TRANSLATE_NOOP("Transcribe", "Portugais"),
 }
 RATE = 16_000
 SPACE_MARGIN_MB = 200
@@ -149,7 +155,7 @@ def run(work: Callable[[Task], object]) -> Task:
         except TranscribeError as exc:
             task.error = str(exc)
         except Exception as exc:  # noqa: BLE001 - the window shows it rather than crash
-            task.error = f"Erreur inattendue : {exc}"
+            task.error = translate("Transcribe", "Erreur inattendue : {exc}").format(exc=exc)
         finally:
             task.done = True
 
@@ -173,8 +179,10 @@ def fetch(url: str, target: Path, info: dict, task: Task, opener=urllib.request.
     free = library.free_mb(folder)
     if free and free < info["size"] / 2**20 + SPACE_MARGIN_MB:
         raise TranscribeError(
-            f"Pas assez de place dans {folder} : {free} Mo libres, "
-            f"{info['size'] // 2**20 + SPACE_MARGIN_MB} Mo nécessaires."
+            translate(
+                "Transcribe",
+                "Pas assez de place dans {folder} : {free} Mo libres, {size} Mo nécessaires.",
+            ).format(folder=folder, free=free, size=info["size"] // 2**20 + SPACE_MARGIN_MB)
         )
     part = target.with_suffix(".part")
     digest = hashlib.sha256()
@@ -184,23 +192,28 @@ def fetch(url: str, target: Path, info: dict, task: Task, opener=urllib.request.
         with opener(request, timeout=30) as response, part.open("wb") as f:
             while chunk := response.read(1 << 20):
                 if task.cancelled:
-                    raise TranscribeError("Téléchargement annulé.")
+                    raise TranscribeError(translate("Transcribe", "Téléchargement annulé."))
                 f.write(chunk)
                 digest.update(chunk)
                 got += len(chunk)
                 task.progress = got / info["size"]
-                task.status = f"{got / 2**20:.0f} / {info['size'] / 2**20:.0f} Mo"
+                task.status = i18n.progress(got, info["size"])
     except TranscribeError:
         part.unlink(missing_ok=True)
         raise
     except (OSError, http.client.HTTPException) as exc:  # a dropped connection: IncompleteRead
         part.unlink(missing_ok=True)
-        raise TranscribeError(f"Le téléchargement a échoué : {exc}") from exc
+        raise TranscribeError(
+            translate("Transcribe", "Le téléchargement a échoué : {exc}").format(exc=exc)
+        ) from exc
     if got != info["size"] or digest.hexdigest() != info["sha256"]:
         part.unlink(missing_ok=True)
         raise TranscribeError(
-            "Le fichier reçu ne correspond pas au modèle attendu (SHA-256) : "
-            "il a été supprimé. Réessayez."
+            translate(
+                "Transcribe",
+                "Le fichier reçu ne correspond pas au modèle attendu (SHA-256) : il a "
+                "été supprimé. Réessayez.",
+            )
         )
     os.replace(part, target)
     return target
@@ -242,16 +255,20 @@ def command(model: Path, wav: Path, out: Path, language: str) -> list[str]:
 def transcribe(path: Path, model_id: str, language: str, task: Task) -> dict:
     """{lines, language}: the lines with their times and their words' times, a draft to check."""
     if not engine_ready():
-        raise TranscribeError("Le moteur de transcription manque dans cette installation.")
+        raise TranscribeError(
+            translate("Transcribe", "Le moteur de transcription manque dans cette installation.")
+        )
     if not installed(model_id):
-        raise TranscribeError("Téléchargez d'abord un modèle de transcription.")
-    task.status = "Lecture de l'audio…"
+        raise TranscribeError(
+            translate("Transcribe", "Téléchargez d'abord un modèle de transcription.")
+        )
+    task.status = translate("Transcribe", "Lecture de l'audio…")
     try:
         y = audio.decode(path, RATE, 1, should_cancel=lambda: task.cancelled)[:, 0]
     except audio.AudioError as exc:
         raise TranscribeError(str(exc)) from exc
     if task.cancelled:
-        raise TranscribeError("Transcription annulée.")
+        raise TranscribeError(translate("Transcribe", "Transcription annulée."))
     # whisper-cli opens files with ANSI names: a Cyrillic or CJK folder would not open. So it runs
     # in the models folder (the working directory is passed as Unicode) and gets ASCII names.
     home = models_dir()
@@ -263,7 +280,7 @@ def transcribe(path: Path, model_id: str, language: str, task: Task) -> dict:
             w.setsampwidth(2)
             w.setframerate(RATE)
             w.writeframes((np.clip(y, -1, 1) * 32767).astype(np.int16).tobytes())
-        task.status = "Transcription…"
+        task.status = translate("Transcribe", "Transcription…")
         cmd = command(
             Path(model_info(model_id)["file"]), rel / "audio.wav", rel / "result", language
         )
@@ -290,7 +307,11 @@ def _run_engine(cmd: list[str], task: Task, cwd: Path | None = None) -> None:
             cwd=cwd,
         )
     except OSError as exc:
-        raise TranscribeError(f"Le moteur de transcription n'a pas démarré : {exc}") from exc
+        raise TranscribeError(
+            translate("Transcribe", "Le moteur de transcription n'a pas démarré : {exc}").format(
+                exc=exc
+            )
+        ) from exc
     task._process = process
     if task.cancelled:  # cancelled while starting: cancel() saw no process yet
         process.kill()
@@ -304,10 +325,12 @@ def _run_engine(cmd: list[str], task: Task, cwd: Path | None = None) -> None:
             tail = (tail + [line])[-8:]
     process.wait()
     if task.cancelled:
-        raise TranscribeError("Transcription annulée.")
+        raise TranscribeError(translate("Transcribe", "Transcription annulée."))
     if process.returncode:
         raise TranscribeError(
-            "La transcription a échoué : " + (" ".join(tail[-3:]) or f"code {process.returncode}")
+            translate("Transcribe", "La transcription a échoué : {reason}").format(
+                reason=" ".join(tail[-3:]) or f"code {process.returncode}"
+            )
         )
 
 

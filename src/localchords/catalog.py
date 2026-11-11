@@ -16,7 +16,10 @@ import time
 import unicodedata
 from pathlib import Path
 
+from PySide6.QtCore import QT_TRANSLATE_NOOP
+
 from . import library
+from .i18n import translate
 from .project import EXTENSION, Project, ProjectError
 
 FILE = "catalog.db"
@@ -63,14 +66,42 @@ CREATE TABLE IF NOT EXISTS members (
 """
 PERSONAL = ("favorite", "genre", "added_at", "added_estimated", "opened_at", "opened_estimated",
             "hidden")  # fmt: skip
-GENRES = ("Pop", "Rock", "Variété française", "Chanson", "Jazz", "Blues", "Folk", "Classique",
-          "Musique de film", "Électro", "Hip-hop", "Reggae", "Soul", "Country", "Métal",
-          "Musiques du monde")  # fmt: skip
-TAGS = ("Piano", "Guitare", "À apprendre", "À retravailler", "Maîtrisé")
+GENRES = (
+    "Pop",
+    "Rock",
+    QT_TRANSLATE_NOOP("Catalog", "Variété française"),
+    QT_TRANSLATE_NOOP("Catalog", "Chanson"),
+    "Jazz",
+    "Blues",
+    "Folk",
+    QT_TRANSLATE_NOOP("Catalog", "Classique"),
+    QT_TRANSLATE_NOOP("Catalog", "Musique de film"),
+    QT_TRANSLATE_NOOP("Catalog", "Électro"),
+    "Hip-hop",
+    "Reggae",
+    "Soul",
+    "Country",
+    QT_TRANSLATE_NOOP("Catalog", "Métal"),
+    QT_TRANSLATE_NOOP("Catalog", "Musiques du monde"),
+)
+TAGS = (
+    "Piano",
+    QT_TRANSLATE_NOOP("Catalog", "Guitare"),
+    QT_TRANSLATE_NOOP("Catalog", "À apprendre"),
+    QT_TRANSLATE_NOOP("Catalog", "À retravailler"),
+    QT_TRANSLATE_NOOP("Catalog", "Maîtrisé"),
+)
 SORTS = {
-    "opened": "Dernière ouverture", "added": "Date d'ajout", "title": "Titre", "artist": "Artiste",
-    "year": "Année", "genre": "Genre", "key": "Tonalité", "bpm": "Tempo", "duration": "Durée",
-}  # fmt: skip
+    "opened": QT_TRANSLATE_NOOP("Catalog", "Dernière ouverture"),
+    "added": QT_TRANSLATE_NOOP("Catalog", "Date d'ajout"),
+    "title": QT_TRANSLATE_NOOP("Catalog", "Titre"),
+    "artist": QT_TRANSLATE_NOOP("Catalog", "Artiste"),
+    "year": QT_TRANSLATE_NOOP("Catalog", "Année"),
+    "genre": QT_TRANSLATE_NOOP("Catalog", "Genre"),
+    "key": QT_TRANSLATE_NOOP("Catalog", "Tonalité"),
+    "bpm": QT_TRANSLATE_NOOP("Catalog", "Tempo"),
+    "duration": QT_TRANSLATE_NOOP("Catalog", "Durée"),
+}
 LATEST = 50  # songs in the "recently opened" and "latest added" views
 
 
@@ -163,7 +194,12 @@ class Catalog:
             self.db.execute("PRAGMA foreign_keys = ON")
             version = self.db.execute("PRAGMA user_version").fetchone()[0]
             if version > SCHEMA_VERSION:
-                raise CatalogError("La bibliothèque vient d'une version plus récente de LocalChords.")
+                raise CatalogError(
+                    translate(
+                        "Catalog",
+                        "La bibliothèque vient d'une version plus récente de LocalChords.",
+                    )
+                )
             with self.db:
                 self.db.executescript(SCHEMA)
                 self.db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -187,14 +223,22 @@ class Catalog:
         except sqlite3.IntegrityError:
             raise
         except sqlite3.Error as exc:
-            raise CatalogError(f"La bibliothèque n'a pas pu être enregistrée : {exc}") from exc
+            raise CatalogError(
+                translate("Catalog", "La bibliothèque n'a pas pu être enregistrée : {exc}").format(
+                    exc=exc
+                )
+            ) from exc
 
     def _many(self, sql: str, rows) -> None:
         try:
             with self.db:
                 self.db.executemany(sql, rows)
         except sqlite3.Error as exc:
-            raise CatalogError(f"La bibliothèque n'a pas pu être enregistrée : {exc}") from exc
+            raise CatalogError(
+                translate("Catalog", "La bibliothèque n'a pas pu être enregistrée : {exc}").format(
+                    exc=exc
+                )
+            ) from exc
 
     # Reading -----------------------------------------------------------------------------------
     def songs(self) -> list[dict]:
@@ -218,7 +262,9 @@ class Catalog:
         return {r[0] for r in self.db.execute("SELECT id FROM songs")}
 
     def tags(self) -> list[str]:
-        return sorted({r[0] for r in self.db.execute("SELECT tag FROM tags GROUP BY tag")}, key=folded)
+        return sorted(
+            {r[0] for r in self.db.execute("SELECT tag FROM tags GROUP BY tag")}, key=folded
+        )
 
     def genres(self) -> list[str]:
         return sorted({s["shown_genre"] for s in self.songs() if s["shown_genre"]}, key=folded)
@@ -296,8 +342,12 @@ class Catalog:
             files = {p.stem: p for p in folder.glob(f"*{EXTENSION}")} if folder.is_dir() else {}
             stats = {sid: p.stat() for sid, p in files.items()}
         except OSError as exc:
-            raise CatalogError(f"Le dossier des projets ne se lit pas : {exc}") from exc
-        known = {r["id"]: r for r in self.db.execute("SELECT id, mtime, size, project_state FROM songs")}
+            raise CatalogError(
+                translate("Catalog", "Le dossier des projets ne se lit pas : {exc}").format(exc=exc)
+            ) from exc
+        known = {
+            r["id"]: r for r in self.db.execute("SELECT id, mtime, size, project_state FROM songs")
+        }
         changed = [
             sid
             for sid, st in stats.items()
@@ -365,12 +415,17 @@ class Catalog:
     def set_genre(self, ids, genre: str | None) -> None:
         """None: back to the file's genre; "": none, whatever the file says."""
         value = genre.strip() if genre else genre
-        self._many("UPDATE songs SET genre = ? WHERE id = ?", [(value, s) for s in ids])
+        self._many(
+            "UPDATE songs SET genre = ? WHERE id = ?",
+            [(value, s) for s in ids],
+        )
 
     def add_tag(self, ids, tag: str) -> None:
         tag = tag.strip()
         if tag:
-            self._many("INSERT OR IGNORE INTO tags (id, tag) VALUES (?, ?)", [(s, tag) for s in ids])
+            self._many(
+                "INSERT OR IGNORE INTO tags (id, tag) VALUES (?, ?)", [(s, tag) for s in ids]
+            )
 
     def remove_tag(self, ids, tag: str) -> None:
         self._many("DELETE FROM tags WHERE id = ? AND tag = ?", [(s, tag) for s in ids])
@@ -387,26 +442,34 @@ class Catalog:
     def create_collection(self, name: str) -> int:
         name = name.strip()
         if not name:
-            raise CatalogError("Une collection a besoin d'un nom.")
+            raise CatalogError(translate("Catalog", "Une collection a besoin d'un nom."))
         try:
             with self.db:
                 cur = self.db.execute(
                     "INSERT INTO collections (name, created_at) VALUES (?, ?)", (name, time.time())
                 )
         except sqlite3.IntegrityError as exc:
-            raise CatalogError(f"Une collection s'appelle déjà « {name} ».") from exc
+            raise CatalogError(
+                translate("Catalog", "Une collection s'appelle déjà « {name} ».").format(name=name)
+            ) from exc
         except sqlite3.Error as exc:
-            raise CatalogError(f"La bibliothèque n'a pas pu être enregistrée : {exc}") from exc
+            raise CatalogError(
+                translate("Catalog", "La bibliothèque n'a pas pu être enregistrée : {exc}").format(
+                    exc=exc
+                )
+            ) from exc
         return int(cur.lastrowid)
 
     def rename_collection(self, cid: int, name: str) -> None:
         name = name.strip()
         if not name:
-            raise CatalogError("Une collection a besoin d'un nom.")
+            raise CatalogError(translate("Catalog", "Une collection a besoin d'un nom."))
         try:
             self._write("UPDATE collections SET name = ? WHERE cid = ?", (name, cid))
         except sqlite3.IntegrityError as exc:
-            raise CatalogError(f"Une collection s'appelle déjà « {name} ».") from exc
+            raise CatalogError(
+                translate("Catalog", "Une collection s'appelle déjà « {name} ».").format(name=name)
+            ) from exc
 
     def delete_collection(self, cid: int) -> None:
         """The collection only: its songs stay in the library."""
@@ -513,7 +576,11 @@ class Catalog:
                             (cid, sid, last + 1 + i),
                         )
         except sqlite3.Error as exc:
-            raise CatalogError(f"La bibliothèque n'a pas pu être enregistrée : {exc}") from exc
+            raise CatalogError(
+                translate("Catalog", "La bibliothèque n'a pas pu être enregistrée : {exc}").format(
+                    exc=exc
+                )
+            ) from exc
 
     def backup_daily(self, folder: Path, keep: int = KEEP_BACKUPS) -> Path | None:
         """A copy of the catalog for today, if none yet, the oldest beyond keep removed. An empty
@@ -547,19 +614,27 @@ def open_catalog(data: Path) -> tuple[Catalog, str | None]:
     problem = library.unwritable(data)
     if problem:
         return Catalog(":memory:"), (
-            f"La bibliothèque ne peut pas être enregistrée ici ({problem}) : favoris et collections "
-            "seront oubliés à la fermeture."
+            translate(
+                "Catalog",
+                "La bibliothèque ne peut pas être enregistrée ici ({problem}) : favoris "
+                "et collections seront oubliés à la fermeture.",
+            ).format(problem=problem)
         )
     try:
         catalog = Catalog(path)
         catalog.check()
         return catalog, None
     except CatalogError as exc:
-        return Catalog(":memory:"), f"{exc} Elle n'est pas modifiée ; rien ne sera retenu."
+        return Catalog(":memory:"), translate(
+            "Catalog", "{exc} Elle n'est pas modifiée ; rien ne sera retenu."
+        ).format(exc=exc)
     except sqlite3.OperationalError as exc:  # locked, busy, cannot open: not damage
         return Catalog(":memory:"), (
-            f"La bibliothèque ne s'ouvre pas ({exc}) ; elle n'est pas modifiée. Favoris et "
-            "collections de cette session seront oubliés à la fermeture."
+            translate(
+                "Catalog",
+                "La bibliothèque ne s'ouvre pas ({exc}) ; elle n'est pas modifiée. "
+                "Favoris et collections de cette session seront oubliés à la fermeture.",
+            ).format(exc=exc)
         )
     except sqlite3.DatabaseError:
         pass
@@ -569,7 +644,9 @@ def open_catalog(data: Path) -> tuple[Catalog, str | None]:
         path.replace(aside)
         path.with_name(FILE + "-journal").unlink(missing_ok=True)
     except OSError:
-        return Catalog(":memory:"), "La bibliothèque est endommagée et ne peut être remplacée."
+        return Catalog(":memory:"), translate(
+            "Catalog", "La bibliothèque est endommagée et ne peut être remplacée."
+        )
     for copy in sorted((data / BACKUPS).glob("catalog-*.db"), reverse=True):
         try:
             path.write_bytes(copy.read_bytes())
@@ -580,13 +657,21 @@ def open_catalog(data: Path) -> tuple[Catalog, str | None]:
             continue
         day = copy.stem.removeprefix("catalog-")
         return catalog, (
-            f"L'index de la bibliothèque était endommagé ; il a été remis en place depuis sa copie "
-            f"du {day} et mis à jour d'après les projets. L'ancien fichier est gardé : {aside.name}."
+            translate(
+                "Catalog",
+                "L'index de la bibliothèque était endommagé ; il a été remis en place "
+                "depuis sa copie du {day} et mis à jour d'après les projets. L'ancien "
+                "fichier est gardé : {name}.",
+            ).format(day=day, name=aside.name)
         )
     return Catalog(path), (
-        "L'index de la bibliothèque était endommagé et n'avait pas de copie lisible : il est "
-        "reconstruit d'après les projets, sans les favoris, étiquettes et collections. "
-        f"L'ancien fichier est gardé : {aside.name}. Une sauvegarde de bibliothèque peut les rendre."
+        translate(
+            "Catalog",
+            "L'index de la bibliothèque était endommagé et n'avait pas de copie "
+            "lisible : il est reconstruit d'après les projets, sans les favoris, "
+            "étiquettes et collections. L'ancien fichier est gardé : {name}. Une "
+            "sauvegarde de bibliothèque peut les rendre.",
+        ).format(name=aside.name)
     )
 
 
@@ -616,9 +701,15 @@ def _sort_value(song: dict, sort: str):
 
 def matches(song: dict, words: list[str]) -> bool:
     text = " ".join(
-        [song["title"], song["artist"], song["album"], song["shown_genre"] or "", *song["tags"],
-         str(song["year"] or "")]
-    )  # fmt: skip
+        [
+            song["title"],
+            song["artist"],
+            song["album"],
+            song["shown_genre"] or "",
+            *song["tags"],
+            str(song["year"] or ""),
+        ]
+    )
     hay = folded(text)
     return all(w in hay for w in words)
 

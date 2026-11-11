@@ -324,10 +324,12 @@ def run(audio_path: Path, out: Path) -> int:
         rows = window.home.model.rows
         step(
             "bibliothèque : index SQLite, favori, page d'accueil",
-            len(rows) == 1 and rows[0]["favorite"] == 1 and bool(rows[0]["opened_at"])
+            len(rows) == 1
+            and rows[0]["favorite"] == 1
+            and bool(rows[0]["opened_at"])
             and window.home.pages.currentWidget() is window.home.table,
             songs=len(rows),
-        )  # fmt: skip
+        )
         window.close()
         report["ok"] = True
     except Exception:  # noqa: BLE001 - the report must say what broke

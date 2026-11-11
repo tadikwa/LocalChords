@@ -3,17 +3,68 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMenu,
+    QMessageBox,
     QSizePolicy,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
+from .. import i18n, library
+from ..i18n import translate
 from . import theme
+
+
+def language_menu(menu: QMenu, settings: dict) -> QMenu:
+    """« Langue / Language »: Automatique (Windows' language), Français, English. Named in both
+    languages, and each language in itself, so that it can be found whatever the interface says.
+    The choice takes effect at the next start."""
+    sub = menu.addMenu("Langue / Language")
+    sub.setObjectName("language")
+    group = QActionGroup(sub)
+    actions = {}
+    for choice in i18n.CHOICES:
+        if choice == "auto":
+            text = translate("Widgets", "Automatique ({language})").format(
+                language=i18n.NAMES[i18n.system_language()]
+            )
+        else:
+            text = i18n.NAMES[choice]
+        action = sub.addAction(text)
+        action.setCheckable(True)
+        action.setData(choice)
+        group.addAction(action)
+        actions[choice] = action
+
+    def sync():  # the other screen's menu may have changed it
+        actions.get(settings.get("language"), actions["auto"]).setChecked(True)
+
+    def chosen(action):
+        choice = action.data()
+        if choice == settings.get("language"):
+            return
+        settings["language"] = choice
+        library.save_settings(settings)
+        language = i18n.resolve(choice)
+        if language != i18n.current():
+            # In both languages: the one being left and the one chosen.
+            box = QMessageBox(QMessageBox.Icon.Information, "Langue / Language", "", parent=menu)
+            box.setText(
+                f"LocalChords s'affichera en {i18n.NAMES[language]} au prochain démarrage.\n"
+                f"LocalChords will be in {i18n.NAMES[language]} the next time it starts."
+            )
+            box.exec()
+
+    sub.aboutToShow.connect(sync)
+    group.triggered.connect(chosen)
+    sync()
+    return sub
 
 
 def fmt_time(seconds: float) -> str:
@@ -70,11 +121,11 @@ class Stepper(QWidget):
         self.minus = QToolButton()
         self.minus.setObjectName("step")
         self.minus.setIcon(theme.icon("minus", size=14))
-        self.minus.setAccessibleName(f"{label} : moins")
+        self.minus.setAccessibleName(translate("Widgets", "{label} : moins").format(label=label))
         self.plus = QToolButton()
         self.plus.setObjectName("step")
         self.plus.setIcon(theme.icon("plus", size=14))
-        self.plus.setAccessibleName(f"{label} : plus")
+        self.plus.setAccessibleName(translate("Widgets", "{label} : plus").format(label=label))
         middle = QVBoxLayout()
         middle.setSpacing(0)
         caption = QLabel(label)

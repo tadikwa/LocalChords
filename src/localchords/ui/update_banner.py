@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import QT_TRANSLATE_NOOP, Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QAction,
     QColor,
@@ -36,20 +36,23 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__, library, transcribe, updates
+from ..i18n import translate
 from . import theme
 from .widgets import ElidedLabel
 
 SAID = 6000  # ms a "nothing new" message stays
 
-CHANGED = (
+CHANGED = QT_TRANSLATE_NOOP(
+    "Updates",
     "Le fichier téléchargé a changé depuis sa vérification : il a été supprimé, rien n'a été "
-    "lancé. Téléchargez-le à nouveau."
+    "lancé. Téléchargez-le à nouveau.",
 )
 
-NOT_SIGNED = (
+NOT_SIGNED = QT_TRANSLATE_NOOP(
+    "Updates",
     "LocalChords n'est pas signé numériquement : Windows SmartScreen peut afficher un "
     "avertissement. Le fichier a été vérifié (taille et SHA-256 identiques à ceux publiés sur "
-    "GitHub), ce qui garantit qu'il est intact, pas qui l'a publié."
+    "GitHub), ce qui garantit qu'il est intact, pas qui l'a publié.",
 )
 
 
@@ -69,7 +72,7 @@ class UpdateBanner(QWidget):
     def __init__(self):
         super().__init__()
         self.setObjectName("bar")
-        self.setAccessibleName("Mise à jour de LocalChords")
+        self.setAccessibleName(translate("Updates", "Mise à jour de LocalChords"))
         row = QHBoxLayout(self)
         row.setContentsMargins(16, 6, 8, 6)
         row.setSpacing(6)
@@ -79,14 +82,16 @@ class UpdateBanner(QWidget):
         self.bar.setRange(0, 1000)
         self.bar.setTextVisible(False)
         self.bar.setFixedSize(140, 6)
-        self.bar.setAccessibleName("Progression du téléchargement")
+        self.bar.setAccessibleName(translate("Updates", "Progression du téléchargement"))
         self.buttons = QHBoxLayout()
         self.buttons.setSpacing(2)
         self.close_button = QToolButton()
         self.close_button.setObjectName("step")
         self.close_button.setIcon(theme.icon("close", size=14))
-        self.close_button.setToolTip("Masquer jusqu'au prochain démarrage")
-        self.close_button.setAccessibleName("Masquer le message de mise à jour")
+        self.close_button.setToolTip(translate("Updates", "Masquer jusqu'au prochain démarrage"))
+        self.close_button.setAccessibleName(
+            translate("Updates", "Masquer le message de mise à jour")
+        )
         row.addWidget(self.text, 1)
         row.addWidget(self.bar)
         row.addLayout(self.buttons)
@@ -181,7 +186,7 @@ def _theme_links(doc: QTextDocument) -> None:
 
 def notes_dialog(parent, release: dict) -> QDialog:
     dialog = QDialog(parent)
-    dialog.setWindowTitle(f"Nouveautés de {release['name']}")
+    dialog.setWindowTitle(translate("Updates", "Nouveautés de {name}").format(name=release["name"]))
     dialog.resize(620, 520)
     layout = QVBoxLayout(dialog)
     layout.setContentsMargins(20, 18, 20, 14)
@@ -189,19 +194,27 @@ def notes_dialog(parent, release: dict) -> QDialog:
     title.setTextFormat(Qt.TextFormat.PlainText)  # a name from the web: never read as HTML
     title.setObjectName("h1")
     layout.addWidget(title)
-    when = f"Publiée le {release['published']} · " if release["published"] else ""
-    sub = QLabel(f"{when}vous avez la version {__version__}")
+    when = (
+        translate("Updates", "Publiée le {published} · ").format(published=release["published"])
+        if release["published"]
+        else ""
+    )
+    sub = QLabel(
+        translate("Updates", "{when}vous avez la version {version}").format(
+            when=when, version=__version__
+        )
+    )
     sub.setObjectName("muted")
     layout.addWidget(sub)
     browser = SafeBrowser()
     browser.document().setMarkdown(
-        release["body"] or "_Pas de notes pour cette version._",
+        release["body"] or translate("Updates", "_Pas de notes pour cette version._"),
         QTextDocument.MarkdownFeature.MarkdownDialectGitHub
         | QTextDocument.MarkdownFeature.MarkdownNoHTML,
     )
     _theme_links(browser.document())
     layout.addWidget(browser, 1)
-    link = QPushButton("Voir la version sur GitHub")
+    link = QPushButton(translate("Updates", "Voir la version sur GitHub"))
     link.setObjectName("link")
     link.clicked.connect(lambda: SafeBrowser._open(QUrl(release["url"])))
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
@@ -235,21 +248,27 @@ class UpdateController:
         self.timer = QTimer(window)
         self.timer.setInterval(100)
         self.timer.timeout.connect(self._poll)
-        self.check_action = QAction("Rechercher des mises à jour…", window)
+        self.check_action = QAction(translate("Updates", "Rechercher des mises à jour…"), window)
         self.check_action.triggered.connect(lambda: self.check(manual=True))
         self.auto_action = QAction(
-            "Vérifier automatiquement les mises à jour au démarrage", window, checkable=True
+            translate("Updates", "Vérifier automatiquement les mises à jour au démarrage"),
+            window,
+            checkable=True,
         )
         self.auto_action.setToolTip(
-            "Une requête anonyme à GitHub au plus une fois par jour : aucun identifiant, rien "
-            "sur vos morceaux. Rien n'est téléchargé sans votre accord."
+            translate(
+                "Updates",
+                "Une requête anonyme à GitHub au plus une fois par jour : aucun "
+                "identifiant, rien sur vos morceaux. Rien n'est téléchargé sans votre "
+                "accord.",
+            )
         )
         self.sync()
         self.auto_action.toggled.connect(self._auto_changed)
 
     def add_to(self, menu) -> None:
         """Into a "more" menu, just before its keyboard shortcuts and about entries."""
-        before = next((a for a in menu.actions() if a.text() == "Raccourcis clavier"), None)
+        before = next((a for a in menu.actions() if a.objectName() == "shortcuts"), None)
         menu.insertAction(before, self.check_action)
         menu.insertAction(before, self.auto_action)
         menu.insertSeparator(before)
@@ -285,9 +304,16 @@ class UpdateController:
         auto = self.settings.get("update_auto")
         if auto is None:
             self.banner.show_state(
-                "Voulez-vous que LocalChords vérifie au démarrage si une nouvelle version est "
-                "publiée ? Une requête anonyme à GitHub, au plus une fois par jour.",
-                [("Oui, vérifier", self._consent), ("Non merci", self._decline)],
+                translate(
+                    "Updates",
+                    "Voulez-vous que LocalChords vérifie au démarrage si une nouvelle "
+                    "version est publiée ? Une requête anonyme à GitHub, au plus une fois "
+                    "par jour.",
+                ),
+                [
+                    (translate("Updates", "Oui, vérifier"), self._consent),
+                    (translate("Updates", "Non merci"), self._decline),
+                ],
             )
         elif auto:
             self.check(manual=False)
@@ -295,7 +321,7 @@ class UpdateController:
     def _consent(self) -> None:
         self.w._remember("update_auto", True)
         self.sync()
-        self.banner.show_state("Recherche d'une nouvelle version…", [])
+        self.banner.show_state(translate("Updates", "Recherche d'une nouvelle version…"), [])
         self.check(manual=False)
 
     def _decline(self) -> None:
@@ -315,13 +341,15 @@ class UpdateController:
         if self.task is not None:
             if manual and self._job == "check":
                 self._manual = True  # its answer is said, as asked
-                self.banner.show_state("Recherche d'une nouvelle version…", [])
+                self.banner.show_state(
+                    translate("Updates", "Recherche d'une nouvelle version…"), []
+                )
             elif manual:
                 self._quiet = False
                 self.banner.show()
             return
         if manual:
-            self.banner.show_state("Recherche d'une nouvelle version…", [])
+            self.banner.show_state(translate("Updates", "Recherche d'une nouvelle version…"), [])
         cache = self.settings.get("update_cache")
         self._manual = manual
         self._job = "check"
@@ -343,7 +371,12 @@ class UpdateController:
             self._offer(found)
         elif self._manual:
             self.release = None
-            self.banner.show_state(f"LocalChords {__version__} est à jour.", [])
+            self.banner.show_state(
+                translate("Updates", "LocalChords {version} est à jour.").format(
+                    version=__version__
+                ),
+                [],
+            )
             QTimer.singleShot(SAID, self._hide_said)
         elif self.banner.isVisible() and self.release is None:
             self.banner.hide_state()
@@ -358,12 +391,14 @@ class UpdateController:
     def _offer(self, release: dict) -> None:
         self.release = release
         self.banner.show_state(
-            f"LocalChords {release['version']} est disponible (vous avez la {__version__}).",
+            translate(
+                "Updates", "LocalChords {version} est disponible (vous avez la {version2})."
+            ).format(version=release["version"], version2=__version__),
             [
-                ("Nouveautés", self.show_notes),
-                ("Télécharger", self.fetch),
-                ("Plus tard", self.later),
-                ("Ignorer cette version", self.skip),
+                (translate("Updates", "Nouveautés"), self.show_notes),
+                (translate("Updates", "Télécharger"), self.fetch),
+                (translate("Updates", "Plus tard"), self.later),
+                (translate("Updates", "Ignorer cette version"), self.skip),
             ],
         )
 
@@ -388,7 +423,9 @@ class UpdateController:
         asset = updates.asset_for(release, self.kind)
         if asset is None:
             self._failed(
-                f"La version {release['tag']} ne propose pas de fichier pour cette installation.",
+                translate(
+                    "Updates", "La version {tag} ne propose pas de fichier pour cette installation."
+                ).format(tag=release["tag"]),
                 self.fetch,
             )
             return
@@ -398,7 +435,7 @@ class UpdateController:
         self._job = "fetch"
         self._quiet = False
         self.task = _run(lambda task: updates.download(release, self.kind, folder, task))
-        self._downloading(0.0, "Vérification des sommes de contrôle…")
+        self._downloading(0.0, translate("Updates", "Vérification des sommes de contrôle…"))
         self.timer.start()
 
     def _folder(self, asset: dict) -> Path | None:
@@ -408,31 +445,43 @@ class UpdateController:
         free = library.free_mb(folder) if why is None else 0
         if why is None and (not free or free >= need):
             return folder
-        problem = why or f"il ne reste que {free} Mo libres ({need} Mo nécessaires)"
-        text = f"Le fichier ne peut pas être enregistré dans {folder} : {problem}."
+        problem = why or translate(
+            "Updates", "il ne reste que {free} Mo libres ({need} Mo nécessaires)"
+        ).format(free=free, need=need)
+        text = translate(
+            "Updates", "Le fichier ne peut pas être enregistré dans {folder} : {problem}."
+        ).format(folder=folder, problem=problem)
         if self.kind == "portable":
-            text += (
-                "\n\nVous pouvez choisir un autre dossier. Attention : la nouvelle version, "
-                "lancée depuis ailleurs, n'utilisera pas le dossier Data d'ici, sauf si vous "
-                "la replacez à côté de l'ancienne. LocalChords ne copie ni ne déplace Data."
+            text += translate(
+                "Updates",
+                "\n\nVous pouvez choisir un autre dossier. Attention : la nouvelle "
+                "version, lancée depuis ailleurs, n'utilisera pas le dossier Data d'ici, "
+                "sauf si vous la replacez à côté de l'ancienne. LocalChords ne copie ni "
+                "ne déplace Data.",
             )
         box = QMessageBox(self.w)
         box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Mise à jour")
+        box.setWindowTitle(translate("Updates", "Mise à jour"))
         box.setText(text)
-        choose = box.addButton("Choisir un dossier…", QMessageBox.ButtonRole.AcceptRole)
-        box.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
+        choose = box.addButton(
+            translate("Updates", "Choisir un dossier…"), QMessageBox.ButtonRole.AcceptRole
+        )
+        box.addButton(translate("Updates", "Annuler"), QMessageBox.ButtonRole.RejectRole)
         box.exec()
         if box.clickedButton() is not choose:
             return None
-        chosen = QFileDialog.getExistingDirectory(self.w, "Enregistrer la nouvelle version dans")
+        chosen = QFileDialog.getExistingDirectory(
+            self.w, translate("Updates", "Enregistrer la nouvelle version dans")
+        )
         return Path(chosen) if chosen else None
 
     def _downloading(self, progress: float, status: str) -> None:
         name = self.release["version"] if self.release else ""
         self.banner.show_state(
-            f"Téléchargement de LocalChords {name} : {status}",
-            [("Annuler", self.cancel)],
+            translate("Updates", "Téléchargement de LocalChords {name} : {status}").format(
+                name=name, status=status
+            ),
+            [(translate("Updates", "Annuler"), self.cancel)],
             progress,
             show=not self._quiet,
         )
@@ -458,23 +507,34 @@ class UpdateController:
         version = str(ready["tag"]).lstrip("v")
         path = Path(ready["path"])
         if ready["kind"] == "installed":
-            text = f"LocalChords {version} est téléchargé et vérifié, prêt à être installé."
-            actions = [("Installer maintenant", self.install), ("Plus tard", self.later)]
-        elif ready["kind"] == "portable":
-            text = f"La nouvelle version est prête : {path.name}, à côté de l'actuelle."
-            if path.parent != Path(sys.executable).parent:
-                text = f"La nouvelle version est prête : {path}."
+            text = translate(
+                "Updates", "LocalChords {version} est téléchargé et vérifié, prêt à être installé."
+            ).format(version=version)
             actions = [
-                ("Lancer la nouvelle version", self.install),
-                ("Ouvrir le dossier", self.reveal),
-                ("Plus tard", self.later),
+                (translate("Updates", "Installer maintenant"), self.install),
+                (translate("Updates", "Plus tard"), self.later),
+            ]
+        elif ready["kind"] == "portable":
+            text = translate(
+                "Updates", "La nouvelle version est prête : {name}, à côté de l'actuelle."
+            ).format(name=path.name)
+            if path.parent != Path(sys.executable).parent:
+                text = translate("Updates", "La nouvelle version est prête : {path}.").format(
+                    path=path
+                )
+            actions = [
+                (translate("Updates", "Lancer la nouvelle version"), self.install),
+                (translate("Updates", "Ouvrir le dossier"), self.reveal),
+                (translate("Updates", "Plus tard"), self.later),
             ]
         else:
-            text = f"Archive de LocalChords {version} vérifiée : {path.name}."
+            text = translate(
+                "Updates", "Archive de LocalChords {version} vérifiée : {name}."
+            ).format(version=version, name=path.name)
             actions = [
-                ("Ouvrir le dossier", self.reveal),
-                ("Comment la mettre en place ?", self.explain_zip),
-                ("Plus tard", self.later),
+                (translate("Updates", "Ouvrir le dossier"), self.reveal),
+                (translate("Updates", "Comment la mettre en place ?"), self.explain_zip),
+                (translate("Updates", "Plus tard"), self.later),
             ]
         self.banner.show_state(text, actions)
 
@@ -482,20 +542,26 @@ class UpdateController:
         try:
             subprocess.Popen(["explorer", "/select,", str(self.ready["path"])])  # noqa: S603, S607
         except OSError as exc:
-            self._failed(f"L'Explorateur ne s'ouvre pas : {exc}", self.reveal)
+            self._failed(
+                translate("Updates", "L'Explorateur ne s'ouvre pas : {exc}").format(exc=exc),
+                self.reveal,
+            )
 
     def explain_zip(self) -> None:
         QMessageBox.information(
             self.w,
-            "Mettre en place la nouvelle version",
-            "1. Fermez LocalChords.\n"
-            "2. Décompressez l'archive dans un nouveau dossier.\n"
-            "3. Si votre dossier actuel contient LocalChords.portable et un dossier Data, "
-            "copiez-les dans le nouveau dossier.\n"
-            "4. Lancez LocalChords.exe depuis le nouveau dossier, puis supprimez l'ancien "
-            "quand tout va bien.\n\n"
-            "Sans LocalChords.portable, vos projets restent dans %LOCALAPPDATA%\\LocalChords et "
-            "sont retrouvés par la nouvelle version.\n\n" + NOT_SIGNED,
+            translate("Updates", "Mettre en place la nouvelle version"),
+            translate(
+                "Updates",
+                "1. Fermez LocalChords.\n2. Décompressez l'archive dans un nouveau "
+                "dossier.\n3. Si votre dossier actuel contient LocalChords.portable et un "
+                "dossier Data, copiez-les dans le nouveau dossier.\n4. Lancez "
+                "LocalChords.exe depuis le nouveau dossier, puis supprimez l'ancien "
+                "quand tout va bien.\n\nSans LocalChords.portable, vos projets restent "
+                "dans %LOCALAPPDATA%\\LocalChords et sont retrouvés par la nouvelle "
+                "version.\n\n",
+            )
+            + translate("Updates", NOT_SIGNED),
         )
 
     def install(self) -> None:
@@ -503,40 +569,44 @@ class UpdateController:
         ready = self.ready
         version = str(ready["tag"]).lstrip("v")
         if ready["kind"] == "installed":
-            title = "Installer la mise à jour"
-            text = (
-                f"Installer LocalChords {version} maintenant ?\n\n"
-                "Votre travail est enregistré, LocalChords se ferme et l'installateur officiel "
-                "s'ouvre. Vos projets, paroles corrigées et préférences sont conservés."
-            )
-            go = "Installer"
+            title = translate("Updates", "Installer la mise à jour")
+            text = translate(
+                "Updates",
+                "Installer LocalChords {version} maintenant ?\n\nVotre travail est "
+                "enregistré, LocalChords se ferme et l'installateur officiel s'ouvre. "
+                "Vos projets, paroles corrigées et préférences sont conservés.",
+            ).format(version=version)
+            go = translate("Updates", "Installer")
         else:
-            title = "Lancer la nouvelle version"
-            text = (
-                f"Lancer LocalChords {version} ?\n\nVotre travail est enregistré, cette version "
-                "se ferme et la nouvelle s'ouvre. L'ancien programme reste en place : vous "
-                "pourrez le supprimer ensuite."
-            )
-            go = "Lancer"
+            title = translate("Updates", "Lancer la nouvelle version")
+            text = translate(
+                "Updates",
+                "Lancer LocalChords {version} ?\n\nVotre travail est enregistré, cette "
+                "version se ferme et la nouvelle s'ouvre. L'ancien programme reste en "
+                "place : vous pourrez le supprimer ensuite.",
+            ).format(version=version)
+            go = translate("Updates", "Lancer")
         box = QMessageBox(self.w)
         box.setWindowTitle(title)
         box.setText(text)
-        box.setInformativeText(NOT_SIGNED)
+        box.setInformativeText(translate("Updates", NOT_SIGNED))
         yes = box.addButton(go, QMessageBox.ButtonRole.AcceptRole)
-        box.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
+        box.addButton(translate("Updates", "Annuler"), QMessageBox.ButtonRole.RejectRole)
         box.exec()
         if box.clickedButton() is not yes:
             return
         path = Path(ready["path"])
         if not self._intact(path, ready):
-            self._failed(CHANGED, self.check_again)
+            self._failed(translate("Updates", CHANGED), self.check_again)
             return
         self.w._remember("update_ready", None if ready["kind"] != "installed" else ready)
         self.w.close()
         if self.w.isVisible():
             return
         if not self._intact(path, ready):  # once more, as late as possible: closing takes time
-            QMessageBox.warning(None, "Mise à jour", CHANGED)
+            QMessageBox.warning(
+                None, translate("Updates", "Mise à jour"), translate("Updates", CHANGED)
+            )
             return
         launch(path)
 
@@ -549,7 +619,13 @@ class UpdateController:
 
     # Plumbing ----------------------------------------------------------------------------------
     def _failed(self, error: str, retry) -> None:
-        self.banner.show_state(error, [("Réessayer", retry), ("Ouvrir GitHub", self.open_github)])
+        self.banner.show_state(
+            error,
+            [
+                (translate("Updates", "Réessayer"), retry),
+                (translate("Updates", "Ouvrir GitHub"), self.open_github),
+            ],
+        )
 
     def open_github(self) -> None:
         url = self.release["url"] if self.release else updates.RELEASES + "/latest"

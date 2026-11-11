@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import voicings
+from ..i18n import translate
 from . import theme
 from .widgets import segmented
 
@@ -161,7 +162,7 @@ class GuitarDiagram(_Diagram):
         self.capo = 0
         self.message = ""
         self.compact = False
-        self.setAccessibleName("Diagramme de guitare")
+        self.setAccessibleName(translate("Diagrams", "Diagramme de guitare"))
 
     def set_fingering(self, fingering, chord, capo: int, message: str = "", animate=True) -> None:
         self.fingering, self.chord, self.capo, self.message = fingering, chord, capo, message
@@ -283,11 +284,15 @@ def describe_fingering(f: voicings.Fingering, chord: voicings.Chord | None) -> s
     parts = []
     for s, fret in enumerate(f.frets):
         if fret is None:
-            parts.append(f"corde {STRINGS[s]} étouffée")
+            parts.append(translate("Diagrams", "corde {string} étouffée").format(string=STRINGS[s]))
         elif fret == 0:
-            parts.append(f"corde {STRINGS[s]} à vide")
+            parts.append(translate("Diagrams", "corde {string} à vide").format(string=STRINGS[s]))
         else:
-            parts.append(f"corde {STRINGS[s]} case {fret} doigt {f.fingers[s]}")
+            parts.append(
+                translate("Diagrams", "corde {string} case {fret} doigt {finger}").format(
+                    string=STRINGS[s], fret=fret, finger=f.fingers[s]
+                )
+            )
     head = f"{chord.title} : " if chord else ""
     return f"{head}{f.text}, {f.kind.lower()}. " + ", ".join(parts) + "."
 
@@ -303,7 +308,7 @@ class PianoDiagram(_Diagram):
         self.message = ""
         self.compact = False
         self.fit = False  # two octaves or more around the chord instead of C3 to B5
-        self.setAccessibleName("Clavier de piano")
+        self.setAccessibleName(translate("Diagrams", "Clavier de piano"))
 
     def set_voicing(self, voicing, chord, message: str = "", animate=True) -> None:
         self.voicing, self.chord, self.message = voicing, chord, message
@@ -363,7 +368,10 @@ class PianoDiagram(_Diagram):
 
         if hands_h:
             p.setFont(theme.app_font(11, 600))
-            for notes, text, tint in ((v.left, "MG", theme.SELECT), (v.right, "MD", theme.ACCENT)):
+            for notes, text, tint in (
+                (v.left, translate("Diagrams", "MG", "main gauche"), theme.SELECT),
+                (v.right, translate("Diagrams", "MD", "main droite"), theme.ACCENT),
+            ):
                 middle = (centers[min(notes)] + centers[max(notes)]) / 2
                 p.setPen(QColor(tint))
                 p.drawText(QRectF(middle - 30, y0 - hands_h, 60, hands_h - 2),
@@ -399,11 +407,15 @@ def describe_voicing(v: voicings.PianoVoicing, chord: voicings.Chord | None) -> 
         return ", ".join(f"{names.get(n % 12, '?')}{n // 12 - 1}" for n in notes)
 
     if v.left:
-        text = f"main gauche {spell(v.left)} ; main droite {spell(v.right)}"
+        text = translate("Diagrams", "main gauche {left} ; main droite {right}").format(
+            left=spell(v.left), right=spell(v.right)
+        )
     else:
         text = spell(v.right)
     head = f"{chord.title} : " if chord else ""
-    return f"{head}{v.name.lower()}, de la plus grave à la plus aiguë : {text}."
+    return translate(
+        "Diagrams", "{head}{lower}, de la plus grave à la plus aiguë : {text}."
+    ).format(head=head, lower=v.name.lower(), text=text)
 
 
 class _Instrument(QWidget):
@@ -430,8 +442,14 @@ class _Instrument(QWidget):
         self.prev = QToolButton()
         self.prev.setObjectName("step")
         self.prev.setIcon(theme.icon("left", size=14))
-        self.prev.setAccessibleName(f"{title} : position précédente")
-        self.prev.setToolTip(f"Position précédente (Maj + {key})" if key else "Position précédente")
+        self.prev.setAccessibleName(
+            translate("Diagrams", "{title} : position précédente").format(title=title)
+        )
+        self.prev.setToolTip(
+            translate("Diagrams", "Position précédente (Maj + {key})").format(key=key)
+            if key
+            else translate("Diagrams", "Position précédente")
+        )
         self.count = QLabel()
         self.count.setObjectName("caption")
         self.count.setMinimumWidth(34)
@@ -439,8 +457,14 @@ class _Instrument(QWidget):
         self.next = QToolButton()
         self.next.setObjectName("step")
         self.next.setIcon(theme.icon("right", size=14))
-        self.next.setAccessibleName(f"{title} : position suivante")
-        self.next.setToolTip(f"Position suivante ({key})" if key else "Position suivante")
+        self.next.setAccessibleName(
+            translate("Diagrams", "{title} : position suivante").format(title=title)
+        )
+        self.next.setToolTip(
+            translate("Diagrams", "Position suivante ({key})").format(key=key)
+            if key
+            else translate("Diagrams", "Position suivante")
+        )
         row.addWidget(name)
         if kind_below:  # a narrow card: the position's name gets its own line instead of being cut
             row.addStretch(1)
@@ -501,15 +525,18 @@ class ChordPanel(QFrame):
         titles.setSpacing(0)
         self.title = QLabel("—")
         self.title.setObjectName("panelChord")
-        self.title.setAccessibleName("Accord des diagrammes")
+        self.title.setAccessibleName(translate("Diagrams", "Accord des diagrammes"))
         self.status = QLabel()
         self.status.setObjectName("caption")
         self.status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.follow = QPushButton("Suivre la lecture")
+        self.follow = QPushButton(translate("Diagrams", "Suivre la lecture"))
         self.follow.setObjectName("link")
         self.follow.setToolTip(
-            "Les diagrammes restent sur l'accord cliqué. Revenir à l'accord joué (Échap) ; "
-            "lancer la lecture y revient aussi."
+            translate(
+                "Diagrams",
+                "Les diagrammes restent sur l'accord cliqué. Revenir à l'accord joué "
+                "(Échap) ; lancer la lecture y revient aussi.",
+            )
         )
         self.follow.setCursor(Qt.CursorShape.PointingHandCursor)
         self.follow.hide()
@@ -526,8 +553,8 @@ class ChordPanel(QFrame):
         self.hide_button = QToolButton()
         self.hide_button.setObjectName("step")
         self.hide_button.setIcon(theme.icon("close", size=14))
-        self.hide_button.setAccessibleName("Masquer les diagrammes")
-        self.hide_button.setToolTip("Masquer les diagrammes (D)")
+        self.hide_button.setAccessibleName(translate("Diagrams", "Masquer les diagrammes"))
+        self.hide_button.setToolTip(translate("Diagrams", "Masquer les diagrammes (D)"))
         head.addWidget(self.resize_button, 0, Qt.AlignmentFlag.AlignTop)
         head.addWidget(self.hide_button, 0, Qt.AlignmentFlag.AlignTop)
         lead.addLayout(head)
@@ -538,10 +565,20 @@ class ChordPanel(QFrame):
         modes.setSpacing(4)
         self.mode_group = QButtonGroup(self)
         self.mode_buttons = {}
-        for mode, text in zip(MODES, ("Guitare", "Piano", "Les deux"), strict=True):
+        for mode, text in zip(
+            MODES,
+            (
+                translate("Diagrams", "Guitare"),
+                translate("Diagrams", "Piano"),
+                translate("Diagrams", "Les deux"),
+            ),
+            strict=True,
+        ):
             b = QPushButton(text)
             b.setCheckable(True)
-            b.setAccessibleName(f"Diagrammes : {text.lower()}")
+            b.setAccessibleName(
+                translate("Diagrams", "Diagrammes : {lower}").format(lower=text.lower())
+            )
             self.mode_group.addButton(b)
             self.mode_buttons[mode] = b
             b.clicked.connect(lambda _=False, m=mode: self._choose_mode(m))
@@ -558,18 +595,24 @@ class ChordPanel(QFrame):
         self.outer.addWidget(self.lead)
 
         self.guitar = _Instrument(
-            "Guitare",
+            translate("Diagrams", "Guitare"),
             GuitarDiagram(),
             "G",
-            "Accordage standard. Les doigts sont une suggestion : 1 index, 2 majeur, 3 annulaire, "
-            "4 auriculaire.",
+            translate(
+                "Diagrams",
+                "Accordage standard. Les doigts sont une suggestion : 1 index, 2 majeur, "
+                "3 annulaire, 4 auriculaire.",
+            ),
         )
         self.piano = _Instrument(
-            "Piano",
+            translate("Diagrams", "Piano"),
             PianoDiagram(),
             "P",
-            "Une disposition possible parmi d'autres ; "
-            "la répartition des mains est une suggestion.",
+            translate(
+                "Diagrams",
+                "Une disposition possible parmi d'autres ; la répartition des mains est "
+                "une suggestion.",
+            ),
         )
         self.guitar.stepped.connect(lambda d: self.step("guitar", d))
         self.piano.stepped.connect(lambda d: self.step("piano", d))
@@ -604,9 +647,15 @@ class ChordPanel(QFrame):
         self.state = state if state in STATES else "full"
         full = self.state == "full"
         self.resize_button.setIcon(theme.icon("shrink" if full else "grow", size=14))
-        self.resize_button.setAccessibleName("Réduire les diagrammes" if full else "Agrandir")
+        self.resize_button.setAccessibleName(
+            translate("Diagrams", "Réduire les diagrammes")
+            if full
+            else translate("Diagrams", "Agrandir")
+        )
         self.resize_button.setToolTip(
-            "Réduire : les diagrammes seuls" if full else "Agrandir : positions et notes"
+            translate("Diagrams", "Réduire : les diagrammes seuls")
+            if full
+            else translate("Diagrams", "Agrandir : positions et notes")
         )
         for part in (self.guitar.header, self.piano.header):
             part.setVisible(full)
@@ -720,29 +769,44 @@ class ChordPanel(QFrame):
             # one on show, and a line, kept even when reduced, names the other.
             chord = shown.sound if self.mode == "piano" else shown.shape
             self.title.setText(chord.title)
-            self.title.setToolTip(f"Notes : {' · '.join(chord.names[pc] for pc in chord.tones)}")
+            self.title.setToolTip(
+                translate("Diagrams", "Notes : {notes}").format(
+                    notes=" · ".join(chord.names[pc] for pc in chord.tones)
+                )
+            )
             capo, full = shown.capo, self.state == "full"
             if capo and self.mode == "piano":
                 shape = shown.shape.title
                 note = (
-                    f"Capo en case {capo} : à la guitare, forme de {shape}."
+                    translate(
+                        "Diagrams", "Capo en case {capo} : à la guitare, forme de {shape}."
+                    ).format(capo=capo, shape=shape)
                     if full
-                    else (f"Capo {capo} · forme de {shape}")
+                    else (
+                        translate("Diagrams", "Capo {capo} · forme de {shape}").format(
+                            capo=capo, shape=shape
+                        )
+                    )
                 )
             elif capo:
                 note = (
-                    f"Capo en case {capo} : forme de {shown.shape.title}, son réel "
-                    f"{shown.sound.title}. Les cases se comptent depuis le capo."
+                    translate(
+                        "Diagrams",
+                        "Capo en case {capo} : forme de {title}, son réel {title2}. Les cases se "
+                        "comptent depuis le capo.",
+                    ).format(capo=capo, title=shown.shape.title, title2=shown.sound.title)
                     if full
-                    else f"Capo {capo} · son réel {shown.sound.title}"
+                    else translate("Diagrams", "Capo {capo} · son réel {title}").format(
+                        capo=capo, title=shown.sound.title
+                    )
                 )
         self.capo_note.setText(note)
         self.capo_note.setVisible(bool(note))
         if shown is None:
             text = (
-                "Pas d'accord ici : rien à jouer pendant ce passage."
+                translate("Diagrams", "Pas d'accord ici : rien à jouer pendant ce passage.")
                 if self.title.text() == "N.C."
-                else "Les diagrammes suivent l'accord joué."
+                else translate("Diagrams", "Les diagrammes suivent l'accord joué.")
             )
             self.guitar.diagram.set_fingering(None, None, 0, text, animate)
             self.piano.diagram.set_voicing(None, None, text, animate)
@@ -758,13 +822,19 @@ class ChordPanel(QFrame):
         else:
             self.guitar.diagram.set_fingering(None, shown.shape, shown.capo,
                                               _unplayable(shown), animate)  # fmt: skip
-            self.guitar.set_place(0, 0, "Aucune position")
+            self.guitar.set_place(0, 0, translate("Diagrams", "Aucune position"))
             self.guitar.diagram.setToolTip("")
         v = self.piano_voicings[self.piano_index]
         self.piano.diagram.set_voicing(v, shown.sound, animate=animate)
         # With a capo the title is the guitar shape; the keyboard plays what is heard.
         both = shown.capo and self.mode != "piano"  # in piano mode the title is already the sound
-        kind = f"son réel {shown.sound.title} · {v.name}" if both else v.name
+        kind = (
+            translate("Diagrams", "son réel {title} · {name}").format(
+                title=shown.sound.title, name=v.name
+            )
+            if both
+            else v.name
+        )
         self.piano.set_place(self.piano_index, len(self.piano_voicings), kind)
         self.piano.diagram.setToolTip(describe_voicing(v, shown.sound))
 
@@ -773,10 +843,19 @@ def _unplayable(shown: voicings.Shown) -> str:
     """Said instead of a diagram that would be wrong."""
     shape, capo = shown.shape, shown.capo
     frets = voicings.MAX_FRET - capo
-    where = f"dans les {frets} cases au-dessus du capo" if capo else f"jusqu'à la case {frets}"
-    text = f"Aucune position vérifiée de {shape.title} {where}."
+    where = (
+        translate("Diagrams", "dans les {frets} cases au-dessus du capo").format(frets=frets)
+        if capo
+        else translate("Diagrams", "jusqu'à la case {frets}").format(frets=frets)
+    )
+    text = translate("Diagrams", "Aucune position vérifiée de {title} {where}.").format(
+        title=shape.title, where=where
+    )
     if shape.inverted:
-        text += " Décocher « Afficher les basses » (menu ☰) montre l'accord sans sa basse."
+        text += translate(
+            "Diagrams",
+            " Décocher « Afficher les basses » (menu ☰) montre l'accord sans sa basse.",
+        )
     if capo:
-        text += " Retirer ou déplacer le capo propose d'autres formes."
+        text += translate("Diagrams", " Retirer ou déplacer le capo propose d'autres formes.")
     return text

@@ -16,15 +16,17 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from PySide6.QtCore import QT_TRANSLATE_NOOP
 
-from . import library
+from . import i18n, library
+from .i18n import translate
 
 # The networks are converted from Meta's published weights (MIT) by scripts/export_demucs_onnx.py,
 # and hosted with the v1.6 release: pinned by size and SHA-256 like the whisper models.
 RELEASE = "https://github.com/tadikwa/LocalChords/releases/download/v1.6/"
 MODEL = {
     "id": "htdemucs",
-    "label": "Demucs v4 « htdemucs » (Meta, licence MIT)",
+    "label": QT_TRANSLATE_NOOP("Stems", "Demucs v4 « htdemucs » (Meta, licence MIT)"),
     "file": "htdemucs.onnx",
     "size": 174_264_717,
     "sha256": "98e91e185f202396e989753f1f5843136f436368eb710177bbf8c418abf82100",
@@ -35,21 +37,21 @@ MODEL = {
 }
 MODES = {
     "karaoke": {
-        "label": "Karaoké : voix et instrumental (2 pistes)",
+        "label": QT_TRANSLATE_NOOP("Stems", "Karaoké : voix et instrumental (2 pistes)"),
         "stems": ["vocals", "instrumental"],
     },
     "musician": {
-        "label": "Musicien : voix, batterie, basse, autres (4 pistes)",
+        "label": QT_TRANSLATE_NOOP("Stems", "Musicien : voix, batterie, basse, autres (4 pistes)"),
         "stems": ["vocals", "drums", "bass", "other"],
     },
 }
 DEFAULT_MODE = "musician"
 NAMES = {
-    "vocals": "Voix",
-    "drums": "Batterie",
-    "bass": "Basse",
-    "other": "Autres",
-    "instrumental": "Instrumental",
+    "vocals": QT_TRANSLATE_NOOP("Stems", "Voix"),
+    "drums": QT_TRANSLATE_NOOP("Stems", "Batterie"),
+    "bass": QT_TRANSLATE_NOOP("Stems", "Basse"),
+    "other": QT_TRANSLATE_NOOP("Stems", "Autres"),
+    "instrumental": QT_TRANSLATE_NOOP("Stems", "Instrumental"),
 }
 FORMAT_VERSION = 1
 # 16-bit FLAC of a separated stem, measured on songs: about this many bytes per second each.
@@ -100,13 +102,16 @@ def gains(settings: dict) -> list[float]:
 
 PRESETS = {
     # name: (label, levels by stem, stems absent from the mode make the preset unavailable)
-    "original": ("Original", None),
+    "original": (QT_TRANSLATE_NOOP("Stems", "Original"), None),
     # Every separated stem at 0 dB: the sum of the stems, not the recording ("original").
-    "all": ("Toutes les pistes", {}),
-    "karaoke": ("Karaoké (sans voix)", {"vocals": 0}),
-    "vocals": ("Voix seule", {"drums": 0, "bass": 0, "other": 0, "instrumental": 0}),
-    "no_bass": ("Sans basse", {"bass": 0}),
-    "no_drums": ("Sans batterie", {"drums": 0}),
+    "all": (QT_TRANSLATE_NOOP("Stems", "Toutes les pistes"), {}),
+    "karaoke": (QT_TRANSLATE_NOOP("Stems", "Karaoké (sans voix)"), {"vocals": 0}),
+    "vocals": (
+        QT_TRANSLATE_NOOP("Stems", "Voix seule"),
+        {"drums": 0, "bass": 0, "other": 0, "instrumental": 0},
+    ),
+    "no_bass": (QT_TRANSLATE_NOOP("Stems", "Sans basse"), {"bass": 0}),
+    "no_drums": (QT_TRANSLATE_NOOP("Stems", "Sans batterie"), {"drums": 0}),
 }
 
 
@@ -345,7 +350,7 @@ def export_mix(target: Path, recording: Path, folder: Path, settings: dict, task
     from .transcribe import TranscribeError
 
     sr = MODEL["samplerate"]
-    task.status = "Lecture des pistes…"
+    task.status = translate("Stems", "Lecture des pistes…")
     y = audio.decode(recording, sr)
     layers = load(folder, settings["mode"], sr, len(y))
     mix = Mix(y, layers, sr)
@@ -353,13 +358,13 @@ def export_mix(target: Path, recording: Path, folder: Path, settings: dict, task
     mix.set_gains(0.0 if on else 1.0, gains(settings) if on else [0.0] * len(layers))
     mix.gains = mix.target.copy()  # no glide from the original: the file starts as set
     out = np.empty_like(y)
-    task.status = "Mixage…"
+    task.status = translate("Stems", "Mixage…")
     for start in range(0, len(y), sr * 10):
         if task.cancelled:
-            raise TranscribeError("Export annulé.")
+            raise TranscribeError(translate("Stems", "Export annulé."))
         out[start : start + sr * 10] = mix[start : start + sr * 10]
         task.progress = 0.9 * min(1.0, (start + sr * 10) / max(1, len(y)))
-    task.status = "Écriture du fichier…"
+    task.status = translate("Stems", "Écriture du fichier…")
     # Beside, then renamed: a failure never leaves half a file, nor removes the one being replaced.
     part = target.with_name(target.stem + ".part" + target.suffix)
     try:
@@ -392,18 +397,19 @@ def space_problem(duration: float, mode: str) -> str | None:
     root = cache_root()
     why = library.unwritable(root)
     if why:
-        return f"Impossible d'écrire dans {root} : {why}."
+        return translate("Stems", "Impossible d'écrire dans {root} : {why}.").format(
+            root=root, why=why
+        )
     need = needed_mb(duration, mode) + SPACE_MARGIN_MB
     free = library.free_mb(root)
     if free and free < need:
-        return (
-            f"Pas assez de place sur le disque de {root} : {free} Mo libres, "
-            f"environ {need} Mo nécessaires pour les pistes de ce morceau."
-        )
+        return translate(
+            "Stems",
+            "Pas assez de place sur le disque de {root} : {free} Mo libres, environ "
+            "{need} Mo nécessaires pour les pistes de ce morceau.",
+        ).format(root=root, free=free, need=need)
     return None
 
 
 def size_text(size: int) -> str:
-    if size >= 2**30:
-        return f"{size / 2**30:.1f} Go".replace(".", ",")
-    return f"{max(1, round(size / 2**20))} Mo"
+    return i18n.size(size)

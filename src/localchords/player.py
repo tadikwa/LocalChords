@@ -12,6 +12,8 @@ import time
 
 import numpy as np
 
+from .i18n import translate
+
 BLOCK = 1024  # frames per callback
 RATE_MIN, RATE_MAX = 0.25, 2.0
 
@@ -361,7 +363,9 @@ class Player:
             return True
         except Exception as exc:  # noqa: BLE001 - PortAudio has many ways to fail, all alike here
             self.stream = None
-            self.last_error = f"Sortie audio indisponible : {exc}"
+            self.last_error = translate("Player", "Sortie audio indisponible : {exc}").format(
+                exc=exc
+            )
             return False
 
     def close_device(self) -> None:

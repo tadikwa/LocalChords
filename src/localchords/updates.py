@@ -23,7 +23,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from . import __version__, library
+from . import __version__, i18n, library
+from .i18n import translate
 
 REPO = "tadikwa/LocalChords"
 API = f"https://api.github.com/repos/{REPO}/releases/latest"
@@ -133,7 +134,7 @@ def check(cache, *, force: bool = False, current: str = __version__, opener=None
                 raw = r.read(MAX_ANSWER + 1)
                 etag = r.headers.get("ETag")
             if len(raw) > MAX_ANSWER:
-                raise UpdateError("Réponse de GitHub inattendue.")
+                raise UpdateError(translate("Updates", "Réponse de GitHub inattendue."))
             cache = {"checked": now, "etag": etag, "release": release_of(json.loads(raw))}
         except urllib.error.HTTPError as exc:
             if exc.code == 304 and "release" in cache:
@@ -142,15 +143,24 @@ def check(cache, *, force: bool = False, current: str = __version__, opener=None
                 cache = {"checked": now, "etag": None, "release": None}
             elif exc.code in (403, 429):
                 raise UpdateError(
-                    "GitHub limite pour l'instant les vérifications depuis cette connexion. "
-                    "Réessayez dans une heure."
+                    translate(
+                        "Updates",
+                        "GitHub limite pour l'instant les vérifications depuis cette connexion. "
+                        "Réessayez dans une heure.",
+                    )
                 ) from exc
             else:
-                raise UpdateError(f"GitHub ne répond pas correctement ({exc.code}).") from exc
+                raise UpdateError(
+                    translate("Updates", "GitHub ne répond pas correctement ({code}).").format(
+                        code=exc.code
+                    )
+                ) from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise UpdateError("GitHub est injoignable : pas de connexion à Internet ?") from exc
+            raise UpdateError(
+                translate("Updates", "GitHub est injoignable : pas de connexion à Internet ?")
+            ) from exc
         except ValueError as exc:
-            raise UpdateError("Réponse de GitHub illisible.") from exc
+            raise UpdateError(translate("Updates", "Réponse de GitHub illisible.")) from exc
     release = cache.get("release")
     found = release if isinstance(release, dict) and newer(release["tag"], current) else None
     return found, cache
@@ -226,14 +236,20 @@ def _get(url: str, limit: int, opener) -> bytes:
     try:
         with opener(request, timeout=TIMEOUT) as r:
             if not str(r.geturl()).startswith("https://"):
-                raise UpdateError("Téléchargement refusé : la connexion n'est pas chiffrée.")
+                raise UpdateError(
+                    translate("Updates", "Téléchargement refusé : la connexion n'est pas chiffrée.")
+                )
             raw = r.read(limit + 1)
     except urllib.error.HTTPError as exc:
-        raise UpdateError(f"GitHub refuse le téléchargement ({exc.code}).") from exc
+        raise UpdateError(
+            translate("Updates", "GitHub refuse le téléchargement ({code}).").format(code=exc.code)
+        ) from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise UpdateError("GitHub est injoignable : pas de connexion à Internet ?") from exc
+        raise UpdateError(
+            translate("Updates", "GitHub est injoignable : pas de connexion à Internet ?")
+        ) from exc
     if len(raw) > limit:
-        raise UpdateError("Fichier de sommes de contrôle inattendu.")
+        raise UpdateError(translate("Updates", "Fichier de sommes de contrôle inattendu."))
     return raw
 
 
@@ -254,25 +270,41 @@ def expected_sha256(release: dict, asset: dict, opener=None) -> str:
     sums = release["assets"].get(SUMS)
     if sums is None:
         raise UpdateError(
-            "Cette version n'a pas de fichier SHA256SUMS.txt : impossible de vérifier le "
-            "téléchargement, il est refusé."
+            translate(
+                "Updates",
+                "Cette version n'a pas de fichier SHA256SUMS.txt : impossible de "
+                "vérifier le téléchargement, il est refusé.",
+            )
         )
     raw = _get(sums["url"], MAX_SUMS, opener)
     if sums["sha256"] and hashlib.sha256(raw).hexdigest() != sums["sha256"]:
         raise UpdateError(
-            "SHA256SUMS.txt ne correspond pas à celui publié : téléchargement refusé."
+            translate(
+                "Updates",
+                "SHA256SUMS.txt ne correspond pas à celui publié : téléchargement refusé.",
+            )
         )
     listed = parse_sums(raw.decode("utf-8", "replace")).get(asset["name"])
     if listed is None:
-        raise UpdateError(f"{asset['name']} n'est pas dans SHA256SUMS.txt : téléchargement refusé.")
+        raise UpdateError(
+            translate(
+                "Updates", "{name} n'est pas dans SHA256SUMS.txt : téléchargement refusé."
+            ).format(name=asset["name"])
+        )
     if not asset["sha256"]:
         raise UpdateError(
-            "GitHub ne donne pas l'empreinte de ce fichier : impossible de la comparer à "
-            "SHA256SUMS.txt, téléchargement refusé."
+            translate(
+                "Updates",
+                "GitHub ne donne pas l'empreinte de ce fichier : impossible de la "
+                "comparer à SHA256SUMS.txt, téléchargement refusé.",
+            )
         )
     if asset["sha256"] != listed:
         raise UpdateError(
-            "Les sommes de contrôle publiées ne concordent pas : téléchargement refusé."
+            translate(
+                "Updates",
+                "Les sommes de contrôle publiées ne concordent pas : téléchargement refusé.",
+            )
         )
     return listed
 
@@ -309,11 +341,15 @@ def download(release: dict, kind: str, folder: Path, task, opener=None) -> dict:
     asset = asset_for(release, kind)
     if asset is None:
         raise UpdateError(
-            f"La version {release['tag']} ne propose pas de fichier pour cette installation."
+            translate(
+                "Updates", "La version {tag} ne propose pas de fichier pour cette installation."
+            ).format(tag=release["tag"])
         )
     if asset["url"] != f"{RELEASES}/download/{release['tag']}/{asset['name']}":
-        raise UpdateError("Adresse de téléchargement inattendue : refusé.")  # a cache edited
-    task.status = "Vérification des sommes de contrôle…"
+        raise UpdateError(
+            translate("Updates", "Adresse de téléchargement inattendue : refusé.")
+        )  # a cache edited
+    task.status = translate("Updates", "Vérification des sommes de contrôle…")
     sha = expected_sha256(release, asset, opener)
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / asset["name"]
@@ -324,29 +360,45 @@ def download(release: dict, kind: str, folder: Path, task, opener=None) -> dict:
     free = library.free_mb(folder)
     need = asset["size"] // 2**20 + SPACE_MARGIN_MB
     if free and free < need:
-        raise UpdateError(f"Pas assez de place dans {folder} : {free} Mo libres, {need} Mo requis.")
+        raise UpdateError(
+            translate(
+                "Updates", "Pas assez de place dans {folder} : {free} Mo libres, {need} Mo requis."
+            ).format(folder=folder, free=free, need=need)
+        )
     part = folder / (asset["name"] + ".part")
     digest, got = hashlib.sha256(), 0
     request = urllib.request.Request(asset["url"], headers={"User-Agent": USER_AGENT})
     try:
         with opener(request, timeout=TIMEOUT) as r, part.open("wb") as f:
             if not str(r.geturl()).startswith("https://"):
-                raise UpdateError("Téléchargement refusé : la connexion n'est pas chiffrée.")
+                raise UpdateError(
+                    translate("Updates", "Téléchargement refusé : la connexion n'est pas chiffrée.")
+                )
             while chunk := r.read(1 << 20):
                 if task.cancelled:
-                    raise UpdateError("Téléchargement annulé.")
+                    raise UpdateError(translate("Updates", "Téléchargement annulé."))
                 got += len(chunk)
                 if got > asset["size"]:
-                    raise UpdateError("Le fichier reçu est plus gros que celui publié : refusé.")
+                    raise UpdateError(
+                        translate(
+                            "Updates", "Le fichier reçu est plus gros que celui publié : refusé."
+                        )
+                    )
                 f.write(chunk)
                 digest.update(chunk)
                 task.progress = got / asset["size"]
-                task.status = f"{got / 2**20:.0f} / {asset['size'] / 2**20:.0f} Mo"
+                task.status = i18n.progress(got, asset["size"])
         if got != asset["size"]:
-            raise UpdateError("Téléchargement interrompu avant la fin : réessayez.")
+            raise UpdateError(
+                translate("Updates", "Téléchargement interrompu avant la fin : réessayez.")
+            )
         if digest.hexdigest() != sha:
             raise UpdateError(
-                "Le fichier reçu ne correspond pas à celui publié (SHA-256) : il a été supprimé."
+                translate(
+                    "Updates",
+                    "Le fichier reçu ne correspond pas à celui publié (SHA-256) : il a été "
+                    "supprimé.",
+                )
             )
         os.replace(part, target)
     except UpdateError:
@@ -354,10 +406,14 @@ def download(release: dict, kind: str, folder: Path, task, opener=None) -> dict:
         raise
     except urllib.error.HTTPError as exc:
         part.unlink(missing_ok=True)
-        raise UpdateError(f"GitHub refuse le téléchargement ({exc.code}).") from exc
+        raise UpdateError(
+            translate("Updates", "GitHub refuse le téléchargement ({code}).").format(code=exc.code)
+        ) from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         part.unlink(missing_ok=True)
-        raise UpdateError(f"Le téléchargement a échoué : {exc}") from exc
+        raise UpdateError(
+            translate("Updates", "Le téléchargement a échoué : {exc}").format(exc=exc)
+        ) from exc
     except BaseException:
         part.unlink(missing_ok=True)
         raise

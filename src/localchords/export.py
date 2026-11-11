@@ -5,6 +5,7 @@ from __future__ import annotations
 from . import __version__
 from . import lyrics as L
 from .chords import key_name, symbol
+from .i18n import translate
 from .project import Project, Segment
 
 BARS_PER_LINE = 4
@@ -55,21 +56,47 @@ def header(project: Project) -> list[tuple[str, str]]:
     tempo = project.tempo()
     meter = project.meter()
     view = project.view
-    fields = [("Titre", project.audio.get("title") or "")]
+    fields = [(translate("Export", "Titre"), project.audio.get("title") or "")]
     if project.audio.get("artist"):
-        fields.append(("Artiste", project.audio["artist"]))
+        fields.append((translate("Export", "Artiste"), project.audio["artist"]))
     if key:
         # What sounds, transposition included; with a capo, the shapes played are another key.
-        fields.append(("Tonalité", key_name(key["label"], int(view["transpose"]))))
+        fields.append(
+            (translate("Export", "Tonalité"), key_name(key["label"], int(view["transpose"])))
+        )
         if view["capo"]:
-            fields.append(("Formes jouées", key_name(key["label"], project.sounding_shift())))
+            fields.append(
+                (
+                    translate("Export", "Formes jouées"),
+                    key_name(key["label"], project.sounding_shift()),
+                )
+            )
     if tempo["bpm"]:
-        fields.append(("Tempo", f"{tempo['bpm']:.0f} BPM"))
-    fields.append(("Mesure", f"{meter['beats_per_bar']} temps"))
+        fields.append((translate("Export", "Tempo"), f"{tempo['bpm']:.0f} BPM"))
+    fields.append(
+        (
+            translate("Export", "Mesure"),
+            translate("Export", "{beats_per_bar} temps").format(
+                beats_per_bar=meter["beats_per_bar"]
+            ),
+        )
+    )
     if view["transpose"]:
-        fields.append(("Transposition", f"{view['transpose']:+d} demi-tons"))
+        fields.append(
+            (
+                translate("Export", "Transposition"),
+                translate("Export", "{shift} demi-tons").format(shift=f"{view['transpose']:+d}"),
+            )
+        )
     if view["capo"]:
-        fields.append(("Capodastre", f"case {view['capo']} (choisie, non détectée)"))
+        fields.append(
+            (
+                translate("Export", "Capodastre"),
+                translate("Export", "case {capo} (choisie, non détectée)").format(
+                    capo=view["capo"]
+                ),
+            )
+        )
     return fields
 
 
@@ -84,7 +111,12 @@ def to_text(project: Project) -> str:
         text = " | ".join(" ".join((c or ".").ljust(width) for c in bar) for bar in row)
         lines.append(f"| {text} |")
     lines.append("")
-    lines.append(f"(LocalChords {__version__} : extraction automatique, à vérifier à l'oreille.)")
+    lines.append(
+        translate(
+            "Export",
+            "(LocalChords {version} : extraction automatique, à vérifier à l'oreille.)",
+        ).format(version=__version__)
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -140,7 +172,12 @@ def to_text_with_lyrics(project: Project, width: int = 72) -> str:
     rows = lyric_rows(project)
     out = [f"{k} : {v}" for k, v in header(project)]
     if approximate(rows):
-        out.append("(Accords placés approximativement dans les lignes sans minutage des mots.)")
+        out.append(
+            translate(
+                "Export",
+                "(Accords placés approximativement dans les lignes sans minutage des mots.)",
+            )
+        )
     out.append("")
     for row in rows:
         if row["kind"] == "section":
@@ -162,10 +199,19 @@ def to_text_with_lyrics(project: Project, width: int = 72) -> str:
                 out.append(text.rstrip())
     out.append("")
     out.append(
-        f"Paroles : {L.KINDS.get(project.lyrics['source'].get('kind'), '')}"
-        + (f" ({project.lyrics['source']['name']})" if project.lyrics["source"].get("name") else "")
+        translate("Export", "Paroles : {kind}").format(
+            kind=translate("Lyrics", L.KINDS.get(project.lyrics["source"].get("kind"), ""))
+        )
+        + (
+            f" ({translate('LyricsOnline', project.lyrics['source']['name'])})"
+            if project.lyrics["source"].get("name")
+            else ""
+        )
     )
     out.append(
-        f"(LocalChords {__version__} : accords extraits automatiquement, à vérifier à l'oreille.)"
+        translate(
+            "Export",
+            "(LocalChords {version} : accords extraits automatiquement, à vérifier à l'oreille.)",
+        ).format(version=__version__)
     )
     return "\n".join(out) + "\n"

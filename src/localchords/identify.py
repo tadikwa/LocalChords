@@ -13,9 +13,21 @@ import unicodedata
 
 # The fields of yt-dlp's info dict worth keeping; the rest (formats, thumbnails…) is dropped.
 INFO_KEYS = (
-    "id", "title", "track", "artist", "artists", "creator", "creators", "album",
-    "album_artist", "duration", "channel", "uploader", "release_year", "webpage_url",
-)  # fmt: skip
+    "id",
+    "title",
+    "track",
+    "artist",
+    "artists",
+    "creator",
+    "creators",
+    "album",
+    "album_artist",
+    "duration",
+    "channel",
+    "uploader",
+    "release_year",
+    "webpage_url",
+)
 
 # Words a video adds to a song's title: they say nothing about the song.
 _NOISE = re.compile(

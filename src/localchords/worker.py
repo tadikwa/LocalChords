@@ -10,12 +10,16 @@ import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import i18n
+from .i18n import translate
+
 
 def _job(path: str, engine: str, conn) -> None:
     # The windowed program has no console: libraries that write to one must not crash on it.
     for name in ("stdout", "stderr"):
         if getattr(sys, name) is None:
             setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115
+    i18n.install_worker()  # its messages in the interface's language
     try:
         from . import audio, library
 
@@ -25,20 +29,26 @@ def _job(path: str, engine: str, conn) -> None:
         from . import engines, project
 
         file = Path(path)
-        conn.send(("progress", 0.01, "Décodage de l'audio…"))
+        conn.send(("progress", 0.01, translate("Worker", "Décodage de l'audio…")))
         y = audio.decode(file, engines.ANALYSIS_SR, channels=1)[:, 0]
         duration = round(len(y) / engines.ANALYSIS_SR, 3)
         conn.send(("waveform", project.encode_waveform(audio.peaks(y)), duration))
-        conn.send(("progress", 0.03, "Chargement du moteur d'analyse…"))
+        conn.send(("progress", 0.03, translate("Worker", "Chargement du moteur d'analyse…")))
         result = engines.analyze(y, engine, lambda f, text: conn.send(("progress", f, text)))
-        conn.send(("progress", 1.0, "Terminé"))
+        conn.send(("progress", 1.0, translate("Worker", "Terminé")))
         conn.send(("done", result))
     except MemoryError:
-        conn.send(("error", "Mémoire insuffisante pour analyser ce morceau.", ""))
+        conn.send(
+            ("error", translate("Worker", "Mémoire insuffisante pour analyser ce morceau."), "")
+        )
     except Exception as exc:  # noqa: BLE001 - the interface must hear of any failure
         # Failures written for the user pass as they are; anything else also goes to the log.
         expected = type(exc).__name__ in ("AudioError", "AnalysisError")
-        text = str(exc) if expected else f"L'analyse a échoué : {exc}"
+        text = (
+            str(exc)
+            if expected
+            else translate("Worker", "L'analyse a échoué : {exc}").format(exc=exc)
+        )
         conn.send(("error", text, "" if expected else traceback.format_exc()))
     finally:
         conn.close()
@@ -65,7 +75,9 @@ class Job:
         self.answered = self.answered or any(m[0] in FINAL for m in messages)
         if self.ended and not self.answered:
             self.answered = True
-            messages.append(("error", "Le processus s'est arrêté brutalement.", ""))
+            messages.append(
+                ("error", translate("Worker", "Le processus s'est arrêté brutalement."), "")
+            )
         return messages
 
     def cancel(self) -> None:
@@ -80,6 +92,7 @@ def _download_job(url: str, folder: str, conn) -> None:
     for name in ("stdout", "stderr"):
         if getattr(sys, name) is None:
             setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115
+    i18n.install_worker()  # its messages in the interface's language
     try:
         import yt_dlp
 
@@ -89,7 +102,7 @@ def _download_job(url: str, folder: str, conn) -> None:
             total = status.get("total_bytes") or status.get("total_bytes_estimate")
             if status.get("status") == "downloading" and total:
                 done = status.get("downloaded_bytes", 0) / total
-                conn.send(("progress", done, "Téléchargement de l'audio…"))
+                conn.send(("progress", done, translate("Worker", "Téléchargement de l'audio…")))
 
         options = {
             # AAC or Opus first: some sites' "best" is a surround codec the decoder doesn't know.
@@ -113,7 +126,13 @@ def _download_job(url: str, folder: str, conn) -> None:
         conn.send(("downloaded", path, info.get("webpage_url") or url, identify.keep(info)))
     except Exception as exc:  # noqa: BLE001 - whatever the site says goes to the user as it is
         text = str(exc).replace("ERROR: ", "")
-        conn.send(("error", f"Le téléchargement a échoué : {text}", ""))
+        conn.send(
+            (
+                "error",
+                translate("Worker", "Le téléchargement a échoué : {text}").format(text=text),
+                "",
+            )
+        )
     finally:
         conn.close()
 
@@ -123,6 +142,7 @@ def _separate_job(path: str, mode: str, fingerprint: str, conn) -> None:
     for name in ("stdout", "stderr"):
         if getattr(sys, name) is None:
             setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115
+    i18n.install_worker()  # its messages in the interface's language
     _below_normal()  # the player and the window keep the processor first
     try:
         import time
@@ -131,12 +151,14 @@ def _separate_job(path: str, mode: str, fingerprint: str, conn) -> None:
 
         model = stems.MODEL
         started = time.perf_counter()
-        conn.send(("progress", 0.0, "Décodage de l'audio…"))
+        conn.send(("progress", 0.0, translate("Worker", "Décodage de l'audio…")))
         y = audio.decode(Path(path), model["samplerate"])
-        conn.send(("progress", 0.03, "Chargement du modèle…"))
+        conn.send(("progress", 0.03, translate("Worker", "Chargement du modèle…")))
 
         def progress(f):
-            conn.send(("progress", 0.03 + 0.9 * f, "Séparation des instruments…"))
+            conn.send(
+                ("progress", 0.03 + 0.9 * f, translate("Worker", "Séparation des instruments…"))
+            )
 
         sources = separation.separate(
             y,
@@ -145,22 +167,36 @@ def _separate_job(path: str, mode: str, fingerprint: str, conn) -> None:
             model["segment"],
             progress,
         )
-        conn.send(("progress", 0.94, "Enregistrement des pistes…"))
+        conn.send(("progress", 0.94, translate("Worker", "Enregistrement des pistes…")))
         layers = stems.arrange(mode, sources, y)
         del sources
         folder = stems.write(
             stems.cache_dir(fingerprint, mode), layers, model["samplerate"], {"mode": mode}
         )
         seconds = time.perf_counter() - started
-        conn.send(("progress", 1.0, "Terminé"))
+        conn.send(("progress", 1.0, translate("Worker", "Terminé")))
         conn.send(("done", str(folder), seconds, len(y) / model["samplerate"]))
     except MemoryError:
-        conn.send(("error", "Mémoire insuffisante pour séparer ce morceau.", ""))
+        conn.send(
+            ("error", translate("Worker", "Mémoire insuffisante pour séparer ce morceau."), "")
+        )
     except OSError as exc:
-        conn.send(("error", f"Impossible d'enregistrer les pistes : {exc.strerror or exc}", ""))
+        conn.send(
+            (
+                "error",
+                translate("Worker", "Impossible d'enregistrer les pistes : {reason}").format(
+                    reason=exc.strerror or exc
+                ),
+                "",
+            )
+        )
     except Exception as exc:  # noqa: BLE001 - the interface must hear of any failure
         expected = type(exc).__name__ in ("AudioError", "SeparationError")
-        text = str(exc) if expected else f"La séparation a échoué : {exc}"
+        text = (
+            str(exc)
+            if expected
+            else translate("Worker", "La séparation a échoué : {exc}").format(exc=exc)
+        )
         conn.send(("error", text, "" if expected else traceback.format_exc()))
     finally:
         conn.close()

@@ -21,8 +21,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from PySide6.QtCore import QT_TRANSLATE_NOOP
 
 from . import onnx_engine, rhythm
+from .i18n import translate
 
 Progress = Callable[[float, str], None]
 ANALYSIS_SR = 22050
@@ -47,9 +49,9 @@ class Engine:
 # The share of an analysis each stage takes, measured on a 4-minute song (docs/BENCHMARKS.md).
 STAGE_SHARE = {"activation": (0.05, 0.30), "beat_features": (0.30, 0.75), "recognize": (0.75, 0.97)}
 STAGE_TEXT = {
-    "activation": "Recherche des temps et des mesures…",
-    "beat_features": "Lecture de la structure harmonique…",
-    "recognize": "Reconnaissance des accords…",
+    "activation": QT_TRANSLATE_NOOP("Engines", "Recherche des temps et des mesures…"),
+    "beat_features": QT_TRANSLATE_NOOP("Engines", "Lecture de la structure harmonique…"),
+    "recognize": QT_TRANSLATE_NOOP("Engines", "Reconnaissance des accords…"),
 }
 
 
@@ -105,7 +107,7 @@ class _Stages:
         name = fn.__name__
         share = STAGE_SHARE.get(name)
         if share:
-            self.progress(share[0], STAGE_TEXT[name])
+            self.progress(share[0], translate("Engines", STAGE_TEXT[name]))
         if name == "activation":
             result = self._activation(args[0])
         elif name == "beat_features":
@@ -114,7 +116,7 @@ class _Stages:
         else:
             result = fn(*args, **kwargs)
         if share:
-            self.progress(share[1], STAGE_TEXT[name])
+            self.progress(share[1], translate("Engines", STAGE_TEXT[name]))
         return result
 
     @contextmanager
@@ -219,12 +221,16 @@ def _chordotomy(engine: str, y: np.ndarray, progress: Progress) -> dict:
         _write_wav(wav, y)
         result = timeline.analyze(wav, engine=engine, cache=stages)
     except NoBeatsError as exc:
-        raise AnalysisError("Aucun temps n'a été détecté dans ce morceau.") from exc
+        raise AnalysisError(
+            translate("Engines", "Aucun temps n'a été détecté dans ce morceau.")
+        ) from exc
     except EngineError as exc:
-        raise AnalysisError(f"Le moteur d'analyse n'a pas pu démarrer : {exc}") from exc
+        raise AnalysisError(
+            translate("Engines", "Le moteur d'analyse n'a pas pu démarrer : {exc}").format(exc=exc)
+        ) from exc
     finally:
         wav.unlink(missing_ok=True)
-    progress(0.97, "Détection de la mesure et de la tonalité…")
+    progress(0.97, translate("Engines", "Détection de la mesure et de la tonalité…"))
     rhythm_info = _rhythm_of(result, stages, y)
     return {
         "engine": {
@@ -244,14 +250,19 @@ def _chordotomy(engine: str, y: np.ndarray, progress: Progress) -> dict:
 ENGINES = {
     "model": Engine(
         "model",
-        "Précis (neuronal)",
-        "lv-chordia et Beat This! : le meilleur résultat mesuré, tous types d'accords.",
+        QT_TRANSLATE_NOOP("Engines", "Précis (neuronal)"),
+        QT_TRANSLATE_NOOP(
+            "Engines",
+            "lv-chordia et Beat This! : le meilleur résultat mesuré, tous types d'accords.",
+        ),
         lambda y, progress: _chordotomy("model", y, progress),
     ),
     "dsp": Engine(
         "dsp",
-        "Classique (chroma)",
-        "Modèles d'accords sur chroma, sans réseau de neurones : un second avis.",
+        QT_TRANSLATE_NOOP("Engines", "Classique (chroma)"),
+        QT_TRANSLATE_NOOP(
+            "Engines", "Modèles d'accords sur chroma, sans réseau de neurones : un second avis."
+        ),
         lambda y, progress: _chordotomy("dsp", y, progress),
     ),
 }
@@ -261,7 +272,9 @@ DEFAULT_ENGINE = "model"
 def analyze(y: np.ndarray, engine: str, progress: Progress) -> dict:
     """Analyze mono float audio at ANALYSIS_SR."""
     if engine not in ENGINES:
-        raise AnalysisError(f"Moteur inconnu : {engine}")
+        raise AnalysisError(translate("Engines", "Moteur inconnu : {engine}").format(engine=engine))
     if len(y) < ANALYSIS_SR or float(np.sqrt(np.mean(np.square(y)))) < SILENCE_RMS:
-        raise AnalysisError("Ce morceau est silencieux ou trop court pour être analysé.")
+        raise AnalysisError(
+            translate("Engines", "Ce morceau est silencieux ou trop court pour être analysé.")
+        )
     return ENGINES[engine].run(y, progress)

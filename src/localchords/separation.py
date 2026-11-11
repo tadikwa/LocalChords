@@ -41,8 +41,10 @@ def spec(x: np.ndarray) -> np.ndarray:
     idx = np.arange(frames)[:, None] * HOP + np.arange(NFFT)[None, :]
     z = np.fft.rfft(padded[:, idx] * _window(), axis=-1)[..., :-1] / np.sqrt(NFFT)
     z = z.transpose(0, 2, 1)  # (C, F, T)
-    return np.stack((z.real, z.imag), axis=1).reshape(channels * 2, NFFT // 2, frames).astype(
-        np.float32
+    return (
+        np.stack((z.real, z.imag), axis=1)
+        .reshape(channels * 2, NFFT // 2, frames)
+        .astype(np.float32)
     )
 
 
