@@ -608,11 +608,7 @@ class UpdateController:
                 None, translate("Updates", "Mise à jour"), translate("Updates", CHANGED)
             )
             return
-        # The installer in the language chosen for the next start (installer/LocalChords.iss).
-        language = i18n.resolve(self.settings.get("language"))
-        launch(
-            path, f"/LANG={INSTALLER_LANGUAGES[language]}" if ready["kind"] == "installed" else ""
-        )
+        launch(path)
 
     def _intact(self, path: Path, ready: dict) -> bool:
         if updates.verified(path, ready["sha256"], ready.get("size")):
@@ -667,7 +663,11 @@ class UpdateController:
 INSTALLER_LANGUAGES = {"fr": "french", "en": "english"}
 
 
-def launch(path: Path, arguments: str = "") -> None:
+def launch(path: Path) -> None:
     """As a double click would: Windows checks the file (SmartScreen, its mark from the web)."""
+    arguments = ""
+    if path.name.startswith("LocalChords-Setup-"):  # the installer, in the language chosen for
+        language = i18n.resolve(library.load_settings().get("language"))  # the next start
+        arguments = f"/LANG={INSTALLER_LANGUAGES[language]}"  # (installer/LocalChords.iss)
     with i18n.without_ours():  # the new program reads its own language from the settings
         os.startfile(str(path), arguments=arguments)  # noqa: S606

@@ -129,17 +129,24 @@ def test_an_override_of_the_users_own_stays_and_wins(monkeypatch):
         assert os.environ[i18n.ENV] == "en"
 
 
-def test_the_updater_starts_the_new_program_without_this_runs_language(monkeypatch, tmp_path):
+def test_the_updater_starts_the_new_program_without_this_runs_language(data, monkeypatch, tmp_path):
+    # This run is in French; English was chosen for the next start.
+    data.mkdir(parents=True, exist_ok=True)
+    library.save_settings({**library.load_settings(), "language": "en"})
     monkeypatch.setattr(i18n, "_ours", "fr")
     monkeypatch.setenv(i18n.ENV, "fr")
-    seen = {}
+    seen = []
 
     def startfile(path, arguments=""):
-        seen.update(env=os.environ.get(i18n.ENV), arguments=arguments)
+        seen.append((Path(path).name, arguments, os.environ.get(i18n.ENV)))
 
     monkeypatch.setattr(update_banner.os, "startfile", startfile, raising=False)
-    update_banner.launch(tmp_path / "LocalChords-Setup.exe", "/LANG=english")
-    assert seen == {"env": None, "arguments": "/LANG=english"}
+    update_banner.launch(tmp_path / "LocalChords-Setup-v9.9.exe")
+    update_banner.launch(tmp_path / "LocalChords-v9.9-portable.exe")
+    assert seen == [
+        ("LocalChords-Setup-v9.9.exe", "/LANG=english", None),
+        ("LocalChords-v9.9-portable.exe", "", None),
+    ]
     assert os.environ[i18n.ENV] == "fr"  # this run's workers keep theirs
 
 
