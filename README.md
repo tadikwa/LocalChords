@@ -13,6 +13,17 @@ aucun abonnement.
 **[⬇ Télécharger la dernière version](https://github.com/tadikwa/LocalChords/releases/latest)** (Windows 10
 ou 11, 64 bits, gratuit, hors ligne)
 
+## Découvrez LocalChords en une minute
+
+[![Présentation vidéo de LocalChords : accords, paroles et séparation des instruments](docs/images/localchords-video-thumbnail.png)](https://youtu.be/tmFD1hkFcLw)
+
+**[▶ Regarder la présentation vidéo sur YouTube](https://youtu.be/tmFD1hkFcLw)**
+
+Découvrez comment LocalChords analyse les accords d'une chanson, affiche les paroles synchronisées et permet de
+séparer la voix, la batterie et la basse pour jouer ou chanter à leur place.
+
+## En images
+
 ![LocalChords : la grille d'accords d'un morceau, l'accord en cours en surbrillance, le diagramme de guitare à droite et les accords du morceau dessous](docs/images/localchords-main.png)
 
 <p align="center">
