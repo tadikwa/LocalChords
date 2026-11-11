@@ -87,6 +87,65 @@ class Wsola:
         return out
 
 
+class Mix:
+    """The recording and its separated stems, read like the array it stands in for.
+
+    Each source has a gain; a new gain is reached by a linear glide of RAMP seconds (per unit of
+    gain), so moving a slider, muting or switching between the original and the stems never
+    clicks. Reading a slice mixes only that slice: nothing scales with the song's length, and the
+    speed and pitch processing downstream sees one ordinary stereo signal.
+    """
+
+    RAMP = 0.03
+    KNEE = 0.95  # a sum of boosted stems above this is rounded off rather than clipped
+
+    def __init__(self, original: np.ndarray, stems: np.ndarray, sr: int):
+        self.original = original
+        self.stems = stems  # (S, L, 2), float16 to halve the memory; the sum is made in float32
+        self.gains = np.zeros(1 + len(stems), dtype=np.float32)
+        self.gains[0] = 1.0  # the original, as before separation
+        self.target = self.gains.copy()
+        self.step = 1.0 / (self.RAMP * sr)
+
+    def __len__(self) -> int:
+        return len(self.original)
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self.original.shape
+
+    def set_gains(self, original: float, stems) -> None:
+        """Called from the interface's thread; one assignment, so the audio thread sees either the
+        old targets or the new ones."""
+        self.target = np.asarray([original, *stems], dtype=np.float32)
+
+    def __getitem__(self, key: slice) -> np.ndarray:
+        start, stop, _ = key.indices(len(self))
+        n = max(0, stop - start)
+        target, now = self.target, self.gains
+        out = np.zeros((n, 2), dtype=np.float32)
+        t = np.arange(1, n + 1, dtype=np.float32)[:, None] * self.step
+        after = now.copy()
+        for i, (a, b) in enumerate(zip(now, target, strict=True)):
+            if a == 0.0 and b == 0.0:
+                continue
+            part = self.original[start:stop] if i == 0 else self.stems[i - 1, start:stop]
+            if a == b:
+                out += part * a
+            else:
+                gain = a + np.clip(t, 0.0, abs(b - a)) * (1.0 if b > a else -1.0)
+                out += part * gain
+                after[i] = gain[-1, 0] if n else a
+        self.gains = after
+        if len(target) > 1 and target[0] != 1.0:  # the stems: their sum may pass full scale
+            loud = np.abs(out) > self.KNEE
+            if loud.any():
+                x = out[loud]
+                k = 1.0 - self.KNEE
+                out[loud] = np.sign(x) * (self.KNEE + k * np.tanh((np.abs(x) - self.KNEE) / k))
+        return out
+
+
 class Player:
     """Thread-safe transport over a stereo float buffer.
 
@@ -116,12 +175,25 @@ class Player:
     # Content -----------------------------------------------------------------------------------
     def load(self, y: np.ndarray) -> None:
         with self.lock:
-            self.y = np.asarray(y, dtype=np.float32)
+            self.y = y if isinstance(y, Mix) else np.asarray(y, dtype=np.float32)
             self.cursor = 0.0
             self.loop = None
             self.playing = False
             self.stretch.reset()
             self._mark()
+
+    def use_mix(self, mix: Mix | None) -> None:
+        """Play the stems (or, with None, the recording alone) from where playback is: same length,
+        same clock, so the chords and words stay where they are."""
+        with self.lock:
+            original = self.y.original if isinstance(self.y, Mix) else self.y
+            if mix is not None and len(mix) != len(original):
+                raise ValueError("stems and recording differ in length")
+            self.y = original if mix is None else mix
+
+    @property
+    def mix(self) -> Mix | None:
+        return self.y if isinstance(self.y, Mix) else None
 
     @property
     def duration(self) -> float:

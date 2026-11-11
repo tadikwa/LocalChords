@@ -17,9 +17,11 @@ src/localchords/
   library.py            dossiers utilisateur, réglages, audio conservé ou retrouvé
   catalog.py            l'index de la bibliothèque (SQLite) : favoris, étiquettes, collections, dates
   backup.py             sauvegarde et restauration de la bibliothèque (zip)
-  player.py             lecture : PortAudio, ralenti WSOLA, boucle, hauteur
+  player.py             lecture : PortAudio, ralenti WSOLA, boucle, hauteur, mixage des pistes (Mix)
+  separation.py         Demucs v4 en ONNX : STFT numpy, segments, fondus (v1.6)
+  stems.py              modèle de séparation, cache des pistes, réglages du mix, export (v1.6)
   selftest.py           le scénario complet, lancé dans le programme compilé
-  ui/                   thème, grille, chronologie, dialogues, PDF, fenêtre, diagrammes
+  ui/                   thème, grille, chronologie, dialogues, PDF, fenêtre, diagrammes, mixer.py (v1.6)
 tests/                  test_core (pur), test_voicings, test_player, test_engines (lents), test_ui (hors écran)
 scripts/                compilation, mesures de performance, captures d'écran
 ```
@@ -283,6 +285,41 @@ différents, plus récents) ; un morceau identique est ignoré, un morceau diff�
 sauf choix contraire, et la version écartée va dans `restored/<date>/`, jamais effacée. Les favoris, étiquettes et
 collections fusionnent sans doublon ; l'audio revient en copies conservées, chacune vérifiée par son
 empreinte. Les noms lus dans le zip sont filtrés : rien ne s'écrit hors de son dossier.
+
+## La séparation et le mixage (v1.6)
+
+Choix du modèle, mesures et limites : [SEPARATION.md](SEPARATION.md). Le chemin :
+
+1. **Demande.** `ui/mixer.py` (`MixerController`, rattaché à la fenêtre comme les paroles) ne sépare que
+   sur un clic. Si `models/separation/htdemucs.onnx` manque, `stems.download_model` le prend dans la
+   publication v1.6 par `transcribe.fetch` (`.part`, taille, SHA-256, place libre), dans un fil.
+2. **Séparation.** `worker.start_separation` lance un processus `spawn` en priorité basse (comme
+   l'analyse) : décodage à 44,1 kHz, `separation.separate` (le réseau ONNX sans sa STFT, segments de
+   7,8 s recouvrement 25 %), `stems.arrange` (Karaoké : voix + reste ; ce que le modèle laisse de côté
+   va dans la dernière piste, la somme redonne le morceau), puis `stems.write`. Messages par tube :
+   `progress`, `done`, `error`. Annuler tue le processus.
+3. **Cache.** `stems/<empreinte>-<mode>-htdemucs-<sha12>/` : une FLAC 16 bits par piste et `info.json`,
+   écrits dans un dossier `.part` renommé une fois complet. L'empreinte est celle du projet
+   (`audio.fingerprint`) : même enregistrement, mêmes pistes, quel que soit son chemin ; un autre modèle a
+   une autre clé. `stems.delete_song`, `delete_all` et `delete_model` n'effacent que dans `stems/` et
+   `models/separation/`.
+4. **Lecture.** `stems.load` relit les pistes au taux de la sortie audio, en float16, à la longueur exacte
+   de l'enregistrement décodé, dans un fil (jeton annulable si l'on change de morceau). `player.Mix`
+   garde l'original et les pistes ; le rappel audio prend le bloc demandé, applique les gains (rampe
+   linéaire de 30 ms vers `target`, calcul limité au bloc, quelle que soit la longueur du morceau), puis WSOLA et hauteur : le
+   mixage est en amont de la vitesse et de la transposition, sur la même horloge. Original / Mix est un
+   jeu de gains `[1, 0…]` ou `[0, g…]`. Au-delà de 0,95, la somme passe par une tangente hyperbolique.
+5. **Réglages.** `project.view["mixer"]` : mode, `on`, `levels` (0..100, 75 = 0 dB, gain = (p/75)²),
+   `mute`, `solo`, et `custom` (le dernier réglage personnel, rappelé par le préréglage Personnalisé).
+   `stems.checked` relit ces valeurs sans faire confiance au fichier. Le dernier mode choisi et la vitesse
+   mesurée de séparation (`separation_speed`, secondes par seconde) sont des réglages du programme.
+6. **Export.** `stems.export_mix` refait le même calcul hors du lecteur, par blocs de 10 s, à 44,1 kHz, en
+   FLAC ou WAV 16 bits ; annulable, le fichier incomplet est supprimé.
+
+Tests : `test_separation.py` (pipeline avec un faux réseau, cache, réglages, téléchargement vérifié ; le
+vrai modèle quand il est installé), `test_mixer.py` (rampes, alignement, bascule, vitesse, boucles),
+`test_mixer_ui.py` (le panneau hors écran avec une séparation simulée). `scripts/mixer_screenshots.py` refait
+le parcours complet avec le vrai modèle dans un dossier de données de test.
 
 ## Reconstruire
 

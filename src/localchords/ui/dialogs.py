@@ -430,6 +430,8 @@ SHORTCUTS = [
     ("K", "Paroles : afficher / revenir à la grille seule"),
     ("Entrée (synchronisation)", "Paroles : caler la ligne choisie sur la lecture"),
     ("Ctrl + molette", "Paroles : taille du texte"),
+    ("M", "Mixage : ouvrir / fermer le panneau"),
+    ("Maj + M", "Mixage : basculer entre l'original et le mix personnalisé"),
     ("Échap", "Diagrammes : revenir à l'accord joué"),
     ("F1", "Cette aide"),
 ]

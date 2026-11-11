@@ -123,6 +123,24 @@ mêmes pendant un téléchargement (seuls le texte et la barre de 140 × 6 px ch
 clic ni le focus. La croix le masque jusqu'au prochain démarrage. La fenêtre des nouveautés affiche le
 texte de la version sans HTML ni images, sur `SURFACE`, liens en `SELECT`. Vérifié à 800, 1280 et 3440 px.
 
+## Panneau Mixage (1.6)
+
+![Le panneau Mixage ouvert sous les accords du morceau, à 1920 × 1080](images/localchords-mixer.png)
+
+Un panneau du bas comme les accords du morceau (`panel`, bord du haut), ouvert par le bouton **Mixage**
+de la barre de lecture (icône de trois curseurs, texte dès 1240 px, allumé quand le panneau est ouvert).
+Trois états dans le même cadre : avant la séparation (choix du mode en contrôle segmenté, **Séparer les
+instruments** en seule action ambre, puis le modèle, la place, la durée estimée si elle a été mesurée et
+l'avertissement sur la qualité, en légende), pendant (étape, barre de progression, **Annuler**), et la
+console. La console : Original / Mix personnalisé et les préréglages en deux contrôles segmentés, puis
+une ligne par piste (nom, curseur, niveau en dB, **M**, **S**). Une piste qu'on n'entend pas (coupée, ou
+écartée par un solo) a son nom estompé ; le curseur garde sa position. Les lignes se rangent sur une
+seule rangée dès 400 px par piste, sinon deux colonnes, sinon une : 4 pistes sur une ligne à 1920 px,
+deux colonnes à 1360 px, une à 800 px. Le panneau garde la hauteur de ce qu'il montre ; sur un écran court
+c'est la grille, puis les accords du morceau, qui cèdent. Les curseurs et les boutons ont un nom
+accessible (« Volume : Basse », « Couper Basse ») ; `M` ouvre et ferme le panneau, `Maj + M` compare.
+Vérifié à 800, 1360 × 820, 1920 × 1080 et 5120 px.
+
 ## Revue indépendante
 
 Une relecture séparée (produit et accessibilité, à partir des captures et du code) a relevé, avant

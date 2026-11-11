@@ -1,6 +1,6 @@
 [project]
 name = "localchords"
-version = "1.5.1"
+version = "1.6"
 description = "Grille d'accords locale et synchronisée pour Windows."
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -43,6 +43,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 "tests/test_lyrics_suggest.py" = ["F811"]
 "tests/test_lyrics_motion.py" = ["F811"]
 "tests/test_updates.py" = ["F811"]
+"tests/test_mixer_ui.py" = ["F811"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
