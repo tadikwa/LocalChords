@@ -52,6 +52,7 @@ from .dialogs import ChordEditor, RhythmDialog, SheetDialog, ShortcutsDialog
 from .grid import ChordGrid
 from .library_view import LibraryPage
 from .lyrics_view import LyricsController
+from .mixer import MixerController
 from .pdf import write_chord_sheet, write_pdf
 from .songchords import UPCOMING, Item, SongChords, chord_key
 from .update_banner import UpdateController
@@ -358,6 +359,13 @@ class SongPage(QWidget):
             "Capo", 0, 11, 0, str, "Case du capodastre : la grille montre les formes à jouer."
         )
         controls.addWidget(self.capo)
+        self.mixer_button = QPushButton()
+        self.mixer_button.setIcon(theme.icon("mixer", size=16))
+        self.mixer_button.setCheckable(True)
+        self.mixer_button.setAccessibleName("Mixage")
+        self.mixer_button.setToolTip("Mixage : séparer les instruments et régler leur volume (M)")
+        self.mixer_button.setMinimumWidth(36)
+        controls.addWidget(self.mixer_button)
 
         # How the chords are written: asked for rarely, kept one click away.
         self.display = QToolButton()
@@ -400,6 +408,7 @@ class SongPage(QWidget):
         controls.addWidget(self.volume_icon)
         controls.addWidget(self.volume)
         layout.addWidget(bottom)
+        self.bottom = bottom  # the mixer's panel goes just above it
         self.adapt_to_width(1360)
 
     def _show_audio_state(self, on: bool) -> None:
@@ -435,10 +444,11 @@ class SongPage(QWidget):
         theme.restyle(self.display)  # the style sheet frames it only with its text
         self._audio_wide = width >= 1240  # narrower, the icon and its highlight say it
         self.audio_button.setText(self._audio_text if self._audio_wide else "")
+        self.mixer_button.setText(" Mixage" if self._audio_wide else "")
         for widget in (self.volume, self.volume_icon):
-            widget.setVisible(width >= 1120)
+            widget.setVisible(width >= 1160)
         for widget in (self.loop_a, self.loop_b):
-            widget.setVisible(width >= 960)
+            widget.setVisible(width >= 1040)  # room for the Mixage button
         self.capo.setVisible(width >= 860)
         # Beside the grid when the grid keeps room for its bars, under it otherwise.
         side = width >= SIDE_PANEL_WIDTH
@@ -544,6 +554,7 @@ class MainWindow(QMainWindow):
         self.updates.add_to(self.song.menu.menu())
         self.updates.add_to(self.home.menu_button.menu())
         self.lyrics = LyricsController(self)
+        self.mixer = MixerController(self)
         self.song.panel.set_mode(self.settings.get("diagram_mode", "guitar"))
         self.song.panel.set_state(self.settings.get("diagram_panel", "full"), emit=False)
         if self.song.panel.state != "hidden":
@@ -651,6 +662,7 @@ class MainWindow(QMainWindow):
         for engine in engines.ENGINES.values():
             compare.addAction(engine.label, lambda e=engine.name: self.compare_with(e))
         menu.addAction("Progressions répétées…", self.show_progressions)
+        menu.addAction("Pistes séparées et modèle de séparation…", lambda: self.mixer.show_store())
         self.reset_action = menu.addAction("Effacer toutes les corrections", self.reset_edits)
         menu.addSeparator()
         self.latin_action = QAction("Notes en Do, Ré, Mi", self, checkable=True)
@@ -716,6 +728,8 @@ class MainWindow(QMainWindow):
         shortcut("Escape", self.follow_playback)
         shortcut("Shift+D", self.toggle_pin)
         shortcut("K", lambda: self.lyrics.toggle_mode())
+        shortcut("M", lambda: self.mixer.toggle_panel())
+        shortcut("Shift+M", lambda: self.mixer.toggle_original())
 
     # Opening -----------------------------------------------------------------------------------
     def choose_file(self) -> None:
@@ -1024,6 +1038,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(s)
         self.setWindowTitle(f"{project.audio.get('title') or ''} : LocalChords")
         self._content_changed(save=False)
+        self.mixer.song_opened()
         self._load_audio(library.audio_file(project.audio))
 
     def _load_audio(self, path: Path) -> None:
@@ -1054,6 +1069,7 @@ class MainWindow(QMainWindow):
         if not len(self.project.audio.get("waveform") or ""):
             self.song.waveform.set_peaks(audio.peaks(y), duration)
         self._set_transport_enabled(True)
+        self.mixer.audio_loaded()
 
     def locate_audio(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Localiser le fichier audio", "", AUDIO_FILTER)
@@ -2057,6 +2073,7 @@ class MainWindow(QMainWindow):
         self._cancel_download()
         self.cancel_batch()
         self.lyrics.cancel()
+        self.mixer.close()
         self.updates.stop()
         self.player.pause()
         self.player.close_device()

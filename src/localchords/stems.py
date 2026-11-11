@@ -7,6 +7,7 @@ is sent anywhere. docs/SEPARATION.md gives the measurements behind the choices m
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import os
@@ -127,6 +128,12 @@ def apply_preset(settings: dict, preset: str) -> dict:
     }
 
 
+def restore_custom(settings: dict) -> dict:
+    """Back to the mix last set by hand, if there is one."""
+    custom = settings.get("custom")
+    return {**settings, **custom, "on": True} if custom else settings
+
+
 def current_preset(settings: dict) -> str:
     """The preset these settings are, or "custom"."""
     if not settings["on"]:
@@ -157,13 +164,19 @@ def checked(settings) -> dict | None:
         value = settings.get(key)
         return [n for n in value if n in names] if isinstance(value, list) else []
 
-    return {
+    out = {
         "mode": settings["mode"],
         "on": bool(settings.get("on", True)),
         "levels": clean,
         "mute": names_in("mute"),
         "solo": names_in("solo"),
     }
+    # The user's own mix, kept while a preset is tried, for "Personnalisé" to bring it back.
+    custom = settings.get("custom")
+    custom = checked({**custom, "mode": settings["mode"]}) if isinstance(custom, dict) else None
+    if custom:
+        out["custom"] = {k: custom[k] for k in ("levels", "mute", "solo")}
+    return out
 
 
 # The model ----------------------------------------------------------------------------------
@@ -223,10 +236,8 @@ def size_of(folders: list[Path]) -> int:
     total = 0
     for folder in folders:
         for f in folder.rglob("*"):
-            try:
+            with contextlib.suppress(OSError):
                 total += f.stat().st_size if f.is_file() else 0
-            except OSError:
-                pass
     return total
 
 
@@ -260,11 +271,30 @@ def arrange(mode: str, sources: np.ndarray, mix: np.ndarray) -> dict[str, np.nda
     return {"vocals": vocals, "drums": drums, "bass": bass, "other": mix - vocals - drums - bass}
 
 
+def encode(path: Path, y: np.ndarray, sr: int) -> None:
+    """Stereo float in -1..1 as 16-bit FLAC, or WAV when the path says so."""
+    import av
+
+    wav = path.suffix.lower() == ".wav"
+    pcm = np.clip(np.round(y * 32768), -32768, 32767).astype(np.int16)
+    with av.open(str(path), "w", format="wav" if wav else "flac") as container:
+        stream = container.add_stream("pcm_s16le" if wav else "flac", rate=sr, layout="stereo")
+        for start in range(0, len(pcm), sr * 10):
+            frame = av.AudioFrame.from_ndarray(
+                np.ascontiguousarray(pcm[start : start + sr * 10]).reshape(1, -1),
+                format="s16",
+                layout="stereo",
+            )
+            frame.sample_rate = sr
+            for packet in stream.encode(frame):
+                container.mux(packet)
+        for packet in stream.encode(None):
+            container.mux(packet)
+
+
 def write(folder: Path, stems: dict[str, np.ndarray], sr: int, about: dict) -> Path:
     """FLAC 16-bit, lossless once written; a stem louder than full scale is stored scaled down and
     scaled back on reading. Written beside, renamed when complete."""
-    import av
-
     part = folder.with_name(folder.name + ".part")
     shutil.rmtree(part, ignore_errors=True)
     part.mkdir(parents=True)
@@ -273,20 +303,7 @@ def write(folder: Path, stems: dict[str, np.ndarray], sr: int, about: dict) -> P
         peak = float(np.abs(y).max()) if len(y) else 0.0
         scale = max(1.0, peak * 1.0001)
         scales[name] = scale
-        pcm = np.clip(np.round(y / scale * 32768), -32768, 32767).astype(np.int16)
-        with av.open(str(part / f"{name}.flac"), "w", format="flac") as container:
-            stream = container.add_stream("flac", rate=sr, layout="stereo")
-            for start in range(0, len(pcm), sr * 10):
-                frame = av.AudioFrame.from_ndarray(
-                    np.ascontiguousarray(pcm[start : start + sr * 10]).reshape(1, -1),
-                    format="s16",
-                    layout="stereo",
-                )
-                frame.sample_rate = sr
-                for packet in stream.encode(frame):
-                    container.mux(packet)
-            for packet in stream.encode(None):
-                container.mux(packet)
+        encode(part / f"{name}.flac", y / scale, sr)
     info = {
         **about,
         "version": FORMAT_VERSION,
@@ -316,6 +333,38 @@ def load(folder: Path, mode: str, sr: int, frames: int, should_cancel=None) -> n
         n = min(frames, len(y))
         out[i, :n] = y[:n] * float(info["scale"].get(name, 1.0))
     return out
+
+
+def export_mix(target: Path, recording: Path, folder: Path, settings: dict, task) -> Path:
+    """The mix as set, at the original speed and pitch, written once to `target` (FLAC or WAV,
+    16-bit, 44.1 kHz like the stems): the recording and the stems summed as the player sums them."""
+    from . import audio
+    from .player import Mix
+    from .transcribe import TranscribeError
+
+    sr = MODEL["samplerate"]
+    task.status = "Lecture des pistes…"
+    y = audio.decode(recording, sr)
+    layers = load(folder, settings["mode"], sr, len(y))
+    mix = Mix(y, layers, sr)
+    on = settings["on"]
+    mix.set_gains(0.0 if on else 1.0, gains(settings) if on else [0.0] * len(layers))
+    mix.gains = mix.target.copy()  # no glide from the original: the file starts as set
+    out = np.empty_like(y)
+    task.status = "Mixage…"
+    for start in range(0, len(y), sr * 10):
+        if task.cancelled:
+            raise TranscribeError("Export annulé.")
+        out[start : start + sr * 10] = mix[start : start + sr * 10]
+        task.progress = 0.9 * min(1.0, (start + sr * 10) / max(1, len(y)))
+    task.status = "Écriture du fichier…"
+    try:
+        encode(target, out, sr)
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
+    task.progress = 1.0
+    return target
 
 
 # Before separating --------------------------------------------------------------------------
