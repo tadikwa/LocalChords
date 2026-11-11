@@ -287,9 +287,7 @@ class SongModel(QAbstractTableModel):
         if key == "artist":
             return s["artist"] or "—"
         if key == "genre":
-            return translate("Catalog", s["shown_genre"] or "") or translate(
-                "Library", "Non renseigné"
-            )
+            return C.shown(s["shown_genre"] or "") or translate("Library", "Non renseigné")
         if key == "year":
             return str(s["year"]) if s["year"] else "—"
         if key == "duration":
@@ -438,7 +436,7 @@ class CardDelegate(QStyledItemDelegate):
         else:
             p.setPen(QColor(theme.TEXT_3))
             extra = [
-                translate("Catalog", s["shown_genre"] or ""),
+                C.shown(s["shown_genre"] or ""),
                 translate("Library", "paroles") if s["lyrics"] else "",
             ]
             line = " · ".join(x for x in extra if x)
@@ -1124,14 +1122,13 @@ class LibraryPage(QWidget):
         fill(
             self.genre_box,
             translate("Library", "Tous les genres"),
-            [(translate("Catalog", g), g) for g in genres]
-            + [(translate("Library", "Non renseigné"), "")],
+            [(C.shown(g), g) for g in genres] + [(translate("Library", "Non renseigné"), "")],
         )
         tags = sorted({t for s in songs for t in s["tags"]}, key=C.folded)
         fill(
             self.tag_box,
             translate("Library", "Toutes les étiquettes"),
-            [(translate("Catalog", t), t) for t in tags],
+            [(C.shown(t), t) for t in tags],
         )
         self.tag_box.setVisible(bool(tags))
 
@@ -1386,7 +1383,7 @@ class LibraryPage(QWidget):
         known = list(C.GENRES) + [g for g in self.catalog.genres() if g not in C.GENRES]
         current = one["shown_genre"] if one else None
         for g in known:
-            action = menu.addAction(translate("Catalog", g), lambda g=g: self._set_genre(ids, g))
+            action = menu.addAction(C.shown(g), lambda g=g: self._set_genre(ids, g))
             if one and one["genre"] is not None and current == g:
                 action.setCheckable(True)
                 action.setChecked(True)
@@ -1413,7 +1410,7 @@ class LibraryPage(QWidget):
         tags = sorted(set(C.TAGS) | set(self.catalog.tags()), key=C.folded)
         for tag in tags:
             have = all(C.folded(tag) in {C.folded(t) for t in s["tags"]} for s in songs)
-            action = menu.addAction(translate("Catalog", tag))
+            action = menu.addAction(C.shown(tag))
             action.setCheckable(True)
             action.setChecked(have)
             action.triggered.connect(lambda _=False, t=tag, h=have: self._tag(ids, t, not h))

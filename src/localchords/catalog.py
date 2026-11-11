@@ -91,6 +91,14 @@ TAGS = (
     QT_TRANSLATE_NOOP("Catalog", "À retravailler"),
     QT_TRANSLATE_NOOP("Catalog", "Maîtrisé"),
 )
+
+
+def shown(value: str) -> str:
+    """A genre or tag as the interface shows it: a suggested one translated, the user's own as is
+    (one they named “Titre” stays “Titre”)."""
+    return translate("Catalog", value) if value in GENRES or value in TAGS else value
+
+
 SORTS = {
     "opened": QT_TRANSLATE_NOOP("Catalog", "Dernière ouverture"),
     "added": QT_TRANSLATE_NOOP("Catalog", "Date d'ajout"),
@@ -709,8 +717,8 @@ def matches(song: dict, words: list[str]) -> bool:
             *song["tags"],
             str(song["year"] or ""),
             # Suggested genres and tags are stored in French and shown translated: find both.
-            translate("Catalog", song["shown_genre"] or ""),
-            *(translate("Catalog", t) for t in song["tags"]),
+            shown(song["shown_genre"] or ""),
+            *(shown(t) for t in song["tags"]),
         ]
     )
     hay = folded(text)

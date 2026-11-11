@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QLibraryInfo, QLocale, QTranslator
@@ -21,6 +22,7 @@ NAMES = {"fr": "Français", "en": "English"}
 ENV = "LOCALCHORDS_LANG"  # set for this run's analysis processes; a test may set it too
 
 _current = SOURCE
+_ours: str | None = None  # the ENV value install() set for the workers, as opposed to the user's
 
 
 def translate(context: str, text: str, disambiguation: str | None = None, n: int = -1) -> str:
@@ -74,7 +76,7 @@ def migrate(settings: dict, existing_user: bool) -> bool:
 
 def resolve(choice: str | None, ui_languages: list[str] | None = None) -> str:
     override = os.environ.get(ENV)
-    if override in LANGUAGES:
+    if override in LANGUAGES and override != _ours:
         return override
     if choice in LANGUAGES:
         return choice
@@ -88,7 +90,7 @@ def current() -> str:
 def install(app: QCoreApplication, language: str) -> str:
     """Load the catalogues of one language once per run: Qt's buttons and LocalChords' own. A
     missing catalogue leaves the French text, never an empty label. Returns the language used."""
-    global _current
+    global _current, _ours
     if getattr(app, "_localchords_language", None) is not None:
         return app._localchords_language
     language = language if language in LANGUAGES else FALLBACK
@@ -106,8 +108,23 @@ def install(app: QCoreApplication, language: str) -> str:
         app.installTranslator(ours)
         app._translators.append(ours)
     app._localchords_language = _current = language
-    os.environ[ENV] = language
+    if os.environ.get(ENV) not in LANGUAGES:  # an override of the user's own stays theirs
+        os.environ[ENV] = _ours = language
     return language
+
+
+@contextmanager
+def without_ours():
+    """While a program that chooses its own language is started (the updated LocalChords, its
+    installer): the value install() set for the workers is out of the environment it inherits."""
+    ours = _ours is not None and os.environ.get(ENV) == _ours
+    if ours:
+        del os.environ[ENV]
+    try:
+        yield
+    finally:
+        if ours:
+            os.environ[ENV] = _ours
 
 
 def install_worker() -> None:

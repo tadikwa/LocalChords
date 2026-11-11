@@ -13,6 +13,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QObject
 
 from localchords import backup, i18n, library
 from localchords.catalog import open_catalog
@@ -97,6 +98,49 @@ def test_the_environment_overrides_for_analysis_processes(monkeypatch):
     assert i18n.resolve("fr") == "en"
     monkeypatch.setenv(i18n.ENV, "zz")
     assert i18n.resolve("fr") == "fr"
+
+
+class FakeApp(QObject):
+    def installTranslator(self, translator):
+        pass
+
+
+def test_the_value_left_for_the_workers_hides_no_new_choice(monkeypatch):
+    # install() leaves its language in the environment for the analysis processes; the menu and
+    # the updater must still see the choice saved for the next start.
+    monkeypatch.setattr(i18n, "_current", i18n._current)
+    monkeypatch.setattr(i18n, "_ours", None)
+    monkeypatch.delenv(i18n.ENV)
+    assert i18n.install(FakeApp(), "fr") == "fr"
+    assert os.environ[i18n.ENV] == "fr"  # for the workers
+    assert i18n.resolve("en") == "en"  # so the menu says “English at the next start”
+    with i18n.without_ours():  # and the program the updater starts reads its own settings
+        assert i18n.ENV not in os.environ
+    assert os.environ[i18n.ENV] == "fr"
+
+
+def test_an_override_of_the_users_own_stays_and_wins(monkeypatch):
+    monkeypatch.setattr(i18n, "_current", i18n._current)
+    monkeypatch.setattr(i18n, "_ours", None)
+    monkeypatch.setenv(i18n.ENV, "en")
+    assert i18n.install(FakeApp(), "en") == "en"
+    assert i18n.resolve("fr") == "en"
+    with i18n.without_ours():
+        assert os.environ[i18n.ENV] == "en"
+
+
+def test_the_updater_starts_the_new_program_without_this_runs_language(monkeypatch, tmp_path):
+    monkeypatch.setattr(i18n, "_ours", "fr")
+    monkeypatch.setenv(i18n.ENV, "fr")
+    seen = {}
+
+    def startfile(path, arguments=""):
+        seen.update(env=os.environ.get(i18n.ENV), arguments=arguments)
+
+    monkeypatch.setattr(update_banner.os, "startfile", startfile, raising=False)
+    update_banner.launch(tmp_path / "LocalChords-Setup.exe", "/LANG=english")
+    assert seen == {"env": None, "arguments": "/LANG=english"}
+    assert os.environ[i18n.ENV] == "fr"  # this run's workers keep theirs
 
 
 def test_restoring_a_backup_keeps_the_interface_language(data, tmp_path):
@@ -275,7 +319,7 @@ from pathlib import Path
 from PySide6.QtGui import QAction, QPainter
 from PySide6.QtWidgets import (QAbstractButton, QComboBox, QLabel, QLineEdit, QMenu, QMessageBox,
                                QWidget)
-from localchords import export, i18n
+from localchords import catalog, export, i18n
 from localchords import lyrics as L
 from localchords.i18n import translate
 from localchords.ui.main_window import MainWindow, app_instance
@@ -329,6 +373,7 @@ print("RESULT" + json.dumps({
     "text": export.to_text(p),
     "pdf": pdf.read_bytes()[:5].decode("latin-1"),
     "drawn": drawn,
+    "genres": [catalog.shown(g) for g in ("Classique", "À apprendre", "Titre", "Durée", "Mien")],
 }, ensure_ascii=False))
 """
 
@@ -397,6 +442,11 @@ def test_qt_buttons_plurals_and_numbers_follow_the_language(run_in):
     assert french["plural"] == ["1 morceau", "2 morceaux"]
     assert (english["number"], french["number"]) == ("1.5", "1,5")
     assert (english["size"], french["size"]) == ("1.5 GB", "1,5 Go")
+
+
+def test_suggested_genres_and_tags_are_translated_but_not_the_users_own(run_in):
+    assert run_in("en")["genres"] == ["Classical", "To Learn", "Titre", "Durée", "Mien"]
+    assert run_in("fr")["genres"] == ["Classique", "À apprendre", "Titre", "Durée", "Mien"]
 
 
 def test_exports_translate_labels_but_never_the_music(run_in):

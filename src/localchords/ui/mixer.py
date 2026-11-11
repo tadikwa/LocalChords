@@ -45,6 +45,10 @@ SHORT_MODE = {
     "karaoke": QT_TRANSLATE_NOOP("Mixer", "Karaoké · 2 pistes"),
     "musician": QT_TRANSLATE_NOOP("Mixer", "Musicien · 4 pistes"),
 }
+MODE_NAME = {
+    "karaoke": QT_TRANSLATE_NOOP("Mixer", "Karaoké"),
+    "musician": QT_TRANSLATE_NOOP("Mixer", "Musicien"),
+}
 ROW_WIDTH = 400  # a stem's row needs about this much to keep its slider usable
 
 
@@ -978,7 +982,7 @@ class MixerController(QObject):
         export.setEnabled(ready and self.export_task is None)
         if self.settings is not None:
             other = _other(self.settings["mode"])
-            name = translate("Mixer", SHORT_MODE[other]).split(" ·")[0]
+            name = translate("Mixer", MODE_NAME[other])
             if stems.cached(self.fp, other):
                 menu.addAction(
                     translate("Mixer", "Utiliser les pistes du mode {name}").format(name=name),

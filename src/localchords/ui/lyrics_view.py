@@ -1200,7 +1200,9 @@ class LyricsController(QObject):
             kind = src.get("kind")
             text = translate("Lyrics", L.KINDS.get(kind, ""))
             if src.get("name"):
-                text += f" : {translate('LyricsOnline', src['name'])}"
+                text = translate("Lyrics", "{kind} : {name}").format(
+                    kind=text, name=translate("LyricsOnline", src["name"])
+                )
             if kind == "catalog" and src.get("artist"):
                 text += f" · {src.get('artist')} – {src.get('title')}"
             if L.edited(lyr):

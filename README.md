@@ -320,9 +320,9 @@ prenez **l'un des trois** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-Setup-v1.6.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
-| `LocalChords-v1.6-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.6-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-Setup-v1.7.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
+| `LocalChords-v1.7-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.7-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
 Même programme, mêmes résultats. **Vos données ne bougent pas** : quel que soit le fichier choisi, vos
 morceaux, votre bibliothèque et vos sauvegardes restent dans `%LOCALAPPDATA%\LocalChords`. Installer,
@@ -337,7 +337,7 @@ ou chercher une mise à jour si vous l'avez permis).
 **Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
 programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 Pour vérifier le fichier, son empreinte SHA-256 figure dans `SHA256SUMS.txt` sur la page de la version
-(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.6.exe`).
+(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.7.exe`).
 
 ### Mises à jour (1.5.1)
 

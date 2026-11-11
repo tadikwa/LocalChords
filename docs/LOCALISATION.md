@@ -31,18 +31,23 @@ A rule follows from this: **no stored value depends on the language.** Code comp
   - `migrate(settings, existing_user)`: gives `settings["language"]` a value once. Someone who already
     had LocalChords data (settings, library or projects) gets `"fr"`, since everything was French before
     1.7; a new user gets `"auto"`.
-  - `resolve(choice)`: `LOCALCHORDS_LANG` if set, else the choice, else (`"auto"`) the system language.
+  - `resolve(choice)`: `LOCALCHORDS_LANG` if the user set it, else the choice, else (`"auto"`) the
+    system language.
   - `install(app, language)`: loads `qtbase_<lang>.qm` (from PySide6) and
     `translations/localchords_<lang>.qm`, then sets `LOCALCHORDS_LANG` so that analysis and separation
     processes started afterwards speak the same language (`install_worker()` in those processes).
+    `resolve` ignores that value of its own, and `without_ours()` keeps it from the new program and
+    installer the updater starts: they read the language from the settings.
 - `ui/main_window.py: app_instance()` runs `migrate` then `install` before any window is built.
 - The **☰ menu → Langue / Language** submenu (`ui/widgets.py: language_menu`, in the song page and the
   library) saves the choice. The new language takes effect at the next start: a bilingual message says
   so. The submenu's own title stays “Langue / Language” in every language, so that anyone can find it.
 - A missing message, or a missing `.qm`, shows the French source: nothing crashes.
 - Restoring a library backup never changes the language (`backup.py`).
-- The updater passes `/LANG=english` or `/LANG=french` to the installer it runs
-  (`ui/update_banner.py: INSTALLER_LANGUAGES`).
+- The updater passes `/LANG=english` or `/LANG=french` to the installer it runs, in the language chosen
+  for the next start (`ui/update_banner.py: INSTALLER_LANGUAGES`).
+- Suggested genres and tags go through `catalog.shown()`: only those of `GENRES` and `TAGS` are
+  translated, never a name the user typed.
 
 ## Writing translatable code
 

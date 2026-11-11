@@ -1668,6 +1668,10 @@ It is a private copy, for you: it is not a way to share songs.</translation>
         <source>Paroles</source>
         <translation>Lyrics</translation>
     </message>
+    <message>
+        <source>{kind} : {name}</source>
+        <translation>{kind}: {name}</translation>
+    </message>
 </context>
 <context>
     <name>LyricsDialogs</name>
@@ -2094,11 +2098,11 @@ It is a private copy, for you: it is not a way to share songs.</translation>
     </message>
     <message>
         <source>Décaler toutes les paroles de -0,1 s</source>
-        <translation>Shift all lyrics by -0.1 s</translation>
+        <translation>Shift All Lyrics by -0.1 s</translation>
     </message>
     <message>
         <source>Décaler toutes les paroles de +0,1 s</source>
-        <translation>Shift all lyrics by +0.1 s</translation>
+        <translation>Shift All Lyrics by +0.1 s</translation>
     </message>
     <message>
         <source>Texte plus grand</source>
@@ -3065,6 +3069,14 @@ Other possible readings: {others}.</translation>
     <message>
         <source>Musicien · 4 pistes</source>
         <translation>Musician · 4 stems</translation>
+    </message>
+    <message>
+        <source>Karaoké</source>
+        <translation>Karaoke</translation>
+    </message>
+    <message>
+        <source>Musicien</source>
+        <translation>Musician</translation>
     </message>
     <message>
         <source>Volume : {label}</source>

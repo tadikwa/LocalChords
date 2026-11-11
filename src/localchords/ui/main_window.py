@@ -1753,7 +1753,7 @@ class MainWindow(QMainWindow):
         s = self.song
         s.grid.set_playhead(position)
         s.waveform.set_position(position)
-        if s.play.accessibleName() == "Pause" and not self.player.playing:
+        if s.play.accessibleName() == translate("MainWindow", "Pause") and not self.player.playing:
             self._update_play_icon()
         s.time.setText(f"{fmt_time(position)} / {fmt_time(self.project.duration)}")
         beat = self.project.beat_at(position)
