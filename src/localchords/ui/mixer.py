@@ -90,6 +90,14 @@ class StemRow(QWidget):
         self.db.setObjectName("caption")
         self.db.setFixedWidth(48)
         self.db.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.reset = QToolButton()
+        self.reset.setIcon(theme.icon("undo", size=14))
+        self.reset.setToolTip(
+            f"Remettre {label} à 0 dB (aussi : double-clic sur le curseur) ; "
+            "les autres pistes, Muet et Solo ne changent pas"
+        )
+        self.reset.setAccessibleName(f"Remettre {label} à 0 dB")
+        self.reset.clicked.connect(lambda: self.slider.setValue(stems.UNITY))
         self.mute = QPushButton("M")
         self.mute.setToolTip(f"Couper : {label}")
         self.mute.setAccessibleName(f"Couper {label}")
@@ -102,6 +110,7 @@ class StemRow(QWidget):
         row.addWidget(self.label)
         row.addWidget(self.slider, 1)
         row.addWidget(self.db)
+        row.addWidget(self.reset)
         row.addWidget(self.mute)
         row.addWidget(self.solo)
         self.slider.valueChanged.connect(lambda v: self.changed.emit(name, "level", v))
@@ -118,6 +127,7 @@ class StemRow(QWidget):
         for widget in (self.slider, self.mute, self.solo):
             widget.blockSignals(False)
         self.db.setText(stems.db_text(level))
+        self.reset.setEnabled(level != stems.UNITY)
         # What is not heard is drawn as such, whatever the reason (its own mute, another's solo).
         heard = stems.gains(settings)[stems.MODES[settings["mode"]]["stems"].index(self.name)] > 0
         self.label.setObjectName("" if heard and settings["on"] else "muted")
@@ -223,7 +233,7 @@ class MixerPanel(QFrame):
         col = QVBoxLayout(self.console)
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(8)
-        row = QHBoxLayout()
+        row = self.top = QHBoxLayout()
         self.ab_group = QButtonGroup(self)
         self.original = QPushButton("Original")
         self.original.setToolTip("Écouter l'enregistrement tel quel (Maj + M pour basculer)")
@@ -232,11 +242,12 @@ class MixerPanel(QFrame):
         for b in (self.original, self.mixed):
             b.setCheckable(True)
             self.ab_group.addButton(b)
-        row.addWidget(segmented([self.original, self.mixed]))
+        self.ab_frame = segmented([self.original, self.mixed])
+        row.addWidget(self.ab_frame, 0, Qt.AlignmentFlag.AlignLeft)
         row.addSpacing(8)
         self.preset_group = QButtonGroup(self)
         self.presets_frame = segmented([])
-        row.addWidget(self.presets_frame)
+        row.addWidget(self.presets_frame, 0, Qt.AlignmentFlag.AlignLeft)
         row.addStretch(1)
         col.addLayout(row)
         self.rows_box = QWidget()
@@ -277,6 +288,11 @@ class MixerPanel(QFrame):
             b.setCheckable(True)
             if key == "custom":
                 b.setToolTip("Revenir à votre propre réglage")
+            elif key == "all":
+                b.setToolTip(
+                    "Toutes les pistes séparées à 0 dB, sans Muet ni Solo. Ce n'est pas "
+                    "l'enregistrement d'origine : pour lui, choisissez « Original »."
+                )
             self.preset_group.addButton(b)
             self.preset_buttons[key] = b
             track.addWidget(b)
@@ -287,6 +303,10 @@ class MixerPanel(QFrame):
         if not n:
             return
         avail = width - 32
+        # Presets too wide beside Original/Mix (a narrow window): they go on a line of their own.
+        wide = self.ab_frame.sizeHint().width() + 8 + self.presets_frame.sizeHint().width()
+        d = QHBoxLayout.Direction
+        self.top.setDirection(d.LeftToRight if avail >= wide else d.TopToBottom)
         cols = n if avail >= ROW_WIDTH * n else (2 if avail >= ROW_WIDTH * 2 else 1)
         for r in self.stem_rows:
             self.rows.removeWidget(r)

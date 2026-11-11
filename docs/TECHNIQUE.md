@@ -311,6 +311,10 @@ Choix du modèle, mesures et limites : [SEPARATION.md](SEPARATION.md). Le chemin
    jeu de gains `[1, 0…]` ou `[0, g…]`. Au-delà de 0,95, la somme passe par une tangente hyperbolique.
 5. **Réglages.** `project.view["mixer"]` : mode, `on`, `levels` (0..100, 75 = 0 dB, gain = (p/75)²),
    `mute`, `solo`, et `custom` (le dernier réglage personnel, rappelé par le préréglage Personnalisé).
+   Les préréglages (`stems.PRESETS`) ne changent que `levels`, `on`, `mute` et `solo`, jamais `custom` ;
+   « Toutes les pistes » (`all`, v1.6.1) met chaque piste à 75 et passe sur le mix, quand « Original »
+   remet seulement `on` à faux. L'icône ↶ d'une piste remet son curseur à 75 : c'est un réglage à la
+   main, gardé dans `custom` comme le double-clic.
    `stems.checked` relit ces valeurs sans faire confiance au fichier. Le dernier mode choisi et la vitesse
    mesurée de séparation (`separation_speed`, secondes par seconde) sont des réglages du programme.
 6. **Export.** `stems.export_mix` refait le même calcul hors du lecteur, par blocs de 10 s, à 44,1 kHz, en

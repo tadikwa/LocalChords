@@ -174,9 +174,16 @@ def test_levels_mute_solo_and_presets():
     k = stems.apply_preset(s, "karaoke")
     assert stems.gains(k) == [0.0, 1.0, 1.0, 1.0] and stems.current_preset(k) == "karaoke"
     assert stems.current_preset(stems.apply_preset(k, "original")) == "original"
-    assert stems.presets_for("karaoke") == ["original", "karaoke", "vocals"]
+    assert stems.presets_for("karaoke") == ["original", "all", "karaoke", "vocals"]
     assert "no_bass" in stems.presets_for("musician")
     assert stems.gains(stems.apply_preset(stems.new_settings("karaoke"), "vocals")) == [1.0, 0.0]
+    # "all" is the stems summed at 0 dB, never the recording; a fresh mix is that preset.
+    assert stems.current_preset(stems.new_settings("musician")) == "all"
+    mixed = {**s, "on": False, "mute": ["bass"], "solo": ["drums"], "custom": {"levels": {}}}
+    every = stems.apply_preset(mixed, "all")
+    assert every["on"] and not every["mute"] and not every["solo"]
+    assert stems.gains(every) == [1.0] * 4 and stems.current_preset(every) == "all"
+    assert every["custom"] is mixed["custom"]  # a preset never overwrites the user's mix
 
 
 def test_settings_read_back_safely():

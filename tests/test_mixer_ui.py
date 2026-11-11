@@ -137,7 +137,7 @@ def test_presets_and_the_custom_mix(app, wav, tmp_path, fake_separation):
     rows = {r.name: r for r in c.panel.stem_rows}
     rows["other"].slider.setValue(90)
     buttons = c.panel.preset_buttons
-    assert set(buttons) == {"karaoke", "vocals", "no_bass", "no_drums", "custom"}
+    assert set(buttons) == {"all", "karaoke", "vocals", "no_bass", "no_drums", "custom"}
     buttons["karaoke"].click()
     assert mix.target[1] == 0.0 and mix.target[4] == 1.0  # vocals off, the rest as separated
     buttons["no_drums"].click()
@@ -153,7 +153,45 @@ def test_karaoke_mode_has_its_own_presets(app, wav, tmp_path, fake_separation):
     window = opened(app, wav, tmp_path)
     c = separated(app, window, "karaoke")
     assert [r.name for r in c.panel.stem_rows] == ["vocals", "instrumental"]
-    assert set(c.panel.preset_buttons) == {"karaoke", "vocals", "custom"}
+    assert set(c.panel.preset_buttons) == {"all", "karaoke", "vocals", "custom"}
+    window.close()
+
+
+@pytest.mark.parametrize("mode", ["karaoke", "musician"])
+def test_reset_one_stem_or_all_of_them(app, wav, tmp_path, fake_separation, mode):
+    window = opened(app, wav, tmp_path)
+    c = separated(app, window, mode)
+    mix, buttons, p = window.player.mix, c.panel.preset_buttons, c.panel
+    assert buttons["all"].isChecked()  # just separated: every stem as it is
+    first, last = p.stem_rows[0], p.stem_rows[-1]
+    assert not first.reset.isEnabled()  # nothing to reset yet
+    first.slider.setValue(30)
+    last.slider.setValue(90)
+    last.mute.click()
+    first.solo.click()
+    # The icon resets that stem's level only: the others, Muet and Solo stay as set.
+    first.reset.click()
+    s = c.settings
+    assert s["levels"] == {**{n: 75 for n in s["levels"]}, last.name: 90}
+    assert s["mute"] == [last.name] and s["solo"] == [first.name]
+    assert not first.reset.isEnabled() and last.reset.isEnabled()
+    assert first.db.text() == "0 dB" and buttons["custom"].isChecked()
+    last.slider.mouseDoubleClickEvent(None)  # the double click still does the same
+    assert c.settings["levels"][last.name] == stems.UNITY
+    last.slider.setValue(90)
+    # "Toutes les pistes", even from Original: the stems at 0 dB, no Muet or Solo.
+    p.original.click()
+    assert mix.target[0] == 1.0
+    buttons["all"].click()
+    s = c.settings
+    assert s["on"] and set(s["levels"].values()) == {stems.UNITY} and not s["mute"] + s["solo"]
+    assert list(mix.target) == [0.0] + [1.0] * len(p.stem_rows)
+    assert buttons["all"].isChecked() and p.mixed.isChecked() and not p.original.isChecked()
+    assert not any(r.mute.isChecked() or r.solo.isChecked() for r in p.stem_rows)
+    # Personnalisé still brings back the mix set by hand.
+    buttons["custom"].click()
+    s = c.settings
+    assert s["levels"][last.name] == 90 and s["mute"] == [last.name] and s["solo"] == [first.name]
     window.close()
 
 
@@ -237,6 +275,9 @@ def test_the_console_fits_the_width(app, wav, tmp_path, fake_separation, width):
     c.panel.reflow(width)
     cols = {c.panel.rows.getItemPosition(c.panel.rows.indexOf(r))[1] for r in c.panel.stem_rows}
     assert len(cols) == {800: 1, 1920: 4, 5120: 4}[width]
+    presets = c.panel.presets_frame  # all six, never cut: on their own line when narrow
+    assert presets.width() >= presets.sizeHint().width()
+    assert presets.mapTo(c.panel, presets.rect().topRight()).x() <= c.panel.width() - 16
     assert (window.song.mixer_button.text() == " Mixage") == (width >= 1240)
     window.close()
 

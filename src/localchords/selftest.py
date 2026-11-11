@@ -299,10 +299,17 @@ def run(audio_path: Path, out: Path) -> int:
             # Done, or failed: separated, then the stems read in the background.
             wait(lambda: window.player.mix is not None or not (c.busy() or c.load_token), 900)
             mix = window.player.mix
+            mixed = False
             if mix is not None:
-                {r.name: r for r in c.panel.stem_rows}["bass"].slider.setValue(0)
+                bass = {r.name: r for r in c.panel.stem_rows}["bass"]
+                bass.slider.setValue(0)
+                mixed = mix.stems.shape[0] == 4 and mix.target[3] == 0.0
+                bass.reset.click()  # one stem back to 0 dB, then every stem
+                mixed = mixed and mix.target[3] == 1.0
+                c.panel.preset_buttons["all"].click()
+                mixed = mixed and list(mix.target) == [0.0, 1.0, 1.0, 1.0, 1.0]
             separated = {
-                "ok": bool(mix is not None and mix.stems.shape[0] == 4 and mix.target[3] == 0.0),
+                "ok": bool(mixed),
                 "seconds": round(time.perf_counter() - started, 1),
                 "error": c.error or c.panel.warn.text(),
             }
