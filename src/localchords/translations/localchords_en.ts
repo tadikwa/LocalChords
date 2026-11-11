@@ -696,6 +696,10 @@ Continue with this PC&apos;s data ({classic_dir}) for this session? Nothing is c
         <translation>fret {capo} (chosen, not detected)</translation>
     </message>
     <message>
+        <source>{label} : {value}</source>
+        <translation>{label}: {value}</translation>
+    </message>
+    <message>
         <source>(LocalChords {version} : extraction automatique, à vérifier à l&apos;oreille.)</source>
         <translation>(LocalChords {version}: automatic extraction, check it by ear.)</translation>
     </message>
@@ -2345,7 +2349,7 @@ It is a private copy, for you: it is not a way to share songs.</translation>
     </message>
     <message>
         <source>Transcription en cours, sur cet ordinateur : {status} {round} % · {fmt_time}</source>
-        <translation>Transcribing, on this computer: {status} {round} % · {fmt_time}</translation>
+        <translation>Transcribing, on this computer: {status} {round}% · {fmt_time}</translation>
     </message>
     <message>
         <source>whisper.cpp, modèle {id}</source>
@@ -2533,6 +2537,10 @@ It is a private copy, for you: it is not a way to share songs.</translation>
     <message>
         <source>Vitesse</source>
         <translation>Speed</translation>
+    </message>
+    <message>
+        <source>{percent} %</source>
+        <translation>{percent}%</translation>
     </message>
     <message>
         <source>Ralentir sans changer la hauteur (- / +)</source>

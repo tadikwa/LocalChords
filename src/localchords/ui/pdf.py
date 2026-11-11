@@ -17,7 +17,7 @@ from PySide6.QtGui import (
     QPen,
 )
 
-from ..export import bar_symbols, header
+from ..export import bar_symbols, field, header
 from ..i18n import translate
 from ..project import Project
 from . import diagrams, theme
@@ -76,7 +76,7 @@ def _writer(path: Path, title: str, landscape: bool = False) -> tuple[QPdfWriter
 def _title(p: QPainter, project: Project, width: float, draw: bool = True) -> float:
     """The title and what to know before playing; returns where the page goes on."""
     fields = dict(header(project))
-    title = fields.pop("Titre", "")
+    title = fields.pop(translate("Export", "Titre"), "")
     p.setPen(INK)
     p.setFont(theme.app_font(30, 700))
     metrics = QFontMetricsF(p.font())
@@ -89,7 +89,7 @@ def _title(p: QPainter, project: Project, width: float, draw: bool = True) -> fl
     y = metrics.height() + 4
     p.setFont(theme.app_font(14))
     metrics = QFontMetricsF(p.font())
-    line = "   ·   ".join(f"{k} : {v}" for k, v in fields.items())
+    line = "   ·   ".join(field(k, v) for k, v in fields.items())
     box = metrics.boundingRect(QRectF(0, 0, width, 1000), Qt.TextFlag.TextWordWrap, line)
     if draw:
         p.drawText(QRectF(0, y, width, box.height()), Qt.TextFlag.TextWordWrap, line)
@@ -475,14 +475,14 @@ def write_lyrics_sheet(
 
     # The head: the title, what to know before playing, where the words come from.
     fields = dict(header(project))
-    title = fields.pop("Titre", "") or translate("Pdf", "Sans titre")
-    artist = fields.pop("Artiste", "")
+    title = fields.pop(translate("Export", "Titre"), "") or translate("Pdf", "Sans titre")
+    artist = fields.pop(translate("Export", "Artiste"), "")
     text_block(title, theme.app_font(26, 700), "#111111", 0)
     if artist:
         text_block(artist, theme.app_font(16, 600), "#3A3A3A", 2)
     if options.get("details", True) and fields:
         text_block(
-            "   ·   ".join(f"{k} : {v}" for k, v in fields.items()),
+            "   ·   ".join(field(k, v) for k, v in fields.items()),
             theme.app_font(12),
             "#3A3A3A",
             8,

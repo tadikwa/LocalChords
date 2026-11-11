@@ -100,9 +100,14 @@ def header(project: Project) -> list[tuple[str, str]]:
     return fields
 
 
+def field(label: str, value) -> str:
+    # “Titre : …” in French, “Title: …” in English.
+    return translate("Export", "{label} : {value}").format(label=label, value=value)
+
+
 def to_text(project: Project) -> str:
     """Aligned bars: `| C . . . | Am . G . |`, four to a line."""
-    lines = [f"{k} : {v}" for k, v in header(project)]
+    lines = [field(k, v) for k, v in header(project)]
     lines.append("")
     bars = bar_symbols(project)
     width = max((len(c) for bar in bars for c in bar), default=1) or 1
@@ -170,7 +175,7 @@ def to_text_with_lyrics(project: Project, width: int = 72) -> str:
     """The chords over the words in plain text, from the same layout as the screen and the PDF,
     with a character as the unit."""
     rows = lyric_rows(project)
-    out = [f"{k} : {v}" for k, v in header(project)]
+    out = [field(k, v) for k, v in header(project)]
     if approximate(rows):
         out.append(
             translate(

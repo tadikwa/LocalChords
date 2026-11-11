@@ -272,13 +272,14 @@ def test_the_compiled_catalogues_match_their_sources(tmp_path):
 PROBE = r"""
 import json, os
 from pathlib import Path
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QPainter
 from PySide6.QtWidgets import (QAbstractButton, QComboBox, QLabel, QLineEdit, QMenu, QMessageBox,
                                QWidget)
 from localchords import export, i18n
+from localchords import lyrics as L
 from localchords.i18n import translate
 from localchords.ui.main_window import MainWindow, app_instance
-from localchords.ui.pdf import write_pdf
+from localchords.ui.pdf import write_lyrics_sheet, write_pdf
 from test_core import project
 
 app = app_instance()
@@ -306,8 +307,17 @@ for a in w.findChildren(QAction):
 box = QMessageBox(QMessageBox.Icon.Question, "", "",
                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
 p = project()
-pdf = Path(os.environ["LOCALCHORDS_DATA"]) / "sheet.pdf"
-write_pdf(p, pdf)
+p.lyrics = L.new(L.parse("[00:01.00]Le matin" + chr(10) + "[00:03.00]se lève"), {"kind": "file"})
+drawn = {"chords": [], "lyrics": []}
+draw = QPainter.drawText
+folder = Path(os.environ["LOCALCHORDS_DATA"])
+for kind, write in (("chords", lambda f: write_pdf(p, f)),
+                    ("lyrics", lambda f: write_lyrics_sheet(p, f, {"diagrams": "none"}, [], {}))):
+    QPainter.drawText = lambda self, *a, kind=kind: (
+        drawn[kind].extend(x for x in a if isinstance(x, str)), draw(self, *a))[1]
+    write(folder / f"{kind}.pdf")
+QPainter.drawText = draw
+pdf = folder / "chords.pdf"
 print("RESULT" + json.dumps({
     "language": i18n.current(),
     "texts": sorted(t for t in texts if t),
@@ -318,6 +328,7 @@ print("RESULT" + json.dumps({
     "size": i18n.size(3 * 2**29),
     "text": export.to_text(p),
     "pdf": pdf.read_bytes()[:5].decode("latin-1"),
+    "drawn": drawn,
 }, ensure_ascii=False))
 """
 
@@ -391,6 +402,12 @@ def test_qt_buttons_plurals_and_numbers_follow_the_language(run_in):
 def test_exports_translate_labels_but_never_the_music(run_in):
     english, french = run_in("en"), run_in("fr")
     assert english["pdf"] == french["pdf"] == "%PDF-"
+    # The sheets' heading is the song's title, and its details are labelled the language's way.
+    for kind in ("chords", "lyrics"):
+        assert english["drawn"][kind][0] == french["drawn"][kind][0] == "Été à Noël"
+        assert any(t.startswith("Key: C major") for t in english["drawn"][kind]), kind
+        assert any(t.startswith("Tonalité : ") for t in french["drawn"][kind]), kind
+        assert not any(t.startswith(("Title", "Untitled")) for t in english["drawn"][kind])
     assert "Title" in english["text"] and "Titre" not in english["text"]
     assert "Titre" in french["text"]
     # The song's own title and its chords are the same in both languages.

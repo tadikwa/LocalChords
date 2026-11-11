@@ -345,7 +345,7 @@ class SongPage(QWidget):
             0,
             len(SPEEDS) - 1,
             SPEEDS.index(1.0),
-            lambda i: f"{round(SPEEDS[i] * 100)} %",
+            lambda i: translate("MainWindow", "{percent} %").format(percent=round(SPEEDS[i] * 100)),
             translate("MainWindow", "Ralentir sans changer la hauteur (- / +)"),
         )
         controls.addWidget(self.speed)
