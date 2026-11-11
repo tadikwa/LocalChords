@@ -1,26 +1,30 @@
 # État du projet
 
-Mis à jour le 2026-11-11 : v1.5.1 (paroles animées et mises à jour assistées) publiée
-(<https://github.com/tadikwa/LocalChords/releases/tag/v1.5.1>), dernière version. Les versions v1.1 à v1.5
-restent en ligne, inchangées.
+Mis à jour le 2026-11-11 : v1.6 (studio d'accompagnement : séparation des instruments et mixage)
+publiée (<https://github.com/tadikwa/LocalChords/releases/tag/v1.6>), dernière version. Les versions v1.1 à
+v1.5.1 restent en ligne, inchangées.
 
-## v1.6 en cours (branche `feature/v1.6-stem-mixer`)
+## v1.6
 
 Séparation des instruments et mixage multipiste ; mesures et choix dans [SEPARATION.md](SEPARATION.md),
-notes dans [NOTES-v1.6.md](NOTES-v1.6.md).
-Fait : modèle (Demucs v4 htdemucs en ONNX, CPU, Karaoké 2 pistes et Musicien 4 pistes, pas de 6 pistes,
-pas de carte graphique), `separation.py`, cache FLAC `stems.py`, `worker.start_separation`, `player.Mix`,
-panneau Mixage `ui/mixer.py` (séparation à la demande, téléchargement vérifié du modèle, console,
-préréglages, réglages par morceau, export FLAC/WAV, gestion des pistes et du modèle), tests
-(`test_separation.py`, `test_mixer.py`, `test_mixer_ui.py`), séparation réelle depuis l'interface,
-docs (README, TECHNIQUE, DESIGN, SEPARATION, licences avec `licences/demucs-MIT.txt`), captures.
-Fait aussi : revue indépendante et ses corrections, version 1.6, autotest (pistes FLAC ;
-séparation réelle en 33 s quand le modèle est dans le dossier de données).
-Reste : fusion, tag, CI, envoi de
-`htdemucs.onnx` (copie de `work/sep-bench/onnx/htdemucs-0.onnx`, 174 264 717 octets, SHA-256 dans
-`stems.MODEL`) dans la publication v1.6, vérification des binaires, mise à jour depuis la v1.5.1,
-publication. Reprise : morceaux de test libres dans `work/test-songs`, données de test (modèle et pistes)
-dans `work/v16-data` ; `LOCALCHORDS_DATA=work/v16-data python scripts/mixer_screenshots.py <morceau> <dossier>`.
+notes dans [NOTES-v1.6.md](NOTES-v1.6.md). Modèle Demucs v4 htdemucs en ONNX, processeur seulement,
+Karaoké (2 pistes) et Musicien (4), pas de 6 pistes ni de carte graphique ; `separation.py`, cache FLAC
+`stems.py`, `worker.start_separation`, `player.Mix`, panneau Mixage `ui/mixer.py`. 847 tests (1 ignoré :
+modèle absent du dossier de données par défaut). Revue indépendante : voir plus bas.
+
+Publication (2026-11-11, fusion c266e3d, tag v1.6) : binaires de la CI vérifiés (SHA-256 identiques à
+`SHA256SUMS.txt`, licences dont `demucs-MIT.txt`, pas de PyTorch, zip 53 Ko de plus que la v1.5.1) ;
+autotest 19/19 du zip (avec une séparation réelle de 31 s dans le programme empaqueté), de l'exécutable
+unique et du programme installé, chacun sur des données vides ; installation par-dessus une v1.5.1
+installée (même dossier, même AppId, une seule entrée, version 1.6), puis désinstallation ; données
+réelles identiques octet pour octet avant, après la mise à jour et après la désinstallation.
+`htdemucs.onnx` (174 264 717 octets) ajouté à la publication et à `SHA256SUMS.txt`. Après publication,
+sans compte : les 6 fichiers se téléchargent, `releases/latest` est v1.6 ; le module de mise à jour en se
+faisant passer pour une 1.5.1 trouve la v1.6, choisit le bon fichier pour chaque installation,
+télécharge l'installateur et le vérifie ; en 1.6, rien de plus récent ; le modèle se télécharge depuis la
+publication et est vérifié (8 s). Reprise : morceaux de test libres dans `work/test-songs`, données de
+test (modèle et pistes) dans `work/v16-data` ;
+`LOCALCHORDS_DATA=work/v16-data python scripts/mixer_screenshots.py <morceau> <dossier>`.
 
 ## Où on en est
 
