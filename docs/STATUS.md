@@ -6,15 +6,19 @@ restent en ligne, inchangées.
 
 ## v1.6 en cours (branche `feature/v1.6-stem-mixer`)
 
-Séparation des instruments et mixage multipiste ; mesures et choix dans [SEPARATION.md](SEPARATION.md).
-Fait : modèle choisi (Demucs v4 htdemucs en ONNX, CPU, Karaoké 2 pistes et Musicien 4 pistes, pas de 6
-pistes), pipeline `separation.py` identique à PyTorch, cache FLAC `stems.py`, job `worker.start_separation`,
-mixage `player.Mix` (rampes, Original/Mix, arrondi des crêtes), tests `test_separation.py`,
-`test_mixer.py`. Reste : panneau Mixage et téléchargement du modèle dans l'interface, réglages par
-morceau, export du mix, gestion du cache, décision CUDA, docs, captures, build, publication.
-Reprise : les modèles ONNX sont dans `work/sep-bench/onnx` (htdemucs-0.onnx = `htdemucs.onnx` de la
-release), les morceaux de test libres dans `work/test-songs`, un dossier de données de test dans
-`work/v16-data` ; `work/sep-bench/jobrun.py musician <morceau>` refait une séparation mesurée.
+Séparation des instruments et mixage multipiste ; mesures et choix dans [SEPARATION.md](SEPARATION.md),
+notes dans [NOTES-v1.6.md](NOTES-v1.6.md).
+Fait : modèle (Demucs v4 htdemucs en ONNX, CPU, Karaoké 2 pistes et Musicien 4 pistes, pas de 6 pistes,
+pas de carte graphique), `separation.py`, cache FLAC `stems.py`, `worker.start_separation`, `player.Mix`,
+panneau Mixage `ui/mixer.py` (séparation à la demande, téléchargement vérifié du modèle, console,
+préréglages, réglages par morceau, export FLAC/WAV, gestion des pistes et du modèle), tests
+(`test_separation.py`, `test_mixer.py`, `test_mixer_ui.py`), séparation réelle depuis l'interface,
+docs (README, TECHNIQUE, DESIGN, SEPARATION, licences avec `licences/demucs-MIT.txt`), captures.
+Reste : suite complète, revue indépendante et ses corrections, version 1.6, fusion, tag, CI, envoi de
+`htdemucs.onnx` (copie de `work/sep-bench/onnx/htdemucs-0.onnx`, 174 264 717 octets, SHA-256 dans
+`stems.MODEL`) dans la publication v1.6, vérification des binaires, mise à jour depuis la v1.5.1,
+publication. Reprise : morceaux de test libres dans `work/test-songs`, données de test (modèle et pistes)
+dans `work/v16-data` ; `LOCALCHORDS_DATA=work/v16-data python scripts/mixer_screenshots.py <morceau> <dossier>`.
 
 ## Où on en est
 

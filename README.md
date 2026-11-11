@@ -21,11 +21,13 @@ ou 11, 64 bits, gratuit, hors ligne)
 
 Les captures viennent du programme (version 1.5, lancée depuis les sources, rendu hors écran ; les paroles
 animées et le bandeau de mise à jour : version 1.5.1 ; l'animation de la grille, les diagrammes seuls et la
-fiche : version 1.2.1), sur un morceau de démonstration
+fiche : version 1.2.1 ; le mixage : version 1.6), sur un morceau de démonstration
 synthétique créé pour l'occasion (`scripts/demo_audio.py`) et des paroles écrites pour lui
 (`scripts/screenshot_lyrics.py`) : aucun enregistrement ni aucune parole du commerce. Les morceaux de la
 bibliothèque sont huit morceaux synthétiques aux titres et artistes inventés, analysés par le programme dans
-un dossier temporaire (`scripts/library_screenshots.py`).
+un dossier temporaire (`scripts/library_screenshots.py`). Les captures du mixage montrent deux morceaux
+libres réellement séparés par le programme : « Monkeys At Typewriters » (Sj, fait avec Suno, CC0) et
+« Welcome to the War (It's Over) » (Geoffrey Benjamin Chew et Timothy Ray Tarkelly, CC BY-SA 3.0).
 
 ## Fonctionnalités
 
@@ -52,6 +54,9 @@ un dossier temporaire (`scripts/library_screenshots.py`).
   les paroles donnent l'heure de chaque mot.
 - **Mises à jour** (1.5.1) : une nouvelle version vous est signalée si vous l'avez permis, téléchargée et
   vérifiée à votre demande, installée seulement après votre confirmation.
+- **Mixage des instruments** (1.6) : séparez un morceau en pistes (voix, batterie, basse, autres) sur votre
+  PC, puis baissez ou coupez-en une pendant la lecture : chanter sans la voix, jouer la basse à la place
+  de la basse, travailler avec moins de batterie. Grille, paroles et diagrammes restent synchronisés.
 
 ## Ma bibliothèque (1.4)
 
@@ -243,6 +248,38 @@ chaque accord avec ses diagrammes (guitare, piano ou les deux), et la grille en 
 Aucun diagramme n'est coupé entre deux pages, et la fiche reprend exactement les positions, la transposition
 et le capo affichés dans le programme.
 
+## Mixage : séparer les instruments (1.6)
+
+![Le panneau Mixage sous les accords du morceau : Original ou Mix personnalisé, les préréglages, et une ligne par piste (Voix, Batterie, Basse, Autres) avec son curseur, son niveau en dB et les boutons M et S ; la basse est coupée, la batterie à −9 dB](docs/images/localchords-mixer.png)
+
+Le bouton **Mixage** de la barre du bas (ou `M`) ouvre le panneau. Rien n'est séparé tant que vous ne le
+demandez pas :
+
+![Avant la séparation : Karaoké 2 pistes ou Musicien 4 pistes, le bouton Séparer les instruments, le modèle, la place nécessaire et la durée estimée](docs/images/localchords-mixer-separate.png)
+
+1. Choisissez **Karaoké** (voix et instrumental) ou **Musicien** (voix, batterie, basse, autres), puis
+   **Séparer les instruments**. La première fois, le modèle de séparation (174 Mo, Demucs v4 de Meta,
+   licence MIT) est téléchargé une seule fois et vérifié. Le panneau dit la place nécessaire et, dès la
+   deuxième séparation, la durée estimée sur votre PC.
+2. La séparation se fait **sur votre PC**, en arrière-plan : environ un cinquième de la durée du morceau
+   sur un processeur récent à 8 cœurs, plus sur une machine modeste, et jusqu'à 3 Go de mémoire. Vous
+   pouvez écouter, lire la grille et changer de morceau pendant ce temps ; **Annuler** arrête tout.
+3. Réglez chaque piste : **curseur** (tout à gauche : silence complet ; un double-clic remet le niveau
+   d'origine), **M** pour la couper, **S** pour l'écouter seule (les réglages des autres sont gardés).
+   **Original / Mix personnalisé** (ou `Maj + M`) compare d'un clic, sans craquement. Préréglages :
+   *Karaoké (sans voix)*, *Voix seule*, *Sans basse*, *Sans batterie*, et *Personnalisé* pour revenir à
+   votre réglage.
+
+Les pistes sont gardées : rouvrez le morceau, le mix revient tel que vous l'avez laissé, sans nouvelle
+séparation. Vitesse, transposition, boucles et volume général s'appliquent au mix. Le menu **⋯** du
+panneau exporte le mix (FLAC ou WAV, sans perte), sépare dans l'autre mode, supprime les pistes de ce
+morceau, ou montre la place prise par toutes les pistes et le modèle (menu ☰ → *Pistes séparées et modèle
+de séparation…*). Supprimer des pistes ne touche jamais au morceau, à ses accords ni à vos paroles.
+
+**Aucune séparation n'est parfaite** : un peu de chaque instrument reste audible dans les autres pistes
+(réverbération du chant, charleston dans la voix…). Guitare, piano et claviers restent ensemble dans
+« Autres ». Mesures, choix du modèle et limites : [docs/SEPARATION.md](docs/SEPARATION.md).
+
 ## Installer
 
 Sur la page de la [dernière version](https://github.com/tadikwa/LocalChords/releases/latest), dans « Assets »,
@@ -250,9 +287,9 @@ prenez **l'un des trois** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-Setup-v1.5.1.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
-| `LocalChords-v1.5.1-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.5.1-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-Setup-v1.6.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
+| `LocalChords-v1.6-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.6-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
 Même programme, mêmes résultats. **Vos données ne bougent pas** : quel que soit le fichier choisi, vos
 morceaux, votre bibliothèque et vos sauvegardes restent dans `%LOCALAPPDATA%\LocalChords`. Installer,
@@ -261,13 +298,13 @@ mettre à jour ou désinstaller ne les modifie ni ne les supprime jamais.
 Le programme installé et le dossier démarrent en moins d'une seconde. L'exécutable unique se
 décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier temporaire de Windows, effacés
 à la fermeture. Rien d'autre à installer : ni Python, ni carte graphique particulière, ni connexion Internet
-(sauf pour importer un lien, chercher des paroles, télécharger un modèle de transcription ou chercher une
-mise à jour si vous l'avez permis).
+(sauf pour importer un lien, chercher des paroles, télécharger un modèle de transcription ou de séparation,
+ou chercher une mise à jour si vous l'avez permis).
 
 **Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
 programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 Pour vérifier le fichier, son empreinte SHA-256 figure dans `SHA256SUMS.txt` sur la page de la version
-(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.5.1.exe`).
+(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.6.exe`).
 
 ### Mises à jour (1.5.1)
 
@@ -321,6 +358,7 @@ l'exécutable unique ou du dossier : voir [docs/PORTABLE.md](docs/PORTABLE.md). 
 | Corriger le tempo, la mesure, le décalage | Le bouton `92 BPM · 4 temps`. Clic droit sur une case : « La première mesure commence ici ». Un `?` signale un résultat à vérifier. |
 | Corriger la tonalité | Le bouton `Tonalité`. |
 | Paroles | Le bouton `Paroles` ou `K` : les quatre vues. « Obtenir les paroles » : fichier, recherche en ligne, transcription ou saisie. |
+| Baisser ou couper un instrument | Le bouton `Mixage` ou `M` : voir [Mixage](#mixage--séparer-les-instruments-16). |
 | Exporter | `Exporter` : texte, ChordPro ou PDF ; avec les paroles, PDF, texte ou `.lrc`. |
 | Voir ce qui revient | Menu ☰ → Progressions répétées. |
 | Deuxième avis | Menu ☰ → Comparer avec : un autre moteur, les passages en désaccord, et vous choisissez. |
@@ -328,7 +366,8 @@ l'exécutable unique ou du dossier : voir [docs/PORTABLE.md](docs/PORTABLE.md). 
 | Notes en Do, Ré, Mi | Menu ☰. |
 
 **Raccourcis :** F1 les affiche tous. Espace lecture, ← → temps, Ctrl + ← → mesure, Entrée corriger,
-Ctrl + Z annuler, `D` diagrammes, `Maj + D` épingler l'accord, `Échap` suivre la lecture, `K` paroles.
+Ctrl + Z annuler, `D` diagrammes, `Maj + D` épingler l'accord, `Échap` suivre la lecture, `K` paroles,
+`M` mixage, `Maj + M` original ou mix.
 
 ### Importer un lien
 
@@ -363,17 +402,21 @@ Les accords sont extraits automatiquement : **vérifiez à l'oreille**. Mesures 
 - **« Sortie audio indisponible »** : vérifiez la sortie son de Windows, puis relancez la lecture.
 - **« Mémoire insuffisante »** ou arrêt brutal : l'analyse demande environ 1 Go pour une chanson, 4 Go pour 20 minutes,
   11 Go pour une heure.
+- **Séparation impossible** : le panneau Mixage dit pourquoi (place sur le disque, mémoire, modèle non
+  téléchargé) et propose de réessayer. Il faut environ 3 Go de mémoire libre.
 - **Autre erreur :** le détail est dans `%LOCALAPPDATA%\LocalChords\log.txt` (en mode portable : `Data\log.txt`).
 
 Vos morceaux analysés sont dans `%LOCALAPPDATA%\LocalChords\projects` : effacer un fichier n'oublie que
 son analyse et vos corrections. Les fichiers audio ne sont ni copiés ni modifiés, sauf ceux importés
 par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. Les modèles de transcription sont dans
-`%LOCALAPPDATA%\LocalChords\models\whisper` : on les supprime depuis la fenêtre de transcription. En mode portable, tout cela est dans le dossier
+`%LOCALAPPDATA%\LocalChords\models\whisper` : on les supprime depuis la fenêtre de transcription. Le modèle
+de séparation est dans `models\separation` et les pistes séparées dans `stems` (environ 10 à 20 Mo par minute
+de morceau) : on les supprime depuis le mixage. En mode portable, tout cela est dans le dossier
 `Data` à côté du programme.
 
 ### Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), mises à jour : [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md), notes de version : [docs/NOTES-v1.5.1.md](docs/NOTES-v1.5.1.md), [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), mises à jour : [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md), séparation et mixage : [docs/SEPARATION.md](docs/SEPARATION.md), notes de version : [docs/NOTES-v1.6.md](docs/NOTES-v1.6.md), [docs/NOTES-v1.5.1.md](docs/NOTES-v1.5.1.md), [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
 Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
 [LICENCES-TIERS.md](LICENCES-TIERS.md).

@@ -67,7 +67,7 @@ cache mémoire d'onnxruntime, qui en prenait 8 de plus pour la même vitesse).
 Accélération graphique : DirectML (onnxruntime-directml 1.24.4) donne des résultats faux sur ce réseau
 (erreur relative de l'ordre de 10⁴, à tous les niveaux d'optimisation) : écarté. CUDA (onnxruntime-gpu
 1.31.1, CUDA 13 et cuDNN 9.28) donne le bon résultat sur la RTX 5070 Ti, environ trois fois plus vite,
-mais demande 1,34 Go de bibliothèques NVIDIA à télécharger. Voir « État » plus bas.
+mais demande 1,34 Go de bibliothèques NVIDIA à télécharger. Voir « Carte graphique » plus bas.
 
 **Cache.** `<données>/stems/<empreinte>-<mode>-htdemucs-<SHA-256 du modèle>/` : une piste FLAC 16 bits
 stéréo à 44,1 kHz par instrument et un `info.json` (modèle, empreinte, facteur d'échelle d'une piste qui
@@ -92,3 +92,21 @@ hyperbolique) plutôt qu'écrêtée ; aucune normalisation par piste.
 Aucune séparation n'est parfaite : un peu de chaque instrument reste audible dans les autres pistes
 (réverbération du chant dans « Autres », charleston dans « Voix », synthés pris pour du chant). Les
 chœurs vont dans « Voix ». Guitare, piano, cuivres, synthés restent ensemble dans « Autres ».
+
+## Carte graphique
+
+**Pas proposée en v1.6.** DirectML, la seule voie sans téléchargement supplémentaire sur toutes les
+cartes, donne des résultats faux. CUDA est juste, mais seulement sur les cartes NVIDIA récentes, et
+demanderait un paquet facultatif de 1,34 Go (CUDA, cuDNN, onnxruntime-gpu) pour gagner une vingtaine de
+secondes par morceau sur un processeur rapide. Le processeur suffit : la séparation se fait une fois par
+morceau, en arrière-plan. À revoir si un utilisateur sur une machine lente le demande.
+
+## Dans le programme
+
+Parcours réel (`scripts/mixer_screenshots.py`, données de test, Ryzen 7 9800X3D) : « Welcome to the
+War » (2 min 38) ouvert, séparé en mode Musicien depuis le panneau et relu en 32 s ; position de lecture
+2,98 s après 3 s de lecture avec les gains réglés ; rouvert, le mix revient sans nouvelle séparation. En
+mémoire, le lecteur garde l'enregistrement en float32 et les pistes en float16 : environ 120 Mo de plus
+pour 4 pistes d'un morceau de 2 min 38 à 48 kHz. L'interface reste fluide pendant la séparation (autre
+processus, priorité basse) ; les gains changent dans le fil de l'interface par une seule affectation,
+lue par le rappel audio au bloc suivant.
