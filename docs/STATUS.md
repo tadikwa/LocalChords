@@ -1,8 +1,25 @@
 # État du projet
 
-Mis à jour le 2026-11-11 : v1.6 (studio d'accompagnement : séparation des instruments et mixage)
-publiée (<https://github.com/tadikwa/LocalChords/releases/tag/v1.6>), dernière version. Les versions v1.1 à
-v1.5.1 restent en ligne, inchangées.
+Mis à jour le 2026-11-11 : v1.6.1 (remise à zéro dans le mixage) publiée
+(<https://github.com/tadikwa/LocalChords/releases/tag/v1.6.1>), dernière version. Les versions v1.1 à
+v1.6 restent en ligne, inchangées ; le modèle de séparation reste un fichier de la publication v1.6.
+
+## v1.6.1
+
+Ergonomie du mixage seulement, séparation inchangée ; notes dans [NOTES-v1.6.1.md](NOTES-v1.6.1.md).
+Icône ↶ par piste (remet cette piste à 0 dB, sans toucher aux autres ni à Muet/Solo ; double-clic
+gardé), préréglage « Toutes les pistes » (`stems.PRESETS["all"]` : toutes à 0 dB, sans Muet ni Solo,
+mix à l'écoute ; distinct d'« Original »), préréglages sur leur propre ligne quand la fenêtre est trop
+étroite. 853 tests ; l'autotest (19 étapes) remet aussi une piste puis toutes les pistes à 0 dB.
+
+Publication (2026-11-11, fusion 40d02a9, tag v1.6.1) : binaires de la CI conformes à `SHA256SUMS.txt`,
+mêmes licences que la v1.6 ; autotest 19/19 avec séparation réelle (29 à 31 s) du zip, de l'exécutable
+unique et du programme installé, chacun sur des données vides ; installation de la v1.6.1 par-dessus une
+v1.6 (même dossier, même AppId, une seule entrée, version 1.6.1), puis désinstallation ; données réelles
+identiques octet pour octet avant et après. Après publication, sans compte : les fichiers se
+téléchargent, `releases/latest` est v1.6.1, le module de mise à jour en 1.6 la trouve, télécharge
+l'installateur et le vérifie ; en 1.6.1, rien de plus récent ; le modèle se télécharge toujours depuis
+la v1.6.
 
 ## v1.6
 
