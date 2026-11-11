@@ -1,8 +1,8 @@
 # État du projet
 
-Mis à jour le 2026-11-11 : v1.7 (interface en français et en anglais) en cours de publication. Les
-versions v1.1 à v1.6.1 restent en ligne, inchangées ; le modèle de séparation reste un fichier de la
-publication v1.6.
+Mis à jour le 2026-11-11 : v1.7 (interface en français et en anglais) publiée
+(<https://github.com/tadikwa/LocalChords/releases/tag/v1.7>), dernière version. Les versions v1.1 à
+v1.6.1 restent en ligne, inchangées ; le modèle de séparation reste un fichier de la publication v1.6.
 
 ## v1.7
 
@@ -25,6 +25,15 @@ par homonymie, des textes affichés relus par le code. Laissés : les listes de 
 triées sur le nom français, et, en mode portable sur un dossier Data non inscriptible, le choix de
 langue initial écrit dans le dossier de ce PC (celui que le programme utilise alors de toute façon). L'autotest vérifie aussi que les catalogues
 sont dans le programme empaqueté (étape « langue »).
+
+Publication (2026-11-11, fusion 5368c7b, tag v1.7) : binaires de la CI conformes à `SHA256SUMS.txt`,
+mêmes licences que la v1.6.1, catalogues `.qm` et `qtbase_fr.qm` présents ; autotest 20/20 avec
+séparation réelle du zip (en anglais), de l'exécutable unique (en français) et du programme installé (en
+Automatique, d'où le français sur ce Windows fr-FR), chacun sur des données vides ; installateur v1.7 en
+anglais par-dessus une v1.6.1 installée (même dossier, même AppId, une seule entrée, version 1.7), puis
+désinstallation ; données réelles identiques octet pour octet avant et après. Après publication :
+`releases/latest` est v1.7 ; le module de mise à jour de la v1.6.1 la trouve, choisit le bon fichier
+pour chaque installation, télécharge l'installateur et le vérifie ; en 1.7, rien de plus récent.
 
 ## v1.6.1
 
