@@ -6,6 +6,24 @@ restent en ligne, inchangées.
 
 ## Où on en est
 
+**v1.5.1 :** paroles animées et mises à jour assistées. Paroles : bande de la ligne chantée qui glisse en
+environ 400 ms, voisines estompées (et à 0,98 dans la vue Paroles seule), mots éclairés par un dégradé
+seulement là où ils sont minutés (LRC enrichi, transcription), ligne seule pour un LRC classique, rien pour
+des paroles sans heures ; horloge du lecteur (pause, saut, boucle, vitesse, transposition, décalage) ;
+version compacte dans le bandeau ; réglage Animée / Simple / Désactivée retenu, Simple par défaut quand
+Windows réduit les animations ; 30 images par seconde au plus, seule la ligne chantée redessinée (mesures
+dans [DESIGN.md](DESIGN.md#paroles-animées-151)). Code QPainter écrit pour LocalChords. Mises à jour
+([MISES-A-JOUR.md](MISES-A-JOUR.md)) : accord demandé au premier lancement, requête anonyme à
+`releases/latest` au plus une fois par jour avec ETag, versions stables seulement ; bandeau non modal ;
+téléchargement annulable en `.part`, taille et SHA-256 exigées à la fois du condensé GitHub et de
+`SHA256SUMS.txt`, revérifiées juste avant le lancement ; installateur après confirmation, exécutable
+unique posé à côté de l'ancien, zip expliqué ; marque « Internet » conservée pour SmartScreen. Revue
+indépendante du code : neuf points corrigés (bouton Annuler recréé à chaque progression, bandeau fermé qui
+revenait, `.part` laissé à la fermeture, revérification avant lancement, recherche manuelle sans réponse,
+question restée affichée, préférences non revérifiées, titre lu comme HTML, empreinte GitHub facultative)
+et une ligne répétée d'un LRC enrichi qui gardait les heures de son premier passage. 815 tests. Notes dans
+[NOTES-v1.5.1.md](NOTES-v1.5.1.md). La v1.5 n'a pas de mise à jour intégrée : passage manuel à la v1.5.1.
+
 **v1.5 :** installateur Windows par utilisateur (Inno Setup 6.7.3, sans droits d'administrateur,
 `%LOCALAPPDATA%\Programs\LocalChords` par défaut, menu Démarrer, bureau et association `.lchords` au
 choix, entrée « Applications », mise à jour qui ferme l'application ouverte, données jamais touchées,
@@ -102,6 +120,8 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
 | K. v1.3 | Paroles : sources locales, LRCLIB, transcription locale ; vues, synchronisation, accords sur les mots, PDF |
 | L. v1.3.1 | Morceau reconnu par ses noms, recherche des paroles avec accord, ligne d'invitation au-dessus de la grille |
 | M. v1.4 | Bibliothèque : index SQLite, favoris, collections, étiquettes, audio conservé, sauvegarde et restauration |
+| N. v1.5 | Interface revue (jetons, 800 px), installateur Windows Inno Setup par utilisateur |
+| O. v1.5.1 | Paroles animées (ligne et mots minutés), mises à jour GitHub avec accord, vérifiées, installées sur confirmation |
 | G. P2 | Liens, lots, comparaison de moteurs, progressions, transposition de l'audio. Non faits : sections, séparation de sources, GPU, avec leurs raisons dans DECISIONS.md |
 
 ## Limites connues

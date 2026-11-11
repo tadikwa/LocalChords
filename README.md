@@ -19,8 +19,9 @@ ou 11, 64 bits, gratuit, hors ligne)
   <img src="docs/images/localchords-demo.gif" width="800" alt="Lecture d'un morceau : la case en cours avance dans la grille et les diagrammes changent avec l'accord">
 </p>
 
-Les captures viennent du programme (version 1.5, lancée depuis les sources, rendu hors écran ; l'animation,
-les diagrammes seuls et la fiche : version 1.2.1), sur un morceau de démonstration
+Les captures viennent du programme (version 1.5, lancée depuis les sources, rendu hors écran ; les paroles
+animées et le bandeau de mise à jour : version 1.5.1 ; l'animation de la grille, les diagrammes seuls et la
+fiche : version 1.2.1), sur un morceau de démonstration
 synthétique créé pour l'occasion (`scripts/demo_audio.py`) et des paroles écrites pour lui
 (`scripts/screenshot_lyrics.py`) : aucun enregistrement ni aucune parole du commerce. Les morceaux de la
 bibliothèque sont huit morceaux synthétiques aux titres et artistes inventés, analysés par le programme dans
@@ -47,6 +48,10 @@ un dossier temporaire (`scripts/library_screenshots.py`).
 - **Hors ligne**, sans compte ; un installateur sans droits d'administrateur, ou un mode portable qui garde
   tout à côté du programme.
 - **Une fenêtre utilisable dès 800 px** de large (1.5), à côté d'une autre ou en mosaïque.
+- **Paroles animées** (1.5.1) : la ligne chantée avance doucement, et les mots s'éclairent un à un quand
+  les paroles donnent l'heure de chaque mot.
+- **Mises à jour** (1.5.1) : une nouvelle version vous est signalée si vous l'avez permis, téléchargée et
+  vérifiée à votre demande, installée seulement après votre confirmation.
 
 ## Ma bibliothèque (1.4)
 
@@ -135,6 +140,26 @@ partition de chanson. La ligne en cours s'allume et la page défile seule pendan
 <p align="center">
   <img src="docs/images/localchords-lyrics-strip.png" width="800" alt="Vue Grille et paroles : la ligne en cours et la suivante au-dessus de la grille d'accords">
 </p>
+
+### Paroles animées (1.5.1)
+
+<p align="center">
+  <img src="docs/images/localchords-lyrics-motion.gif" width="900" alt="Lecture : la bande de la ligne chantée glisse d'une ligne à la suivante et les mots s'éclairent un à un, de gauche à droite">
+</p>
+
+La ligne chantée passe au premier plan en douceur (environ 0,4 s), ses voisines s'estompent. Les accords
+ne bougent jamais et le texte ne saute pas : vous pouvez toujours glisser un accord, modifier le texte ou
+faire défiler la page vous-même.
+
+- **Les mots s'éclairent un à un** seulement quand les paroles donnent l'heure de chaque mot : fichier
+  `.lrc` enrichi (`<mm:ss.xx>` devant les mots) ou transcription par l'IA. Avec l'heure de chaque ligne
+  seulement, c'est la ligne qui s'allume ; des paroles sans heures restent fixes.
+- **Toujours à l'heure de la lecture** : pause, saut, boucle, vitesse, transposition, décalage, et dans
+  les quatre vues (le bandeau au-dessus de la grille a sa version compacte).
+- **Paroles → ⋯ → Animation des paroles** : **Animée** (par défaut), **Simple** (la ligne en surbrillance,
+  comme en 1.5) ou **Désactivée** (sans défilement animé). Le choix est retenu. Si Windows est réglé pour
+  réduire les animations, LocalChords démarre en **Simple**.
+- Animation à 30 images par seconde au plus, et seule la ligne chantée est redessinée.
 
 ### Paroles trouvées pour vous (1.3.1)
 
@@ -225,24 +250,43 @@ prenez **l'un des trois** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-Setup-v1.5.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
-| `LocalChords-v1.5-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.5-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-Setup-v1.5.1.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
+| `LocalChords-v1.5.1-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.5.1-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
 Même programme, mêmes résultats. **Vos données ne bougent pas** : quel que soit le fichier choisi, vos
 morceaux, votre bibliothèque et vos sauvegardes restent dans `%LOCALAPPDATA%\LocalChords`. Installer,
-mettre à jour ou désinstaller ne les modifie ni ne les supprime jamais ; pour une mise à jour, lancez
-simplement l'installateur de la nouvelle version.
+mettre à jour ou désinstaller ne les modifie ni ne les supprime jamais.
 
 Le programme installé et le dossier démarrent en moins d'une seconde. L'exécutable unique se
 décompresse à chaque lancement : environ 4 s, et 605 Mo dans le dossier temporaire de Windows, effacés
 à la fermeture. Rien d'autre à installer : ni Python, ni carte graphique particulière, ni connexion Internet
-(sauf pour importer un lien, chercher des paroles ou télécharger un modèle de transcription).
+(sauf pour importer un lien, chercher des paroles, télécharger un modèle de transcription ou chercher une
+mise à jour si vous l'avez permis).
 
 **Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
 programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 Pour vérifier le fichier, son empreinte SHA-256 figure dans `SHA256SUMS.txt` sur la page de la version
-(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.5.exe`).
+(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.5.1.exe`).
+
+### Mises à jour (1.5.1)
+
+![Le bandeau « LocalChords 1.6 est disponible » en haut de la fenêtre, avec Nouveautés, Télécharger, Plus tard et Ignorer cette version](docs/images/localchords-update-banner.png)
+
+*Capture faite avec une version 1.6 simulée.* Au premier lancement, LocalChords vous demande s'il peut
+vérifier au démarrage qu'une nouvelle version est publiée : une requête anonyme à GitHub, au plus une
+fois par jour, rien sur vos morceaux. Une nouvelle version s'annonce dans un bandeau discret
+(**Nouveautés**, **Télécharger**, **Plus tard**, **Ignorer cette version**). Le fichier téléchargé est gardé
+seulement si sa taille et son empreinte SHA-256 sont celles publiées, et **rien ne s'installe ni ne se
+lance sans votre confirmation**. Installateur : il se met à jour en place, vos données ne bougent pas.
+Exécutable unique : la nouvelle version arrive à côté de l'ancienne, qui n'est jamais remplacée. Zip :
+l'archive est vérifiée et LocalChords explique comment la mettre en place.
+
+Le choix se change dans le menu **⋯** : **Vérifier automatiquement les mises à jour au démarrage** ;
+**Rechercher des mises à jour…** marche toujours. **Depuis la v1.5**, téléchargez une fois la v1.5.1 à la
+main : la v1.5 n'a pas ce système. Détails et sécurité : [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md).
+
+### Mode portable et désinstallation
 
 Pour tout garder à côté du programme (clé USB), créez un fichier vide `LocalChords.portable` à côté de
 l'exécutable unique ou du dossier : voir [docs/PORTABLE.md](docs/PORTABLE.md). Pour désinstaller : Paramètres
@@ -330,6 +374,6 @@ par lien, gardés dans `%LOCALAPPDATA%\LocalChords\downloads`. Les modèles de t
 ### Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), notes de version : [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), mises à jour : [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md), notes de version : [docs/NOTES-v1.5.1.md](docs/NOTES-v1.5.1.md), [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
 Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
 [LICENCES-TIERS.md](LICENCES-TIERS.md).

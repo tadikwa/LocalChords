@@ -90,6 +90,39 @@ cours et la lecture seulement. Le nom de la position (« Barré en case 2 ») es
 ![v1.4](images/design/lyrics-1360-v1.4.png)
 ![v1.5 : les accords en bleu au-dessus des mots, la ligne en cours marquée par un filet ambre](images/design/lyrics-1360-v1.5.png)
 
+## Paroles animées (1.5.1)
+
+Une animation écrite pour LocalChords, en QPainter : aucune ligne de code reprise d'un autre logiciel.
+
+- **La ligne chantée** reçoit une bande de surbrillance qui glisse de l'ancienne ligne à la nouvelle en
+  environ 400 ms (courbe adoucie) et passe en pleine lumière ; les voisines s'estompent (opacité) et,
+  dans la vue Paroles seule, se réduisent légèrement (échelle 0,98, autour de leur début de ligne). La mise en page ne change jamais :
+  la hauteur de chaque ligne est fixe, les accords restent à leur place, une échelle ne s'applique pas
+  quand les accords sont affichés, pour qu'un accord glissé reste sous le pointeur.
+- **Les mots** s'éclairent de gauche à droite par un dégradé (ceux à venir à 60 % d'opacité), le mot
+  chanté se soulève à peine puis se repose, seulement là où les paroles ont l'heure de chaque mot (LRC
+  enrichi, transcription). Paroles minutées à la ligne : la ligne seule. Sans heures :
+  rien ne bouge.
+- **L'horloge est celle du lecteur** : chaque image lit la position de lecture (décalage compris) ; un
+  saut ou un retour de boucle place la bande sans transition ; en pause, rien n'est redessiné.
+- **Coût** : au plus 30 images par seconde, et seul le rectangle de la ligne chantée est redessiné
+  pendant que les mots s'éclairent (mesuré : 30 dessins par seconde d'environ 80 000 px au lieu de
+  263 000 pour la page entière ; 2,9 par seconde pour des paroles minutées à la ligne ; un seul en
+  pause).
+- **Le bandeau au-dessus de la grille** a la version compacte : les mots s'éclairent sans bande.
+- **Réglage** dans Paroles → ⋯ → Animation des paroles : Animée, Simple (la surbrillance de la 1.5) ou
+  Désactivée (ni balayage, ni défilement animé). Retenu ; sans choix, le réglage Windows « Afficher les
+  animations » décide.
+
+## Bandeau de mise à jour (1.5.1)
+
+Une ligne au-dessus des pages, sur le fond des barres (`bar`), message en texte secondaire, actions en
+boutons-liens : il ne prend jamais l'ambre de l'action principale et ne bloque rien. Un message trop long
+est coupé avec « … » et lu en entier dans l'infobulle et par les lecteurs d'écran. Les boutons restent les
+mêmes pendant un téléchargement (seuls le texte et la barre de 140 × 6 px changent), pour ne perdre ni un
+clic ni le focus. La croix le masque jusqu'au prochain démarrage. La fenêtre des nouveautés affiche le
+texte de la version sans HTML ni images, sur `SURFACE`, liens en `SELECT`. Vérifié à 800, 1280 et 3440 px.
+
 ## Revue indépendante
 
 Une relecture séparée (produit et accessibilité, à partir des captures et du code) a relevé, avant
@@ -107,4 +140,6 @@ vue Grille et paroles s'ajoute sur un écran de 820 px.
   la grille, le ruban des accords, la liste des morceaux et la boucle.
 - L'ordre de tabulation suit l'ordre visuel.
 - Rien ne dépend de la couleur seule : l'accord en cours est aussi écrit en grand en haut de l'écran, un accord corrigé porte un point.
-- Peu de mouvement : seuls le défilement qui suit la lecture et le court fondu d'un diagramme qui change sont animés.
+- Peu de mouvement : le défilement qui suit la lecture, le court fondu d'un diagramme qui change et,
+  depuis la 1.5.1, les paroles animées. Celles-ci se règlent (Animée, Simple, Désactivée) et démarrent en
+  Simple quand Windows demande moins d'animations.
