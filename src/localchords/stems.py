@@ -157,7 +157,7 @@ def checked(settings) -> dict | None:
         return None
     try:
         clean = {n: max(0, min(TOP, int(levels.get(n, UNITY)))) for n in names}
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # OverflowError: Infinity, 1e999
         return None
 
     def names_in(key):
@@ -322,7 +322,7 @@ def write(folder: Path, stems: dict[str, np.ndarray], sr: int, about: dict) -> P
 
 def load(folder: Path, mode: str, sr: int, frames: int, should_cancel=None) -> np.ndarray:
     """The stems at the player's rate, cut or padded to the recording's `frames`: (S, frames, 2),
-    float16 (a quarter of a 4-minute song's stems is 23 MB)."""
+    float16 (one stem of a 4-minute song at 48 kHz is 46 MB)."""
     from . import audio
 
     info = json.loads((folder / "info.json").read_text(encoding="utf-8"))
@@ -358,10 +358,13 @@ def export_mix(target: Path, recording: Path, folder: Path, settings: dict, task
         out[start : start + sr * 10] = mix[start : start + sr * 10]
         task.progress = 0.9 * min(1.0, (start + sr * 10) / max(1, len(y)))
     task.status = "Écriture du fichier…"
+    # Beside, then renamed: a failure never leaves half a file, nor removes the one being replaced.
+    part = target.with_name(target.stem + ".part" + target.suffix)
     try:
-        encode(target, out, sr)
+        encode(part, out, sr)
+        os.replace(part, target)
     except Exception:
-        target.unlink(missing_ok=True)
+        part.unlink(missing_ok=True)
         raise
     task.progress = 1.0
     return target

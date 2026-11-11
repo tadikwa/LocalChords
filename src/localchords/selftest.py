@@ -273,6 +273,44 @@ def run(audio_path: Path, out: Path) -> int:
             recent=len(window.catalog.songs()),
         )
         wait(lambda: window.audio_ready, 60)  # a decode left running crashes Python at exit
+        # v1.6: stems written and read back as FLAC by the packaged FFmpeg; with the model in the
+        # data folder, a real separation from the panel, then the mix in the player.
+        import numpy as np
+
+        from . import stems
+
+        y = window.player.y[: window.player.sr * 2].astype(np.float32)
+        folder = stems.write(
+            stems.cache_dir("selftest", "karaoke"),
+            {"vocals": y * 0.5, "instrumental": y * 0.5},
+            window.player.sr,
+            {"mode": "karaoke"},
+        )
+        back = stems.load(folder, "karaoke", window.player.sr, len(y)).astype(np.float32)
+        stems.delete_song("selftest")
+        flac_ok = back.shape == (2, len(y), 2) and float(np.abs(back.sum(0) - y).max()) < 0.01
+        separated = None
+        if stems.model_installed():
+            started = time.perf_counter()
+            c = window.mixer
+            c.button.setChecked(True)
+            c.panel.mode_buttons["musician"].click()
+            c.panel.separate.click()
+            # Done, or failed: separated, then the stems read in the background.
+            wait(lambda: window.player.mix is not None or not (c.busy() or c.load_token), 900)
+            mix = window.player.mix
+            if mix is not None:
+                {r.name: r for r in c.panel.stem_rows}["bass"].slider.setValue(0)
+            separated = {
+                "ok": bool(mix is not None and mix.stems.shape[0] == 4 and mix.target[3] == 0.0),
+                "seconds": round(time.perf_counter() - started, 1),
+                "error": c.error or c.panel.warn.text(),
+            }
+        step(
+            "mixage : pistes FLAC" + (", séparation réelle" if separated else ""),
+            flac_ok and (separated is None or separated["ok"]),
+            separation=separated or "modèle non installé : séparation réelle non essayée",
+        )
         window.song.star.setChecked(True)
         window.go_home()
         wait(lambda: not window.home.scanning, 30)

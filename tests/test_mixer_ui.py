@@ -46,9 +46,7 @@ class FakeJob:
 @pytest.fixture
 def fake_separation(monkeypatch):
     calls = []
-    monkeypatch.setattr(
-        worker, "start_separation", lambda p, m, f: FakeJob(p, m, f, calls)
-    )
+    monkeypatch.setattr(worker, "start_separation", lambda p, m, f: FakeJob(p, m, f, calls))
     monkeypatch.setattr(stems, "model_installed", lambda: True)
     return calls
 
@@ -241,3 +239,49 @@ def test_the_console_fits_the_width(app, wav, tmp_path, fake_separation, width):
     assert len(cols) == {800: 1, 1920: 4, 5120: 4}[width]
     assert (window.song.mixer_button.text() == " Mixage") == (width >= 1240)
     window.close()
+
+
+def test_switching_mode_while_playing_keeps_sound_and_each_modes_mix(
+    app, wav, tmp_path, fake_separation
+):
+    window = opened(app, wav, tmp_path)
+    c = separated(app, window)
+    {r.name: r for r in c.panel.stem_rows}["bass"].slider.setValue(0)
+    window.player.play()
+    c.separate("karaoke")
+    assert wait_for(
+        app, lambda: window.player.mix is not None and len(window.player.mix.stems) == 2
+    )
+    {r.name: r for r in c.panel.stem_rows}["vocals"].slider.setValue(0)
+    c.use_mode("musician")
+    window.player.mix[0:64]  # the karaoke stems, still playing while the others load
+    assert wait_for(app, lambda: len(window.player.mix.stems) == 4)
+    assert c.settings["levels"]["bass"] == 0  # its own mix, not the karaoke one
+    assert window.player.mix.target[3] == 0.0
+    window.player.mix[0:64]
+    c.use_mode("karaoke")
+    assert wait_for(app, lambda: len(window.player.mix.stems) == 2)
+    assert c.settings["levels"]["vocals"] == 0
+    window.player.pause()
+    window.close()
+
+
+def test_export_adds_the_extension_and_leaves_no_part(
+    app, wav, tmp_path, fake_separation, monkeypatch
+):
+    window = opened(app, wav, tmp_path)
+    c = separated(app, window)
+    monkeypatch.setattr(
+        mixer.QFileDialog,
+        "getSaveFileName",
+        lambda *a, **k: (str(tmp_path / "Live 1.5"), "FLAC (*.flac)"),
+    )
+    c.export()
+    assert wait_for(app, lambda: c.export_task is None)
+    assert (tmp_path / "Live 1.5.flac").is_file()
+    assert not list(tmp_path.glob("*.part*"))
+    window.close()
+
+
+def test_unreadable_levels_open_as_new():
+    assert stems.checked({"mode": "karaoke", "levels": {"vocals": float("inf")}}) is None

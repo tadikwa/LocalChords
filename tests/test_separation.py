@@ -122,7 +122,10 @@ def test_cache_write_load_and_delete(data):
     assert not list(stems.cache_root().glob("*.part"))
     back = stems.load(folder, "karaoke", SR, len(y))
     assert back.dtype == np.float16 and back.shape == (2, len(y), 2)
-    assert np.abs(back[0] - loud).max() < 4 * 2e-3 and np.abs(back.astype(np.float32).sum(0) - y).max() < 1e-2
+    assert (
+        np.abs(back[0] - loud).max() < 4 * 2e-3
+        and np.abs(back.astype(np.float32).sum(0) - y).max() < 1e-2
+    )
     info = json.loads((folder / "info.json").read_text())
     assert info["model_sha256"] == stems.MODEL["sha256"] and info["frames"] == len(y)
     assert stems.size_of(stems.song_folders("abc")) == stems.total_size() > 0
@@ -157,7 +160,9 @@ def test_stems_line_up_with_the_recording_at_another_rate(data, tmp_path):
 def test_levels_mute_solo_and_presets():
     s = stems.new_settings("musician")
     assert stems.gains(s) == [1.0, 1.0, 1.0, 1.0]
-    assert stems.gain(0) == 0.0 and stems.db_text(0) == "−∞" and stems.db_text(stems.UNITY) == "0 dB"
+    assert (
+        stems.gain(0) == 0.0 and stems.db_text(0) == "−∞" and stems.db_text(stems.UNITY) == "0 dB"
+    )
     assert stems.db_text(stems.UNITY // 2) == "−12 dB" and stems.db_text(stems.TOP) == "+5 dB"
     s["levels"]["drums"] = 40
     s["solo"] = ["vocals", "drums"]
@@ -213,7 +218,9 @@ def test_model_download_is_checked(data):
         stems.MODEL = {**model, "sha256": "0" * 64}
         with pytest.raises(transcribe.TranscribeError, match="SHA-256"):
             stems.download_model(transcribe.Task(), opener)
-        assert not stems.model_path().exists() and not stems.model_path().with_suffix(".part").exists()
+        assert (
+            not stems.model_path().exists() and not stems.model_path().with_suffix(".part").exists()
+        )
     finally:
         stems.MODEL = old
 

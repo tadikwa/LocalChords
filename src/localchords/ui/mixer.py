@@ -480,12 +480,19 @@ class MixerController(QObject):
             folder = stems.cached(self.fp, mode) if self.fp else None
             if folder:
                 self.folder = folder
-                self.settings = (
-                    saved if saved and saved["mode"] == mode else stems.new_settings(mode)
-                )
+                self.settings = self._saved(mode)
                 break
         self.panel.mode_buttons[first].setChecked(True)
         self.refresh()
+
+    def _saved(self, mode: str) -> dict:
+        """This song's settings for `mode`: each mode keeps its own ("mixer" is the one in use)."""
+        view = self.w.project.view
+        for key in ("mixer", "mixer_other"):
+            saved = stems.checked(view.get(key))
+            if saved and saved["mode"] == mode:
+                return saved
+        return stems.new_settings(mode)
 
     def audio_loaded(self) -> None:
         if self.folder is not None:
@@ -512,7 +519,7 @@ class MixerController(QObject):
         threading.Thread(target=run, daemon=True).start()
         self.refresh()
 
-    def _stems_loaded(self, token, layers, error) -> None:
+    def _stems_loaded(self, token, layers, error, faded=False) -> None:
         if token is not self.load_token:
             return
         self.load_token = None
@@ -520,8 +527,20 @@ class MixerController(QObject):
         if error:
             self.error = error + " Elles peuvent être séparées de nouveau."
             self.folder = None
+            player.use_mix(None)  # another mode's stems may still be playing
         else:
-            original = player.mix.original if player.mix else player.y
+            old = player.mix
+            if old is not None and player.playing and not faded and old.gains[0] != 1.0:
+                # Other stems are being heard: back to the recording first, which both mixes
+                # start from, then the swap, so that changing mixes never clicks.
+                old.set_gains(1.0, [0.0] * len(old.stems))
+                self.load_token = token
+                QTimer.singleShot(
+                    int(Mix.RAMP * 1000) + 30,
+                    lambda: self._stems_loaded(token, layers, None, faded=True),
+                )
+                return
+            original = old.original if old else player.y
             player.use_mix(Mix(original, layers, player.sr))
             self._apply(save=False)
         self.refresh()
@@ -680,13 +699,18 @@ class MixerController(QObject):
     def _apply(self, save: bool = True) -> None:
         mix = self.w.player.mix
         s = self.settings
-        if mix is not None and s is not None:
-            n = len(stems.MODES[s["mode"]]["stems"])
+        n = len(stems.MODES[s["mode"]]["stems"]) if s is not None else 0
+        # The other mode's stems may still be playing while these load: they keep their gains.
+        if mix is not None and s is not None and len(mix.stems) == n:
             mix.set_gains(0.0 if s["on"] else 1.0, stems.gains(s) if s["on"] else [0.0] * n)
         if s is not None:
             self._show_settings()
             self._show_button()
         if save and self.w.project is not None and s is not None:
+            view = self.w.project.view
+            before = stems.checked(view.get("mixer"))
+            if before and before["mode"] != s["mode"]:
+                view["mixer_other"] = before  # the other mode's mix, kept for coming back to it
             self.w.project.set_view(mixer=s)
             self.w.save_timer.start()
 
@@ -801,11 +825,9 @@ class MixerController(QObject):
             self.refresh()
             return
         if self.settings is None or self.settings["mode"] != mode:
-            saved = stems.checked(self.w.project.view.get("mixer"))
-            self.settings = saved if saved and saved["mode"] == mode else stems.new_settings(mode)
+            self.settings = self._saved(mode)
         self.folder = folder
-        self.w.player.use_mix(None)
-        if self.w.audio_ready:
+        if self.w.audio_ready:  # what is playing now goes on until the new stems are read
             self._load_stems()
         else:
             self.refresh()
@@ -843,8 +865,7 @@ class MixerController(QObject):
         folder = stems.cached(self.fp, mode)
         if not folder:
             return
-        saved = stems.checked(self.w.project.view.get("mixer"))
-        self.settings = saved if saved and saved["mode"] == mode else stems.new_settings(mode)
+        self.settings = self._saved(mode)
         self.folder = folder
         self.w._remember("mixer_mode", mode)
         self._load_stems()
@@ -885,7 +906,15 @@ class MixerController(QObject):
             return
         target = Path(name)
         if target.suffix.lower() not in (".flac", ".wav"):
-            target = target.with_suffix(".wav" if "WAV" in chosen else ".flac")
+            # Added, not replaced: "Live 1.5" is a name, not a file type.
+            target = target.with_name(target.name + (".wav" if "WAV" in chosen else ".flac"))
+            if target.exists() and not _confirm(
+                self.w,
+                "Exporter le mix",
+                f"« {target.name} » existe déjà. Le remplacer ?",
+                "Remplacer",
+            ):
+                return
         recording = library.audio_file(project.audio)
         folder, settings = self.folder, dict(self.settings)
         self.export_task = transcribe.run(

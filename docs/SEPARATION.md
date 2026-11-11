@@ -78,7 +78,7 @@ Le FLAC 16 bits garde un bruit de quantification à −96 dB, très en dessous d
 (−20 à −30 dB) ; le WAV prendrait deux à trois fois plus de place pour rien. Les données
 `%LOCALAPPDATA%\LocalChords` ou, en mode portable, `Data` à côté du programme.
 
-**Mixage.** Les pistes sont lues en mémoire en float16 (une piste de 4 minutes : 23 Mo) et mixées bloc par
+**Mixage.** Les pistes sont lues en mémoire en float16 (une piste de 4 minutes à 48 kHz : 46 Mo) et mixées bloc par
 bloc par le lecteur, avant le changement de vitesse et de hauteur : boucles, sauts, vitesse, transposition,
 volume général, accords et paroles suivent la même horloge. Chaque gain change par une rampe de 30 ms
 (sans clic), la bascule Original / Mix est un fondu de 30 ms entre l'enregistrement et la somme des

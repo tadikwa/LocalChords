@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -192,7 +193,7 @@ def fetch(url: str, target: Path, info: dict, task: Task, opener=urllib.request.
     except TranscribeError:
         part.unlink(missing_ok=True)
         raise
-    except OSError as exc:
+    except (OSError, http.client.HTTPException) as exc:  # a dropped connection: IncompleteRead
         part.unlink(missing_ok=True)
         raise TranscribeError(f"Le téléchargement a échoué : {exc}") from exc
     if got != info["size"] or digest.hexdigest() != info["sha256"]:
