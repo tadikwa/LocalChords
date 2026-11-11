@@ -14,7 +14,9 @@ panneau Mixage `ui/mixer.py` (séparation à la demande, téléchargement vérif
 préréglages, réglages par morceau, export FLAC/WAV, gestion des pistes et du modèle), tests
 (`test_separation.py`, `test_mixer.py`, `test_mixer_ui.py`), séparation réelle depuis l'interface,
 docs (README, TECHNIQUE, DESIGN, SEPARATION, licences avec `licences/demucs-MIT.txt`), captures.
-Reste : suite complète, revue indépendante et ses corrections, version 1.6, fusion, tag, CI, envoi de
+Fait aussi : revue indépendante et ses corrections, version 1.6, autotest (pistes FLAC ;
+séparation réelle en 33 s quand le modèle est dans le dossier de données).
+Reste : fusion, tag, CI, envoi de
 `htdemucs.onnx` (copie de `work/sep-bench/onnx/htdemucs-0.onnx`, 174 264 717 octets, SHA-256 dans
 `stems.MODEL`) dans la publication v1.6, vérification des binaires, mise à jour depuis la v1.5.1,
 publication. Reprise : morceaux de test libres dans `work/test-songs`, données de test (modèle et pistes)
@@ -188,6 +190,23 @@ dans [TECHNIQUE.md](TECHNIQUE.md#les-diagrammes-daccords), notes de version dans
   <https://github.com/tadikwa/LocalChords/releases>.
 
 ## Revue indépendante
+
+**v1.6 :** revue du diff entier (séparation, cache, lecteur, panneau) par un agent séparé, 5 constats et
+4 risques. Corrigés, avec des tests :
+- changer de mode pendant la lecture coupait le son : le réglage du nouveau mode (2 pistes) était envoyé
+  au mix encore chargé (4 pistes). Les pistes écoutées continuent jusqu'au chargement des autres, puis le
+  passage se fait par l'original, sans clic ;
+- un seul réglage par morceau : changer de mode effaçait le mix de l'autre. Chaque mode garde le sien ;
+- une séparation terminée pendant l'écoute d'un mix ramenait brusquement à l'original ;
+- l'export écrivait directement le fichier choisi (un échec pouvait effacer celui qu'il remplaçait) ; il
+  écrit à côté puis renomme, et ajoute l'extension au lieu de la remplacer (« Live 1.5 ») ;
+- un niveau `Infinity` dans un projet modifié à la main, une connexion coupée pendant le téléchargement
+  du modèle (`IncompleteRead`) : gérés ; la mémoire des pistes annoncée (23 Mo) était fausse : 46 Mo par
+  piste de 4 minutes.
+
+Laissé : à une vitesse autre que 1, la lecture lit un peu en avance pour l'étirement, et la rampe de gain
+de 30 ms avance d'autant : inaudible. Pas de vérification de la mémoire libre avant une séparation (3 Go
+environ, annoncés dans le panneau).
 
 **v1.5 :** relecture produit et accessibilité par un agent séparé, sur les captures et le code. Corrigés :
 focus peu visible sur les boutons ambre (contour sombre de 2 px), segment choisi peu distinct, numéro de
