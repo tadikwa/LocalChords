@@ -1,7 +1,7 @@
 # État du projet
 
-Mis à jour le 2026-11-08 : v1.5 (interface revue et installateur Windows) publiée
-(<https://github.com/tadikwa/LocalChords/releases/tag/v1.5>), dernière version. Les versions v1.1 à v1.4
+Mis à jour le 2026-11-11 : v1.5.1 (paroles animées et mises à jour assistées) publiée
+(<https://github.com/tadikwa/LocalChords/releases/tag/v1.5.1>), dernière version. Les versions v1.1 à v1.5
 restent en ligne, inchangées.
 
 ## Où on en est
@@ -23,6 +23,15 @@ revenait, `.part` laissé à la fermeture, revérification avant lancement, rech
 question restée affichée, préférences non revérifiées, titre lu comme HTML, empreinte GitHub facultative)
 et une ligne répétée d'un LRC enrichi qui gardait les heures de son premier passage. 815 tests. Notes dans
 [NOTES-v1.5.1.md](NOTES-v1.5.1.md). La v1.5 n'a pas de mise à jour intégrée : passage manuel à la v1.5.1.
+
+Publication (2026-11-11) : binaires de la CI vérifiés (SHA-256 identiques à `SHA256SUMS.txt`, licences et
+sources tierces présentes, FFmpeg LGPL v3 sans x264/x265) ; autotest 18/18 du zip, de l'exécutable unique
+et du programme installé, chacun sur des données vides ; mise à jour par-dessus une v1.5 installée (même
+dossier, même AppId, version 1.5.1 dans « Applications », données et préférences identiques octet pour
+octet), puis désinstallation ; exécutable unique v1.5.1 posé à côté d'une v1.5 portable : même `Data`,
+projet existant repris. Téléchargements publics revérifiés sans compte, `releases/latest` sur v1.5.1. Le
+module de mise à jour, contre la vraie version : « à jour » en 1.5.1 ; en se faisant passer pour une 1.5,
+il trouve la v1.5.1, télécharge l'installateur, le vérifie (les deux empreintes) et le marque « Internet ».
 
 **v1.5 :** installateur Windows par utilisateur (Inno Setup 6.7.3, sans droits d'administrateur,
 `%LOCALAPPDATA%\Programs\LocalChords` par défaut, menu Démarrer, bureau et association `.lchords` au
