@@ -29,6 +29,8 @@ datas = [
     ("LICENSE", "."),
     ("LICENCES-TIERS.md", "."),
     ("licences/*.txt", "licences"),
+    # The interface's languages (docs/LOCALISATION.md), compiled from the .ts files.
+    ("src/localchords/translations/*.qm", "localchords/translations"),
 ]
 # The engines read their own version, weights and tables at run time.
 for package in ("chordotomy", "lv-chordia", "beat-this", "librosa", "soundfile", "numpy"):
@@ -82,7 +84,8 @@ a = Analysis(
     excludes=excludes,
 )
 
-# Qt translations, unused Qt modules' DLLs and C headers carry no behaviour.
+# Qt translations but the French buttons' (English is Qt's own), unused Qt modules' DLLs and C
+# headers carry no behaviour.
 drop = ("Qt6Quick", "Qt6Qml", "Qt6Network", "Qt6OpenGL", "opengl32sw", "Qt6Pdf", "Qt6VirtualKeyboard")
 a.binaries = [b for b in a.binaries if not Path(b[0]).name.startswith(drop)]
 # sounddevice loads libportaudio64bit.dll alone; the ASIO builds carry Steinberg's SDK.
@@ -99,7 +102,11 @@ a.datas = [d for d in a.datas if not unused_portaudio(d)]
 a.datas = [
     d
     for d in a.datas
-    if not d[0].startswith(("PySide6/translations", "torch/include", "torch/share"))
+    if not (
+        d[0].replace("\\", "/").startswith("PySide6/translations/")
+        and Path(d[0]).name != "qtbase_fr.qm"
+    )
+    and not d[0].startswith(("torch/include", "torch/share"))
     and not d[0].endswith((".h", ".hpp", ".lib"))
     # librosa finds its own lazy imports through its .pyi files at run time.
     and not (d[0].endswith(".pyi") and not d[0].startswith("librosa"))

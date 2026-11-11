@@ -1,0 +1,53 @@
+1
+00:00:00,533 --> 00:00:05,933
+LocalChords
+Your music. Your chords. Your freedom.
+
+2
+00:00:06,800 --> 00:00:15,800
+ANALYSIS
+Discover the chords of your songs.
+
+3
+00:00:16,600 --> 00:00:21,333
+PRACTICE
+Learn. Play. Improve.
+
+4
+00:00:26,600 --> 00:00:35,800
+LYRICS
+Follow every word,
+every chord.
+
+5
+00:00:37,500 --> 00:00:41,333
+MIXER — No vocals
+Remove the vocals.
+
+6
+00:00:41,333 --> 00:00:45,167
+MIXER — Vocals only
+Remove the vocals.
+
+7
+00:00:45,167 --> 00:00:48,000
+MIXER — Drums only
+Isolate the instruments.
+
+8
+00:00:48,000 --> 00:00:50,200
+MIXER — Drums only
+Isolate the instruments.
+Play in their place.
+
+9
+00:00:50,400 --> 00:00:55,933
+LIBRARY
+Find all your music in one place.
+
+10
+00:00:56,467 --> 00:01:01,867
+LocalChords
+Free · Open source · On your PC
+https://github.com/tadikwa/LocalChords
+

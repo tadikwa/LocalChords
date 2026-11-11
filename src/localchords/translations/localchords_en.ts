@@ -1950,7 +1950,7 @@ It is a private copy, for you: it is not a way to share songs.</translation>
     </message>
     <message>
         <source>Paroles et accords</source>
-        <translation>Lyrics &amp; Chords</translation>
+        <translation>Lyrics &amp;&amp; Chords</translation>
     </message>
     <message>
         <source>Animée (recommandée)</source>
@@ -2134,7 +2134,7 @@ It is a private copy, for you: it is not a way to share songs.</translation>
     </message>
     <message>
         <source>Paroles et accords (PDF)…</source>
-        <translation>Lyrics &amp; Chords (PDF)…</translation>
+        <translation>Lyrics &amp;&amp; Chords (PDF)…</translation>
     </message>
     <message>
         <source>Grille avec paroles (.txt)…</source>

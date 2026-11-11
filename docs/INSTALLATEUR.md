@@ -19,6 +19,16 @@ forme portable ([PORTABLE.md](PORTABLE.md)).
 | Applications installées | une entrée « LocalChords » dans Paramètres → Applications, pour désinstaller |
 | Fin de l'installation | propose de lancer LocalChords |
 
+## Langue (depuis la v1.7)
+
+L'assistant est en anglais et en français, par le mécanisme officiel d'Inno Setup (`[Languages]` :
+`Default.isl` pour l'anglais, `Languages\French.isl` pour le français ; les textes propres à LocalChords
+dans `[CustomMessages]`). Au lancement, il propose la langue de Windows si c'est l'une des deux, et
+demande sinon (`ShowLanguageDialog=auto`). `/LANG=english` ou `/LANG=french` choisit sans demander : c'est
+ce que fait la mise à jour depuis le programme, dans la langue de l'interface. La langue de l'assistant
+ne change rien à celle de LocalChords (menu ☰ → Langue / Language), ni à l'AppId, au dossier ou aux
+données.
+
 ## Ce qu'il ne fait jamais
 
 - Il ne touche **jamais** à `%LOCALAPPDATA%\LocalChords` : projets, bibliothèque, sauvegardes,

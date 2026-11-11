@@ -708,6 +708,9 @@ def matches(song: dict, words: list[str]) -> bool:
             song["shown_genre"] or "",
             *song["tags"],
             str(song["year"] or ""),
+            # Suggested genres and tags are stored in French and shown translated: find both.
+            translate("Catalog", song["shown_genre"] or ""),
+            *(translate("Catalog", t) for t in song["tags"]),
         ]
     )
     hay = folded(text)

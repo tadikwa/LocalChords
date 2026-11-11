@@ -112,5 +112,10 @@ def install(app: QCoreApplication, language: str) -> str:
 
 def install_worker() -> None:
     """An analysis process speaks the interface's language: it inherits ENV from the program."""
-    app = QCoreApplication.instance() or QCoreApplication([sys.argv[0]])
-    install(app, resolve(None))
+    language = resolve(None)
+    app = QCoreApplication.instance()
+    if app is None:
+        if language == SOURCE:
+            return  # its messages are French already; and a test may run it in its own process
+        app = QCoreApplication([sys.argv[0]])
+    install(app, language)

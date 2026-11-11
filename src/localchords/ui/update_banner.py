@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, library, transcribe, updates
+from .. import __version__, i18n, library, transcribe, updates
 from ..i18n import translate
 from . import theme
 from .widgets import ElidedLabel
@@ -608,7 +608,11 @@ class UpdateController:
                 None, translate("Updates", "Mise à jour"), translate("Updates", CHANGED)
             )
             return
-        launch(path)
+        # The installer in the interface's language (installer/LocalChords.iss, [Languages]).
+        launch(
+            path,
+            f"/LANG={INSTALLER_LANGUAGES[i18n.current()]}" if ready["kind"] == "installed" else "",
+        )
 
     def _intact(self, path: Path, ready: dict) -> bool:
         if updates.verified(path, ready["sha256"], ready.get("size")):
@@ -660,6 +664,9 @@ class UpdateController:
         self.timer.stop()
 
 
-def launch(path: Path) -> None:
+INSTALLER_LANGUAGES = {"fr": "french", "en": "english"}
+
+
+def launch(path: Path, arguments: str = "") -> None:
     """As a double click would: Windows checks the file (SmartScreen, its mark from the web)."""
-    os.startfile(str(path))  # noqa: S606
+    os.startfile(str(path), arguments=arguments)  # noqa: S606
