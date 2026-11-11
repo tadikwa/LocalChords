@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from ..chords import parse
 from ..export import chord_text
+from ..i18n import translate
 from ..project import Project
 from . import theme
 
@@ -29,8 +30,8 @@ class Waveform(QWidget):
         self.setMinimumHeight(84)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.setAccessibleName("Forme d'onde et chronologie des accords")
-        self.setToolTip("Cliquez pour vous déplacer dans le morceau")
+        self.setAccessibleName(translate("Waveform", "Forme d'onde et chronologie des accords"))
+        self.setToolTip(translate("Waveform", "Cliquez pour vous déplacer dans le morceau"))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def set_peaks(self, peaks: np.ndarray, duration: float) -> None:

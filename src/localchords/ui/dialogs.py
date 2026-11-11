@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QT_TRANSLATE_NOOP, Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -34,6 +34,7 @@ from ..chords import (
     symbol,
     transpose_key,
 )
+from ..i18n import translate
 from ..project import Project
 
 
@@ -45,7 +46,7 @@ class ChordEditor(QDialog):
         super().__init__(parent)
         self.project = project
         self.first, self.last = first, last
-        self.setWindowTitle("Corriger l'accord")
+        self.setWindowTitle(translate("Dialogs", "Corriger l'accord"))
         self.setMinimumWidth(560)
         self.shift = project.sounding_shift()
         self.latin = bool(project.view.get("latin"))
@@ -64,11 +65,11 @@ class ChordEditor(QDialog):
         root.setContentsMargins(20, 18, 20, 18)
 
         self.input = QLineEdit()
-        self.input.setPlaceholderText("Am7, D/F#, Bb, N.C.…")
-        self.input.setAccessibleName("Accord")
+        self.input.setPlaceholderText(translate("Dialogs", "Am7, D/F#, Bb, N.C.…"))
+        self.input.setAccessibleName(translate("Dialogs", "Accord"))
         self.input.setObjectName("chordInput")
         self.input.textChanged.connect(self._typed)
-        label = QLabel("Accord")
+        label = QLabel(translate("Dialogs", "Accord"))
         label.setObjectName("h2")
         root.addWidget(label)
         root.addWidget(self.input)
@@ -79,7 +80,7 @@ class ChordEditor(QDialog):
         # What the analysis also heard: usually the right answer is one of these.
         candidates = (segment.candidates if segment else [])[:6]
         if candidates:
-            title = QLabel("Proposés par l'analyse")
+            title = QLabel(translate("Dialogs", "Proposés par l'analyse"))
             title.setObjectName("caption")
             root.addWidget(title)
             row = QHBoxLayout()
@@ -93,7 +94,7 @@ class ChordEditor(QDialog):
             row.addStretch()
             root.addLayout(row)
 
-        title = QLabel("Note de base")
+        title = QLabel(translate("Dialogs", "Note de base"))
         title.setObjectName("caption")
         root.addWidget(title)
         grid = QGridLayout()
@@ -113,7 +114,7 @@ class ChordEditor(QDialog):
         self.root_buttons.idClicked.connect(self._pick_root)
         root.addLayout(grid)
 
-        title = QLabel("Type")
+        title = QLabel(translate("Dialogs", "Type"))
         title.setObjectName("caption")
         root.addWidget(title)
         grid = QGridLayout()
@@ -129,16 +130,16 @@ class ChordEditor(QDialog):
         root.addLayout(grid)
 
         row = QHBoxLayout()
-        row.addWidget(QLabel("Basse"))
+        row.addWidget(QLabel(translate("Dialogs", "Basse")))
         self.bass = QComboBox()
-        self.bass.setAccessibleName("Note de basse")
-        self.bass.addItem("Fondamentale", None)
+        self.bass.setAccessibleName(translate("Dialogs", "Note de basse"))
+        self.bass.addItem(translate("Dialogs", "Fondamentale"), None)
         for pc in range(12):
             name = spell_root(pc, moved_key, project.view["accidentals"])
             self.bass.addItem(pretty_note(name, latin=self.latin), pc)
         self.bass.currentIndexChanged.connect(self._pick_bass)
         row.addWidget(self.bass)
-        none = QPushButton("Pas d'accord (N.C.)")
+        none = QPushButton(translate("Dialogs", "Pas d'accord (N.C.)"))
         none.clicked.connect(lambda: self.input.setText("N.C."))
         row.addStretch()
         row.addWidget(none)
@@ -146,13 +147,17 @@ class ChordEditor(QDialog):
 
         # The chord's whole span, or just the beats that were selected.
         span_row = QHBoxLayout()
-        span_row.addWidget(QLabel("Appliquer à"))
+        span_row.addWidget(QLabel(translate("Dialogs", "Appliquer à")))
         selected = last - first + 1
         self.scope_selection = QRadioButton(
-            f"la sélection ({selected} temps)" if selected > 1 else "ce temps seulement"
+            translate("Dialogs", "la sélection ({selected} temps)").format(selected=selected)
+            if selected > 1
+            else translate("Dialogs", "ce temps seulement")
         )
         seg_beats = (segment.end_beat - segment.start_beat) if segment else selected
-        self.scope_chord = QRadioButton(f"tout cet accord ({seg_beats} temps)")
+        self.scope_chord = QRadioButton(
+            translate("Dialogs", "tout cet accord ({seg_beats} temps)").format(seg_beats=seg_beats)
+        )
         whole = segment is not None and (
             selected == 1 or (first, last + 1) == (segment.start_beat, segment.end_beat)
         )
@@ -163,9 +168,13 @@ class ChordEditor(QDialog):
         root.addLayout(span_row)
 
         buttons = QDialogButtonBox()
-        self.apply_button = buttons.addButton("Appliquer", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.apply_button = buttons.addButton(
+            translate("Dialogs", "Appliquer"), QDialogButtonBox.ButtonRole.AcceptRole
+        )
         self.apply_button.setObjectName("primary")
-        cancel = buttons.addButton("Annuler", QDialogButtonBox.ButtonRole.RejectRole)
+        cancel = buttons.addButton(
+            translate("Dialogs", "Annuler"), QDialogButtonBox.ButtonRole.RejectRole
+        )
         cancel.setAutoDefault(False)
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
@@ -192,7 +201,10 @@ class ChordEditor(QDialog):
         self.apply_button.setEnabled(parsed is not None)
         if parsed is None:
             self.message.setText(
-                "Accord non reconnu. Exemples : C, Am, G7, Fmaj7, Dm7, Bm7b5, Dsus4, C/E, N.C."
+                translate(
+                    "Dialogs",
+                    "Accord non reconnu. Exemples : C, Am, G7, Fmaj7, Dm7, Bm7b5, Dsus4, C/E, N.C.",
+                )
             )
             self.message.setObjectName("error")
         else:
@@ -265,37 +277,50 @@ class ChordEditor(QDialog):
 class SheetDialog(QDialog):
     """What the printed chord sheet holds: which diagrams, and the grid or not."""
 
-    MODES = (("guitar", "Guitare"), ("piano", "Piano"), ("both", "Guitare et piano"))
+    MODES = (
+        ("guitar", QT_TRANSLATE_NOOP("Dialogs", "Guitare")),
+        ("piano", QT_TRANSLATE_NOOP("Dialogs", "Piano")),
+        ("both", QT_TRANSLATE_NOOP("Dialogs", "Guitare et piano")),
+    )
 
     def __init__(self, mode: str, grid: bool, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Fiche des accords")
+        self.setWindowTitle(translate("Dialogs", "Fiche des accords"))
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(10)
-        layout.addWidget(QLabel("Diagrammes à imprimer"))
+        layout.addWidget(QLabel(translate("Dialogs", "Diagrammes à imprimer")))
         self.group = QButtonGroup(self)
         for value, text in self.MODES:
-            button = QRadioButton(text)
+            button = QRadioButton(translate("Dialogs", text))
             button.setProperty("mode", value)
             button.setChecked(value == mode)
             self.group.addButton(button)
             layout.addWidget(button)
         if self.group.checkedButton() is None:
             self.group.buttons()[0].setChecked(True)
-        self.grid = QCheckBox("Ajouter la grille sur une page à part")
+        self.grid = QCheckBox(translate("Dialogs", "Ajouter la grille sur une page à part"))
         self.grid.setChecked(grid)
         layout.addWidget(self.grid)
-        note = QLabel("Les positions sont celles choisies dans le programme, transposition "
-                      "et capodastre compris.")  # fmt: skip
+        note = QLabel(
+            translate(
+                "Dialogs",
+                "Les positions sont celles choisies dans le programme, transposition et "
+                "capodastre compris.",
+            )
+        )
         note.setWordWrap(True)
         note.setObjectName("muted")
         layout.addWidget(note)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Exporter…")
-        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Annuler")
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText(
+            translate("Dialogs", "Exporter…")
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(
+            translate("Dialogs", "Annuler")
+        )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -313,7 +338,7 @@ class RhythmDialog(QDialog):
     def __init__(self, project: Project, parent=None):
         super().__init__(parent)
         self.project = project
-        self.setWindowTitle("Tempo et mesure")
+        self.setWindowTitle(translate("Dialogs", "Tempo et mesure"))
         self.setMinimumWidth(460)
         form = QFormLayout(self)
         form.setContentsMargins(20, 18, 20, 18)
@@ -322,65 +347,80 @@ class RhythmDialog(QDialog):
         self.per_bar = QSpinBox()
         self.per_bar.setRange(2, 12)
         self.per_bar.setValue(int(meter["beats_per_bar"]))
-        self.per_bar.setAccessibleName("Temps par mesure")
+        self.per_bar.setAccessibleName(translate("Dialogs", "Temps par mesure"))
         self.per_bar.valueChanged.connect(self._meter_changed)
-        form.addRow("Temps par mesure", self.per_bar)
+        form.addRow(translate("Dialogs", "Temps par mesure"), self.per_bar)
         self.first = QSpinBox()
         self.first.setRange(1, 12)
         self.first.setValue(int(meter["first_downbeat"]) + 1)
-        self.first.setAccessibleName("Premier temps de la première mesure")
-        self.first.setToolTip("Le numéro du temps du morceau qui tombe sur le début d'une mesure.")
+        self.first.setAccessibleName(translate("Dialogs", "Premier temps de la première mesure"))
+        self.first.setToolTip(
+            translate(
+                "Dialogs", "Le numéro du temps du morceau qui tombe sur le début d'une mesure."
+            )
+        )
         self.first.valueChanged.connect(self._meter_changed)
-        form.addRow("Première mesure au temps n°", self.first)
+        form.addRow(translate("Dialogs", "Première mesure au temps n°"), self.first)
 
         tempo_row = QWidget()
         row = QHBoxLayout(tempo_row)
         row.setContentsMargins(0, 0, 0, 0)
         half = QPushButton("÷ 2")
-        half.setToolTip("Le tempo détecté est deux fois trop rapide")
+        half.setToolTip(translate("Dialogs", "Le tempo détecté est deux fois trop rapide"))
         half.clicked.connect(lambda: self._scale(0.5))
         double = QPushButton("× 2")
-        double.setToolTip("Le tempo détecté est deux fois trop lent")
+        double.setToolTip(translate("Dialogs", "Le tempo détecté est deux fois trop lent"))
         double.clicked.connect(lambda: self._scale(2))
-        normal = QPushButton("Détecté")
+        normal = QPushButton(translate("Dialogs", "Détecté"))
         normal.clicked.connect(lambda: self._scale(1))
         for b in (half, double, normal):
             b.setAutoDefault(False)
             row.addWidget(b)
         row.addStretch()
-        form.addRow("Grille de temps", tempo_row)
+        form.addRow(translate("Dialogs", "Grille de temps"), tempo_row)
 
         grid = project.edits["grid"] or {}
         self.bpm = QDoubleSpinBox()
         self.bpm.setRange(0, 300)
         self.bpm.setDecimals(1)
-        self.bpm.setSpecialValueText("Automatique")
+        self.bpm.setSpecialValueText(translate("Dialogs", "Automatique"))
         self.bpm.setValue(float(grid.get("bpm") or 0))
         self.bpm.setSuffix(" BPM")
-        self.bpm.setAccessibleName("Tempo imposé")
-        self.bpm.setToolTip("Pose une grille régulière à ce tempo. 0 revient à la grille détectée.")
+        self.bpm.setAccessibleName(translate("Dialogs", "Tempo imposé"))
+        self.bpm.setToolTip(
+            translate(
+                "Dialogs", "Pose une grille régulière à ce tempo. 0 revient à la grille détectée."
+            )
+        )
         self.bpm.editingFinished.connect(self._bpm_changed)
-        form.addRow("Tempo imposé", self.bpm)
+        form.addRow(translate("Dialogs", "Tempo imposé"), self.bpm)
 
         self.offset = QSpinBox()
         self.offset.setRange(-2000, 2000)
         self.offset.setSingleStep(10)
         self.offset.setSuffix(" ms")
         self.offset.setValue(int(float(grid.get("offset") or 0) * 1000))
-        self.offset.setAccessibleName("Décalage de la grille en millisecondes")
-        self.offset.setToolTip("Décale tous les temps, si la grille tombe à côté de la musique.")
+        self.offset.setAccessibleName(
+            translate("Dialogs", "Décalage de la grille en millisecondes")
+        )
+        self.offset.setToolTip(
+            translate("Dialogs", "Décale tous les temps, si la grille tombe à côté de la musique.")
+        )
         self.offset.editingFinished.connect(self._offset_changed)
-        form.addRow("Décalage", self.offset)
+        form.addRow(translate("Dialogs", "Décalage"), self.offset)
 
         note = QLabel(
-            "Les corrections d'accords sont conservées : elles sont enregistrées en secondes, "
-            "pas sur la grille."
+            translate(
+                "Dialogs",
+                "Les corrections d'accords sont conservées : elles sont enregistrées en "
+                "secondes, pas sur la grille.",
+            )
         )
         note.setObjectName("caption")
         note.setWordWrap(True)
         form.addRow(note)
         close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        close.button(QDialogButtonBox.StandardButton.Close).setText("Fermer")
+        close.button(QDialogButtonBox.StandardButton.Close).setText(translate("Dialogs", "Fermer"))
         close.rejected.connect(self.reject)
         form.addRow(close)
 
@@ -408,44 +448,90 @@ class RhythmDialog(QDialog):
 
 
 SHORTCUTS = [
-    ("Espace", "Lecture / pause"),
-    ("← / →", "Temps précédent / suivant"),
-    ("Ctrl + ← / →", "Mesure précédente / suivante"),
-    ("Début / Fin", "Début / fin du morceau"),
-    ("Entrée ou E", "Corriger l'accord sélectionné"),
-    ("Maj + clic", "Étendre la sélection"),
-    ("A / B", "Début / fin de boucle"),
-    ("L", "Boucler la sélection, ou arrêter la boucle"),
-    ("- / +", "Ralentir / accélérer"),
-    ("Ctrl + ↑ / ↓", "Transposer d'un demi-ton"),
-    ("Ctrl + Z / Y", "Annuler / rétablir"),
-    ("Ctrl + O", "Ouvrir un morceau"),
-    ("Ctrl + S", "Enregistrer une copie du projet"),
-    ("Ctrl + E", "Exporter"),
-    ("D", "Afficher / masquer les diagrammes"),
-    ("T", "Afficher / masquer les accords du morceau"),
-    ("G / Maj + G", "Position de guitare suivante / précédente"),
-    ("P / Maj + P", "Disposition de piano suivante / précédente"),
-    ("Clic sur un accord, Maj + D", "Épingler ses diagrammes (← → le déplacent)"),
-    ("K", "Paroles : afficher / revenir à la grille seule"),
-    ("Entrée (synchronisation)", "Paroles : caler la ligne choisie sur la lecture"),
-    ("Ctrl + molette", "Paroles : taille du texte"),
-    ("M", "Mixage : ouvrir / fermer le panneau"),
-    ("Maj + M", "Mixage : basculer entre l'original et le mix personnalisé"),
-    ("Échap", "Diagrammes : revenir à l'accord joué"),
-    ("F1", "Cette aide"),
+    (QT_TRANSLATE_NOOP("Shortcuts", "Espace"), QT_TRANSLATE_NOOP("Shortcuts", "Lecture / pause")),
+    ("← / →", QT_TRANSLATE_NOOP("Shortcuts", "Temps précédent / suivant")),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Ctrl + ← / →"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Mesure précédente / suivante"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Début / Fin"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Début / fin du morceau"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Entrée ou E"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Corriger l'accord sélectionné"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Maj + clic"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Étendre la sélection"),
+    ),
+    ("A / B", QT_TRANSLATE_NOOP("Shortcuts", "Début / fin de boucle")),
+    ("L", QT_TRANSLATE_NOOP("Shortcuts", "Boucler la sélection, ou arrêter la boucle")),
+    ("- / +", QT_TRANSLATE_NOOP("Shortcuts", "Ralentir / accélérer")),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Ctrl + ↑ / ↓"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Transposer d'un demi-ton"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Ctrl + Z / Y"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Annuler / rétablir"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Ctrl + O"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Ouvrir un morceau"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Ctrl + S"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Enregistrer une copie du projet"),
+    ),
+    (QT_TRANSLATE_NOOP("Shortcuts", "Ctrl + E"), QT_TRANSLATE_NOOP("Shortcuts", "Exporter")),
+    ("D", QT_TRANSLATE_NOOP("Shortcuts", "Afficher / masquer les diagrammes")),
+    ("T", QT_TRANSLATE_NOOP("Shortcuts", "Afficher / masquer les accords du morceau")),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "G / Maj + G"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Position de guitare suivante / précédente"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "P / Maj + P"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Disposition de piano suivante / précédente"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Clic sur un accord, Maj + D"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Épingler ses diagrammes (← → le déplacent)"),
+    ),
+    ("K", QT_TRANSLATE_NOOP("Shortcuts", "Paroles : afficher / revenir à la grille seule")),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Entrée (synchronisation)"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Paroles : caler la ligne choisie sur la lecture"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Ctrl + molette"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Paroles : taille du texte"),
+    ),
+    ("M", QT_TRANSLATE_NOOP("Shortcuts", "Mixage : ouvrir / fermer le panneau")),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Maj + M"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Mixage : basculer entre l'original et le mix personnalisé"),
+    ),
+    (
+        QT_TRANSLATE_NOOP("Shortcuts", "Échap"),
+        QT_TRANSLATE_NOOP("Shortcuts", "Diagrammes : revenir à l'accord joué"),
+    ),
+    ("F1", QT_TRANSLATE_NOOP("Shortcuts", "Cette aide")),
 ]
 
 
 class ShortcutsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Raccourcis clavier")
+        self.setWindowTitle(translate("Dialogs", "Raccourcis clavier"))
         layout = QGridLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setHorizontalSpacing(24)
         layout.setVerticalSpacing(8)
         for i, (keys, what) in enumerate(SHORTCUTS):
+            keys, what = translate("Shortcuts", keys), translate("Shortcuts", what)
             k = QLabel(keys)
             k.setObjectName("key")
             layout.addWidget(k, i, 0, Qt.AlignmentFlag.AlignRight)

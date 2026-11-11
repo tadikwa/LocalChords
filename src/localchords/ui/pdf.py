@@ -17,7 +17,8 @@ from PySide6.QtGui import (
     QPen,
 )
 
-from ..export import bar_symbols, header
+from ..export import bar_symbols, field, header
+from ..i18n import translate
 from ..project import Project
 from . import diagrams, theme
 from .diagrams import GuitarDiagram, PianoDiagram, Positions, positions_of
@@ -68,14 +69,14 @@ def _writer(path: Path, title: str, landscape: bool = False) -> tuple[QPdfWriter
     writer.setCreator("LocalChords")
     p = QPainter(writer)
     if not p.isActive():
-        raise OSError(f"Impossible d'écrire dans {path}")
+        raise OSError(translate("Pdf", "Impossible d'écrire dans {path}").format(path=path))
     return writer, p
 
 
 def _title(p: QPainter, project: Project, width: float, draw: bool = True) -> float:
     """The title and what to know before playing; returns where the page goes on."""
     fields = dict(header(project))
-    title = fields.pop("Titre", "")
+    title = fields.pop(translate("Export", "Titre"), "")
     p.setPen(INK)
     p.setFont(theme.app_font(30, 700))
     metrics = QFontMetricsF(p.font())
@@ -88,7 +89,7 @@ def _title(p: QPainter, project: Project, width: float, draw: bool = True) -> fl
     y = metrics.height() + 4
     p.setFont(theme.app_font(14))
     metrics = QFontMetricsF(p.font())
-    line = "   ·   ".join(f"{k} : {v}" for k, v in fields.items())
+    line = "   ·   ".join(field(k, v) for k, v in fields.items())
     box = metrics.boundingRect(QRectF(0, 0, width, 1000), Qt.TextFlag.TextWordWrap, line)
     if draw:
         p.drawText(QRectF(0, y, width, box.height()), Qt.TextFlag.TextWordWrap, line)
@@ -108,9 +109,12 @@ def _grid_rows(count: int, y: float, height: float) -> list[tuple[int, float]]:
 
 
 def _draw_grid(
-    p: QPainter, project: Project, rows: list[tuple[int, float]], width: float,
+    p: QPainter,
+    project: Project,
+    rows: list[tuple[int, float]],
+    width: float,
     new_page: Callable[[], None],
-) -> None:  # fmt: skip
+) -> None:
     bars = bar_symbols(project, ascii_only=False)
     bar_w = width / BARS_PER_LINE
     numbers = [bar.number for bar in project.bars()]
@@ -222,9 +226,14 @@ def _fit_font(text: str, size: float, weight: int, room: float):
 
 
 def _draw_card(
-    p: QPainter, rect: QRectF, item, mode: str, positions: Positions,
-    guitar: GuitarDiagram, piano: PianoDiagram,
-) -> None:  # fmt: skip
+    p: QPainter,
+    rect: QRectF,
+    item,
+    mode: str,
+    positions: Positions,
+    guitar: GuitarDiagram,
+    piano: PianoDiagram,
+) -> None:
     shown = item.shown
     p.setPen(QPen(QColor("#CCCCCC"), 1.0))
     p.setBrush(Qt.BrushStyle.NoBrush)
@@ -239,11 +248,18 @@ def _draw_card(
     )
     y = inner.top() + NAME_H
     p.setPen(QColor("#666666"))
-    p.setFont(_fit_font(f"première fois : {item.place}", 11, 400, inner.width()))
+    p.setFont(
+        _fit_font(
+            translate("Pdf", "première fois : {place}").format(place=item.place),
+            11,
+            400,
+            inner.width(),
+        )
+    )
     p.drawText(
         QRectF(inner.left(), y, inner.width(), PLACE_H),
         int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop),
-        f"première fois : {item.place}",
+        translate("Pdf", "première fois : {place}").format(place=item.place),
     )
     y += PLACE_H
     fingerings, voicing_list = positions_of(shown)
@@ -269,13 +285,18 @@ def _draw_card(
             f = fingerings[i]
             guitar.fingering, guitar.chord, guitar.capo = f, shown.shape, shown.capo
             guitar.draw(p, box)
-            text = f"Guitare · {f.kind}"
+            text = translate("Pdf", "Guitare · {kind}").format(kind=f.kind)
             if len(fingerings) > 1:
-                text += f" · position {i + 1}/{len(fingerings)}"
+                text += " · " + translate("Pdf", "position {number}/{count}").format(
+                    number=i + 1, count=len(fingerings)
+                )
         else:
-            guitar.fingering, guitar.message = None, "Pas de position vérifiée à la guitare."
+            guitar.fingering, guitar.message = (
+                None,
+                translate("Pdf", "Pas de position vérifiée à la guitare."),
+            )
             guitar.draw(p, box)
-            text = "Guitare"
+            text = translate("Pdf", "Guitare")
         y += GUITAR_H
         caption(text)
         y += CAPTION_H
@@ -286,7 +307,11 @@ def _draw_card(
         piano.voicing, piano.chord = v, shown.sound
         piano.draw(p, box)
         y += PIANO_H
-        text = f"Piano · son réel {shown.sound.title}" if shown.capo else f"Piano · {v.name}"
+        text = (
+            translate("Pdf", "Piano · son réel {title}").format(title=shown.sound.title)
+            if shown.capo
+            else translate("Pdf", "Piano · {name}").format(name=v.name)
+        )
         caption(text)
 
 
@@ -305,14 +330,18 @@ def _foot(p: QPainter, project: Project, width: float, height: float, page: int,
     p.drawText(
         QRectF(0, height + 4, width, FOOTER_H - 4),
         int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
-        f"Page {page} / {total}",
+        translate("Pdf", "Page {page} / {total}").format(page=page, total=total),
     )
 
 
 def write_chord_sheet(
-    project: Project, path: Path, items: list, mode: str, include_grid: bool,
+    project: Project,
+    path: Path,
+    items: list,
+    mode: str,
+    include_grid: bool,
     positions: Positions,
-) -> int:  # fmt: skip
+) -> int:
     """Every chord of the song once, with its diagrams as chosen in the program, on A4 pages;
     the grid on pages of its own if asked. Returns the number of pages."""
     writer, p = _writer(path, project.audio.get("title"))
@@ -340,10 +369,13 @@ def write_chord_sheet(
     p.setPen(QColor("#444444"))
     p.setFont(theme.app_font(14, 600))
     count = len(items)
-    intro = f"{count} accord{'s' if count > 1 else ''} différent{'s' if count > 1 else ''}"
-    intro += ", dans l'ordre où ils arrivent" if count > 1 else ""
+    intro = (
+        translate("Pdf", "%n accords différents, dans l'ordre où ils arrivent", None, count)
+        if count > 1
+        else translate("Pdf", "1 accord différent")
+    )
     if not items:
-        intro = "Aucun accord dans ce morceau."
+        intro = translate("Pdf", "Aucun accord dans ce morceau.")
     p.drawText(QRectF(0, top, width, intro_h), int(Qt.AlignmentFlag.AlignLeft), intro)
 
     guitar, piano = GuitarDiagram(), PianoDiagram()
@@ -368,7 +400,9 @@ def write_chord_sheet(
         new_page()
         p.setPen(INK)
         p.setFont(theme.app_font(20, 700))
-        p.drawText(QRectF(0, 0, width, 34), int(Qt.AlignmentFlag.AlignLeft), "Grille")
+        p.drawText(
+            QRectF(0, 0, width, 34), int(Qt.AlignmentFlag.AlignLeft), translate("Pdf", "Grille")
+        )
         _draw_grid(p, project, grid, width, new_page)
     foot()
     p.end()
@@ -441,26 +475,30 @@ def write_lyrics_sheet(
 
     # The head: the title, what to know before playing, where the words come from.
     fields = dict(header(project))
-    title = fields.pop("Titre", "") or "Sans titre"
-    artist = fields.pop("Artiste", "")
+    title = fields.pop(translate("Export", "Titre"), "") or translate("Pdf", "Sans titre")
+    artist = fields.pop(translate("Export", "Artiste"), "")
     text_block(title, theme.app_font(26, 700), "#111111", 0)
     if artist:
         text_block(artist, theme.app_font(16, 600), "#3A3A3A", 2)
     if options.get("details", True) and fields:
         text_block(
-            "   ·   ".join(f"{k} : {v}" for k, v in fields.items()),
+            "   ·   ".join(field(k, v) for k, v in fields.items()),
             theme.app_font(12),
             "#3A3A3A",
             8,
         )
     lyr = project.lyrics
     src = lyr["source"]
-    origin = f"Paroles : {KINDS.get(src.get('kind'), '')}"
+    origin = translate("Pdf", "Paroles : {kind}").format(
+        kind=translate("Lyrics", KINDS.get(src.get("kind"), ""))
+    )
     if src.get("name"):
-        origin += f" ({src['name']})"
+        origin += f" ({translate('LyricsOnline', src['name'])})"
     rows = lyric_rows(project)
     if approximate(rows):
-        origin += ". En italique gris : accord placé approximativement dans la ligne."
+        origin += translate(
+            "Pdf", ". En italique gris : accord placé approximativement dans la ligne."
+        )
     text_block(origin, theme.app_font(11), "#5A5A5A", 6)
 
     # The diagrams, a row of cards per block.
@@ -489,7 +527,7 @@ def write_lyrics_sheet(
             "draw": lambda y: (
                 p.setFont(theme.app_font(15, 700)),
                 p.setPen(INK),
-                p.drawText(QRectF(0, y, sheet_w, 26), "Accords"),
+                p.drawText(QRectF(0, y, sheet_w, 26), translate("Pdf", "Accords")),
             ),
         }
         card_blocks.insert(0, heading)

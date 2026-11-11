@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from itertools import product
 
+from PySide6.QtCore import QT_TRANSLATE_NOOP
+
 from .chords import (
     QUALITIES,
     SHARP_NAMES,
@@ -21,6 +23,7 @@ from .chords import (
     symbol,
     transpose_key,
 )
+from .i18n import translate
 
 # Standard tuning, low string first: E2 A2 D3 G3 B3 E4.
 TUNING = (40, 45, 50, 55, 59, 64)
@@ -160,10 +163,10 @@ class Fingering:
     @property
     def kind(self) -> str:
         if self.barre:
-            return f"Barré en case {self.barre[0]}"
+            return translate("Voicings", "Barré en case {fret}").format(fret=self.barre[0])
         if 0 in self.frets and self.highest_fret <= 4:
-            return "Position ouverte"
-        return f"Case {self.lowest_fret}"
+            return translate("Voicings", "Position ouverte")
+        return translate("Voicings", "Case {fret}").format(fret=self.lowest_fret)
 
     @property
     def text(self) -> str:
@@ -325,7 +328,12 @@ def _covers(better: tuple, other: tuple) -> bool:
 
 # Piano ----------------------------------------------------------------------------------------
 LOW_KEY, HIGH_KEY = 48, 83  # the keyboard drawn: C3 to B5
-INVERSIONS = ("Position fondamentale", "1er renversement", "2e renversement", "3e renversement")
+INVERSIONS = (
+    QT_TRANSLATE_NOOP("Voicings", "Position fondamentale"),
+    QT_TRANSLATE_NOOP("Voicings", "1er renversement"),
+    QT_TRANSLATE_NOOP("Voicings", "2e renversement"),
+    QT_TRANSLATE_NOOP("Voicings", "3e renversement"),
+)
 
 
 @dataclass(frozen=True)
@@ -358,18 +366,28 @@ def piano(root: int, quality: str, bass: int | None = None) -> tuple:
     if bass == root:
         for k in range(len(chord_tones)):
             order = chord_tones[k:] + chord_tones[:k]
-            out.append(PianoVoicing(INVERSIONS[k], (), _stack(order, 55)))
+            out.append(PianoVoicing(translate("Voicings", INVERSIONS[k]), (), _stack(order, 55)))
     else:
         if bass in chord_tones:
             k = chord_tones.index(bass)
-            name, order = INVERSIONS[k], chord_tones[k:] + chord_tones[:k]
+            name, order = translate("Voicings", INVERSIONS[k]), chord_tones[k:] + chord_tones[:k]
         else:
-            name, order = "Basse ajoutée", (bass, *chord_tones)
+            name, order = translate("Voicings", "Basse ajoutée"), (bass, *chord_tones)
         # A foreign bass under the whole chord spans more: start it lower to stay on the keys.
         out.append(PianoVoicing(name, (), _stack(order, 55 if bass in chord_tones else 48)))
     left = _stack([bass], 48)
     for k in range(len(chord_tones) if bass != root else 1):
         order = chord_tones[k:] + chord_tones[:k]
-        hand = "accord" if k == 0 else INVERSIONS[k].lower()
-        out.append(PianoVoicing(f"Deux mains : basse et {hand}", left, _stack(order, 60)))
+        hand = (
+            translate("Voicings", "accord")
+            if k == 0
+            else translate("Voicings", INVERSIONS[k]).lower()
+        )
+        out.append(
+            PianoVoicing(
+                translate("Voicings", "Deux mains : basse et {hand}").format(hand=hand),
+                left,
+                _stack(order, 60),
+            )
+        )
     return tuple(out)

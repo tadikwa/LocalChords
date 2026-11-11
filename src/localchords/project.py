@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from . import lyrics as lyrics_module
+from .i18n import translate
 
 FORMAT = "localchords"
 VERSION = 2  # 2 adds the lyrics; a project without lyrics is still written as 1
@@ -129,23 +130,43 @@ class Project:
             with path.open(encoding="utf-8") as f:
                 d = json.load(f)
         except FileNotFoundError as exc:
-            raise ProjectError(f"Projet introuvable : {path}") from exc
+            raise ProjectError(
+                translate("Project", "Projet introuvable : {path}").format(path=path)
+            ) from exc
         except (OSError, ValueError) as exc:
-            raise ProjectError(f"« {path.name} » n'est pas un projet lisible.") from exc
+            raise ProjectError(
+                translate("Project", "« {name} » n'est pas un projet lisible.").format(
+                    name=path.name
+                )
+            ) from exc
         if not isinstance(d, dict) or d.get("format") != FORMAT:
-            raise ProjectError(f"« {path.name} » n'est pas un projet LocalChords.")
+            raise ProjectError(
+                translate("Project", "« {name} » n'est pas un projet LocalChords.").format(
+                    name=path.name
+                )
+            )
         if d.get("version", 0) > VERSION:
-            raise ProjectError(f"« {path.name} » vient d'une version plus récente de LocalChords.")
+            raise ProjectError(
+                translate(
+                    "Project", "« {name} » vient d'une version plus récente de LocalChords."
+                ).format(name=path.name)
+            )
         try:
             analysis = d["analysis"]
             analysis["beats"], analysis["segments"], d["audio"]["duration"]  # noqa: B018
         except (KeyError, TypeError) as exc:
-            raise ProjectError(f"« {path.name} » est incomplet.") from exc
+            raise ProjectError(
+                translate("Project", "« {name} » est incomplet.").format(name=path.name)
+            ) from exc
         lyr = d.get("lyrics")
         if lyr is not None:
             lyr = lyrics_module.checked(lyr)
             if lyr is None:
-                raise ProjectError(f"Les paroles de « {path.name} » sont illisibles.")
+                raise ProjectError(
+                    translate("Project", "Les paroles de « {name} » sont illisibles.").format(
+                        name=path.name
+                    )
+                )
         return cls(d["audio"], analysis, d.get("edits"), d.get("view"), lyr)
 
     # Corrections and undo ----------------------------------------------------------------------

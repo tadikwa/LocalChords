@@ -13,11 +13,14 @@ import urllib.parse
 import urllib.request
 from difflib import SequenceMatcher
 
+from PySide6.QtCore import QT_TRANSLATE_NOOP
+
 from . import __version__, identify
 from . import lyrics as L
+from .i18n import translate
 
 API = "https://lrclib.net/api"
-NAME = "LRCLIB (lrclib.net), base de paroles communautaire"
+NAME = QT_TRANSLATE_NOOP("LyricsOnline", "LRCLIB (lrclib.net), base de paroles communautaire")
 USER_AGENT = f"LocalChords/{__version__} (https://github.com/tadikwa/LocalChords)"
 TIMEOUT = 12
 
@@ -39,16 +42,31 @@ def _get(path: str, params: dict, opener=urllib.request.urlopen) -> object | Non
         if exc.code == 429:
             wait = exc.headers.get("Retry-After") if exc.headers else None
             raise OnlineError(
-                "LRCLIB reçoit trop de demandes"
-                + (f" : réessayez dans {wait} s." if wait else " : réessayez dans un moment.")
+                translate(
+                    "LyricsOnline", "LRCLIB reçoit trop de demandes : réessayez dans {wait} s."
+                ).format(wait=wait)
+                if wait
+                else translate(
+                    "LyricsOnline", "LRCLIB reçoit trop de demandes : réessayez dans un moment."
+                )
             ) from exc
-        raise OnlineError(f"LRCLIB a répondu par une erreur ({exc.code}).") from exc
+        raise OnlineError(
+            translate("LyricsOnline", "LRCLIB a répondu par une erreur ({code}).").format(
+                code=exc.code
+            )
+        ) from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise OnlineError("Pas de réponse de LRCLIB : vérifiez la connexion à Internet.") from exc
+        raise OnlineError(
+            translate(
+                "LyricsOnline", "Pas de réponse de LRCLIB : vérifiez la connexion à Internet."
+            )
+        ) from exc
     try:
         return json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, ValueError) as exc:
-        raise OnlineError("LRCLIB a renvoyé une réponse illisible.") from exc
+        raise OnlineError(
+            translate("LyricsOnline", "LRCLIB a renvoyé une réponse illisible.")
+        ) from exc
 
 
 def search(
@@ -60,7 +78,7 @@ def search(
 ) -> list[dict]:
     """Candidates, the closest in duration first. Nothing here says one is the right one."""
     if not title.strip():
-        raise OnlineError("Indiquez au moins le titre du morceau.")
+        raise OnlineError(translate("LyricsOnline", "Indiquez au moins le titre du morceau."))
     found: dict[int, dict] = {}
     if artist and 1 <= duration <= 3600:
         exact = _get(

@@ -10,6 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from .i18n import translate
 from .project import EXTENSION, Project, ProjectError
 
 DEFAULT_SETTINGS = {
@@ -112,7 +113,11 @@ def keep_copy(source: Path, fingerprint: str) -> str:
 
     try:
         if audio.fingerprint(source) != fingerprint:
-            raise KeepError(f"« {source.name} » n'est pas l'enregistrement analysé.")
+            raise KeepError(
+                translate("Storage", "« {name} » n'est pas l'enregistrement analysé.").format(
+                    name=source.name
+                )
+            )
         folder = data_dir() / "audio"
         target = folder / f"{fingerprint}{source.suffix.lower()}"
         if target.is_file() and audio.fingerprint(target) == fingerprint:
@@ -120,19 +125,30 @@ def keep_copy(source: Path, fingerprint: str) -> str:
         folder.mkdir(exist_ok=True)
         need = source.stat().st_size // 2**20 + 50
         if free_mb(folder) < need:
-            raise KeepError(f"Pas assez de place : il faut environ {need} Mo sur {folder}.")
+            raise KeepError(
+                translate(
+                    "Storage", "Pas assez de place : il faut environ {need} Mo sur {folder}."
+                ).format(need=need, folder=folder)
+            )
         fd, tmp = tempfile.mkstemp(dir=folder, suffix=".part")
         os.close(fd)
         try:
             # Contents only: the copy takes the Data folder's rights, the original keeps its own.
             shutil.copyfile(source, tmp)
             if audio.fingerprint(Path(tmp)) != fingerprint:
-                raise KeepError("La copie ne correspond pas à l'original : elle n'est pas gardée.")
+                raise KeepError(
+                    translate(
+                        "Storage",
+                        "La copie ne correspond pas à l'original : elle n'est pas gardée.",
+                    )
+                )
             os.replace(tmp, target)
         finally:
             Path(tmp).unlink(missing_ok=True)
     except OSError as exc:
-        raise KeepError(f"Copie impossible : {exc.strerror or exc}") from exc
+        raise KeepError(
+            translate("Storage", "Copie impossible : {reason}").format(reason=exc.strerror or exc)
+        ) from exc
     return f"audio/{target.name}"
 
 
@@ -192,6 +208,17 @@ def recent(limit: int = 30) -> list[tuple[Path, dict]]:
         except ProjectError:
             continue
     return out
+
+
+def existing_user() -> bool:
+    """Whether LocalChords was used here before (it was all French then)."""
+    data = data_dir()
+    projects = data / "projects"
+    return (
+        (data / "settings.json").exists()
+        or (data / "catalog.db").exists()
+        or (projects.is_dir() and any(projects.iterdir()))
+    )
 
 
 def load_settings() -> dict:

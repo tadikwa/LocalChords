@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import QT_TRANSLATE_NOOP
+
+from .i18n import translate
+
 LETTERS = "CDEFGAB"
 NATURAL = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 LATIN = {"C": "Do", "D": "Ré", "E": "Mi", "F": "Fa", "G": "Sol", "A": "La", "B": "Si"}
@@ -33,7 +37,11 @@ QUALITIES = {
     "maj(9)": ("add9", "add9", (0, 2, 4, 7), "maj"),
     "min(9)": ("madd9", "madd9", (0, 2, 3, 7), "min"),
 }
-MODE_NAMES = {"maj": "majeur", "min": "mineur"}
+# A key's name in the interface's language; the tonic itself follows the notation setting.
+MODE_NAMES = {
+    "maj": QT_TRANSLATE_NOOP("Chords", "{tonic} majeur"),
+    "min": QT_TRANSLATE_NOOP("Chords", "{tonic} mineur"),
+}
 
 
 def name_to_pc(name: str) -> int:
@@ -117,7 +125,8 @@ def key_name(key: str | None, semitones: int = 0, *, latin: bool = False) -> str
     moved = transpose_key(key, semitones)
     if moved is None:
         return "—"
-    return f"{pretty_note(spell_tonic(*moved), latin=latin)} {MODE_NAMES[moved[1]]}"
+    tonic = pretty_note(spell_tonic(*moved), latin=latin)
+    return translate("Chords", MODE_NAMES[moved[1]]).format(tonic=tonic)
 
 
 def simplified(quality: str) -> str:

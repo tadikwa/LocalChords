@@ -3,7 +3,7 @@ text, and choosing what the printed lyrics and chords sheet holds."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import QMimeData, Qt, QTimer
+from PySide6.QtCore import QT_TRANSLATE_NOOP, QMimeData, Qt, QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -26,7 +26,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .. import library, lyrics_online, transcribe
+from .. import i18n, library, lyrics_online, transcribe
+from ..i18n import translate
 from . import theme
 from .widgets import fmt_time
 
@@ -45,7 +46,9 @@ def _buttons(ok: str, dialog: QDialog) -> QDialogButtonBox:
         QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
     )
     box.button(QDialogButtonBox.StandardButton.Ok).setText(ok)
-    box.button(QDialogButtonBox.StandardButton.Cancel).setText("Annuler")
+    box.button(QDialogButtonBox.StandardButton.Cancel).setText(
+        translate("LyricsDialogs", "Annuler")
+    )
     box.accepted.connect(dialog.accept)
     box.rejected.connect(dialog.reject)
     return box
@@ -67,7 +70,7 @@ class SearchDialog(QDialog):
         """records: candidates already found, best first, shown without asking again. version:
         the recording is a live, a cover…, whose times are not the catalog's."""
         super().__init__(parent)
-        self.setWindowTitle("Rechercher les paroles en ligne")
+        self.setWindowTitle(translate("LyricsDialogs", "Rechercher les paroles en ligne"))
         self.resize(760, 620)
         self.duration = duration
         self.version = version
@@ -79,10 +82,13 @@ class SearchDialog(QDialog):
         layout.setSpacing(10)
         layout.addWidget(
             _note(
-                "Seuls le titre, l'artiste, l'album et la durée sont envoyés à "
-                f"{lyrics_online.NAME}, jamais l'audio. Les paroles trouvées s'affichent et "
-                "s'enregistrent dans le projet, mais ne s'exportent pas : leurs droits "
-                "appartiennent à leurs auteurs."
+                translate(
+                    "LyricsDialogs",
+                    "Seuls le titre, l'artiste, l'album et la durée sont envoyés à {name}, "
+                    "jamais l'audio. Les paroles trouvées s'affichent et s'enregistrent dans "
+                    "le projet, mais ne s'exportent pas : leurs droits appartiennent à leurs "
+                    "auteurs.",
+                ).format(name=translate("LyricsOnline", lyrics_online.NAME))
             )
         )
         form = QFormLayout()
@@ -90,15 +96,15 @@ class SearchDialog(QDialog):
         self.artist = QLineEdit(artist)
         self.album = QLineEdit(album)
         for label, field in (
-            ("Titre", self.title),
-            ("Artiste", self.artist),
-            ("Album", self.album),
+            (translate("LyricsDialogs", "Titre"), self.title),
+            (translate("LyricsDialogs", "Artiste"), self.artist),
+            (translate("LyricsDialogs", "Album"), self.album),
         ):
             field.returnPressed.connect(self.search)
             form.addRow(label, field)
         layout.addLayout(form)
         row = QHBoxLayout()
-        self.go = QPushButton("Chercher")
+        self.go = QPushButton(translate("LyricsDialogs", "Chercher"))
         self.go.setObjectName("primary")
         self.go.clicked.connect(self.search)
         self.status = QLabel()
@@ -114,13 +120,19 @@ class SearchDialog(QDialog):
         self.preview.setReadOnly(True)
         self.preview.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)  # no copy
         layout.addWidget(self.preview, 2)
-        self.plain = QCheckBox("Garder le texte seul, sans les horodatages du catalogue")
+        self.plain = QCheckBox(
+            translate("LyricsDialogs", "Garder le texte seul, sans les horodatages du catalogue")
+        )
         self.plain.setToolTip(
-            "Pour une reprise, un enregistrement live, une autre durée ou une version générée : "
-            "les horodatages d'un autre enregistrement ne tombent pas juste."
+            translate(
+                "LyricsDialogs",
+                "Pour une reprise, un enregistrement live, une autre durée ou une "
+                "version générée : les horodatages d'un autre enregistrement ne tombent "
+                "pas juste.",
+            )
         )
         layout.addWidget(self.plain)
-        self.box = _buttons("Utiliser ces paroles", self)
+        self.box = _buttons(translate("LyricsDialogs", "Utiliser ces paroles"), self)
         self.box.accepted.disconnect()
         self.box.accepted.connect(self._accept)
         self.ok = self.box.button(QDialogButtonBox.StandardButton.Ok)
@@ -132,7 +144,12 @@ class SearchDialog(QDialog):
         self.timer.timeout.connect(self._poll)
         if records:
             self.query = (title, artist, album)
-            self._fill(records, "Versions trouvées, la plus probable en premier : vérifiez")
+            self._fill(
+                records,
+                translate(
+                    "LyricsDialogs", "Versions trouvées, la plus probable en premier : vérifiez"
+                ),
+            )
 
     def search(self) -> None:
         if self.task is not None:
@@ -148,7 +165,7 @@ class SearchDialog(QDialog):
                 raise transcribe.TranscribeError(str(exc)) from exc
 
         self.go.setEnabled(False)
-        self.status.setText("Recherche…")
+        self.status.setText(translate("LyricsDialogs", "Recherche…"))
         self.task = transcribe.run(work)
         self.timer.start()
 
@@ -162,7 +179,10 @@ class SearchDialog(QDialog):
         if task.error:
             self.status.setText(task.error)
             return
-        self._fill(task.result or [], "vérifiez qu'il s'agit bien du même enregistrement")
+        self._fill(
+            task.result or [],
+            translate("LyricsDialogs", "vérifiez qu'il s'agit bien du même enregistrement"),
+        )
 
     def _fill(self, records: list[dict], advice: str) -> None:
         self.records = records
@@ -170,9 +190,13 @@ class SearchDialog(QDialog):
         for r in self.records:
             self.results.addItem(QListWidgetItem(self._describe(r)))
         self.status.setText(
-            f"{len(self.records)} résultat(s) : {advice}."
+            translate(
+                "LyricsDialogs", "%n résultat(s) : {advice}.", None, len(self.records)
+            ).format(advice=advice)
             if self.records
-            else "Rien trouvé. Essayez sans l'album, ou une autre orthographe."
+            else translate(
+                "LyricsDialogs", "Rien trouvé. Essayez sans l'album, ou une autre orthographe."
+            )
         )
         if self.records:
             self.results.setCurrentRow(0)
@@ -191,13 +215,17 @@ class SearchDialog(QDialog):
         parts.append(
             "instrumental"
             if r.get("instrumental")
-            else "synchronisées"
+            else translate("LyricsDialogs", "synchronisées")
             if r.get("syncedLyrics")
-            else "texte seul"
+            else translate("LyricsDialogs", "texte seul")
         )
         gap = self._gap(r)
         if gap is not None:
-            parts.append("même durée" if gap < 1 else f"écart {gap:.0f} s")
+            parts.append(
+                translate("LyricsDialogs", "même durée")
+                if gap < 1
+                else translate("LyricsDialogs", "écart {gap:.0f} s").format(gap=gap)
+            )
         return " · ".join(parts)
 
     def _show(self, row: int) -> None:
@@ -210,7 +238,7 @@ class SearchDialog(QDialog):
         self.preview.setPlainText(
             r.get("syncedLyrics")
             or r.get("plainLyrics")
-            or "(morceau instrumental : pas de paroles)"
+            or translate("LyricsDialogs", "(morceau instrumental : pas de paroles)")
         )
         gap = self._gap(r)
         loose = self.version or not r.get("syncedLyrics") or (gap is not None and gap > LOOSE_GAP)
@@ -229,7 +257,9 @@ class TranscribeDialog(QDialog):
 
     def __init__(self, model: str, language: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Transcrire les paroles avec l'IA, sur cet ordinateur")
+        self.setWindowTitle(
+            translate("LyricsDialogs", "Transcrire les paroles avec l'IA, sur cet ordinateur")
+        )
         self.setMinimumWidth(640)
         self.task: transcribe.Task | None = None
         self.loading: str | None = None
@@ -238,15 +268,22 @@ class TranscribeDialog(QDialog):
         layout.setSpacing(10)
         layout.addWidget(
             _note(
-                "La transcription se fait entièrement sur cet ordinateur avec whisper.cpp : "
-                "l'audio n'est envoyé nulle part. Il faut une fois un modèle de reconnaissance "
-                "de la parole, téléchargé depuis Hugging Face (huggingface.co) et vérifié. "
-                "Le résultat est un brouillon : le chant est plus difficile que la parole, "
-                "relisez-le."
+                translate(
+                    "LyricsDialogs",
+                    "La transcription se fait entièrement sur cet ordinateur avec "
+                    "whisper.cpp : l'audio n'est envoyé nulle part. Il faut une fois un "
+                    "modèle de reconnaissance de la parole, téléchargé depuis Hugging Face "
+                    "(huggingface.co) et vérifié. Le résultat est un brouillon : le chant "
+                    "est plus difficile que la parole, relisez-le.",
+                )
             )
         )
         if not transcribe.engine_ready():
-            warn = QLabel("Le moteur de transcription manque dans cette installation.")
+            warn = QLabel(
+                translate(
+                    "LyricsDialogs", "Le moteur de transcription manque dans cette installation."
+                )
+            )
             warn.setObjectName("error")
             layout.addWidget(warn)
         grid = QGridLayout()
@@ -254,7 +291,7 @@ class TranscribeDialog(QDialog):
         self.group = QButtonGroup(self)
         self.rows: dict[str, tuple] = {}
         for i, m in enumerate(transcribe.MODELS):
-            radio = QRadioButton(m["label"])
+            radio = QRadioButton(translate("Transcribe", m["label"]))
             radio.setProperty("model", m["id"])
             self.group.addButton(radio)
             status = QLabel()
@@ -264,7 +301,7 @@ class TranscribeDialog(QDialog):
             grid.addWidget(radio, 2 * i, 0)
             grid.addWidget(status, 2 * i, 1)
             grid.addWidget(button, 2 * i, 2)
-            grid.addWidget(_note(m["note"]), 2 * i + 1, 0, 1, 3)
+            grid.addWidget(_note(translate("Transcribe", m["note"])), 2 * i + 1, 0, 1, 3)
             self.rows[m["id"]] = (radio, status, button)
         layout.addLayout(grid)
         chosen = self.rows.get(model) or self.rows[transcribe.DEFAULT_MODEL]
@@ -276,7 +313,7 @@ class TranscribeDialog(QDialog):
         self.progress.setRange(0, 1000)
         self.progress.setTextVisible(False)
         self.progress_text = QLabel()
-        self.cancel_button = QPushButton("Annuler le téléchargement")
+        self.cancel_button = QPushButton(translate("LyricsDialogs", "Annuler le téléchargement"))
         self.cancel_button.clicked.connect(self._cancel)
         work.addWidget(self.progress, 1)
         work.addWidget(self.progress_text)
@@ -289,18 +326,20 @@ class TranscribeDialog(QDialog):
         form = QFormLayout()
         self.language_box = QComboBox()
         for value, text in transcribe.LANGUAGES.items():
-            self.language_box.addItem(text, value)
+            self.language_box.addItem(translate("Transcribe", text), value)
         self.language_box.setCurrentIndex(max(0, self.language_box.findData(language)))
-        form.addRow("Langue chantée", self.language_box)
+        form.addRow(translate("LyricsDialogs", "Langue chantée"), self.language_box)
         layout.addLayout(form)
         layout.addWidget(
             _note(
-                "Selon l'ordinateur, compter de quelques dizaines de secondes à "
-                "quelques minutes par morceau. La lecture reste possible pendant "
-                "ce temps."
+                translate(
+                    "LyricsDialogs",
+                    "Selon l'ordinateur, compter de quelques dizaines de secondes à quelques "
+                    "minutes par morceau. La lecture reste possible pendant ce temps.",
+                )
             )
         )
-        self.box = _buttons("Transcrire", self)
+        self.box = _buttons(translate("LyricsDialogs", "Transcrire"), self)
         self.ok = self.box.button(QDialogButtonBox.StandardButton.Ok)
         layout.addWidget(self.box)
         self.timer = QTimer(self)
@@ -320,10 +359,18 @@ class TranscribeDialog(QDialog):
         for mid, (_radio, status, button) in self.rows.items():
             have = transcribe.installed(mid)
             if mid == self.loading:
-                status.setText("Téléchargement…")
+                status.setText(translate("LyricsDialogs", "Téléchargement…"))
             else:
-                status.setText("Installé" if have else "Non téléchargé")
-            button.setText("Supprimer" if have else "Télécharger")
+                status.setText(
+                    translate("LyricsDialogs", "Installé")
+                    if have
+                    else translate("LyricsDialogs", "Non téléchargé")
+                )
+            button.setText(
+                translate("LyricsDialogs", "Supprimer")
+                if have
+                else translate("LyricsDialogs", "Télécharger")
+            )
             button.setEnabled(self.loading is None)
         busy = self.loading is not None
         for w in (self.progress, self.progress_text, self.cancel_button):
@@ -333,7 +380,15 @@ class TranscribeDialog(QDialog):
         theme.restyle(self.folder)
         free = library.free_mb(folder if folder.exists() else library.data_dir())
         self.folder.setText(
-            f"Dossier des modèles : {folder}" + (f" · {free / 1024:.1f} Go libres" if free else "")
+            translate("LyricsDialogs", "Dossier des modèles : {folder}").format(folder=folder)
+            + (
+                " · "
+                + translate("LyricsDialogs", "{size} Go libres").format(
+                    size=i18n.number(free / 1024)
+                )
+                if free
+                else ""
+            )
         )
         self.ok.setEnabled(
             not busy and transcribe.engine_ready() and transcribe.installed(self.model)
@@ -344,9 +399,12 @@ class TranscribeDialog(QDialog):
             info = transcribe.model_info(mid)
             sure = QMessageBox.question(
                 self,
-                "Supprimer le modèle",
-                f"Supprimer le modèle « {info['label']} » ? Les paroles déjà transcrites restent ; "
-                "il faudra le retélécharger pour transcrire à nouveau.",
+                translate("LyricsDialogs", "Supprimer le modèle"),
+                translate(
+                    "LyricsDialogs",
+                    "Supprimer le modèle « {label} » ? Les paroles déjà transcrites restent "
+                    "; il faudra le retélécharger pour transcrire à nouveau.",
+                ).format(label=translate("Transcribe", info["label"])),
             )
             if sure != QMessageBox.StandardButton.Yes:
                 return
@@ -396,24 +454,27 @@ class LyricsEditor(QDialog):
 
     def __init__(self, text: str, parent=None, copyable: bool = True):
         super().__init__(parent)
-        self.setWindowTitle("Paroles")
+        self.setWindowTitle(translate("LyricsDialogs", "Paroles"))
         self.resize(680, 640)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(10)
         layout.addWidget(
             _note(
-                "Une ligne par ligne chantée ; une ligne vide sépare les couplets ; "
-                "« [Refrain] » seul sur une ligne nomme une partie. Un temps « [01:23.45] » au "
-                "début d'une ligne la fait commencer là. Une ligne modifiée perd le minutage "
-                "de ses mots."
+                translate(
+                    "LyricsDialogs",
+                    "Une ligne par ligne chantée ; une ligne vide sépare les couplets ; « "
+                    "[Refrain] » seul sur une ligne nomme une partie. Un temps « [01:23.45] "
+                    "» au début d'une ligne la fait commencer là. Une ligne modifiée perd le "
+                    "minutage de ses mots.",
+                )
             )
         )
         self.edit = (QPlainTextEdit if copyable else _NoCopyEdit)(text)
         font = QFont(theme.app_font(15))
         self.edit.setFont(font)
         layout.addWidget(self.edit, 1)
-        layout.addWidget(_buttons("Enregistrer", self))
+        layout.addWidget(_buttons(translate("LyricsDialogs", "Enregistrer"), self))
 
     def text(self) -> str:
         return self.edit.toPlainText()
@@ -423,12 +484,16 @@ class LyricsPdfDialog(QDialog):
     """What the printed lyrics and chords sheet holds."""
 
     DIAGRAMS = (
-        ("guitar", "Guitare"),
-        ("piano", "Piano"),
-        ("both", "Guitare et piano"),
-        ("none", "Aucun"),
+        ("guitar", QT_TRANSLATE_NOOP("LyricsDialogs", "Guitare")),
+        ("piano", QT_TRANSLATE_NOOP("LyricsDialogs", "Piano")),
+        ("both", QT_TRANSLATE_NOOP("LyricsDialogs", "Guitare et piano")),
+        ("none", QT_TRANSLATE_NOOP("LyricsDialogs", "Aucun")),
     )
-    SIZES = (("small", "Petit"), ("medium", "Moyen"), ("large", "Grand"))
+    SIZES = (
+        ("small", QT_TRANSLATE_NOOP("LyricsDialogs", "Petit")),
+        ("medium", QT_TRANSLATE_NOOP("LyricsDialogs", "Moyen")),
+        ("large", QT_TRANSLATE_NOOP("LyricsDialogs", "Grand")),
+    )
     DEFAULTS = {
         "diagrams": "guitar",
         "landscape": False,
@@ -440,7 +505,7 @@ class LyricsPdfDialog(QDialog):
     def __init__(self, saved: dict, parent=None):
         super().__init__(parent)
         o = {**self.DEFAULTS, **{k: v for k, v in saved.items() if k in self.DEFAULTS}}
-        self.setWindowTitle("Paroles et accords (PDF)")
+        self.setWindowTitle(translate("LyricsDialogs", "Paroles et accords (PDF)"))
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(10)
@@ -452,22 +517,24 @@ class LyricsPdfDialog(QDialog):
             (self.size, self.SIZES, o["size"]),
         ):
             for v, text in items:
-                box.addItem(text, v)
+                box.addItem(translate("LyricsDialogs", text), v)
             box.setCurrentIndex(max(0, box.findData(value)))
         self.orientation = QComboBox()
-        self.orientation.addItem("A4 portrait", False)
-        self.orientation.addItem("A4 paysage", True)
+        self.orientation.addItem(translate("LyricsDialogs", "A4 portrait"), False)
+        self.orientation.addItem(translate("LyricsDialogs", "A4 paysage"), True)
         self.orientation.setCurrentIndex(1 if o["landscape"] else 0)
         self.place = QComboBox()
-        self.place.addItem("En tête de la première page", True)
-        self.place.addItem("En annexe, après les paroles", False)
+        self.place.addItem(translate("LyricsDialogs", "En tête de la première page"), True)
+        self.place.addItem(translate("LyricsDialogs", "En annexe, après les paroles"), False)
         self.place.setCurrentIndex(0 if o["diagrams_first"] else 1)
-        form.addRow("Diagrammes", self.diagrams)
-        form.addRow("Diagrammes placés", self.place)
-        form.addRow("Format", self.orientation)
-        form.addRow("Taille du texte", self.size)
+        form.addRow(translate("LyricsDialogs", "Diagrammes"), self.diagrams)
+        form.addRow(translate("LyricsDialogs", "Diagrammes placés"), self.place)
+        form.addRow(translate("LyricsDialogs", "Format"), self.orientation)
+        form.addRow(translate("LyricsDialogs", "Taille du texte"), self.size)
         layout.addLayout(form)
-        self.details = QCheckBox("Tonalité, tempo, mesure et capodastre en tête")
+        self.details = QCheckBox(
+            translate("LyricsDialogs", "Tonalité, tempo, mesure et capodastre en tête")
+        )
         self.details.setChecked(bool(o["details"]))
         layout.addWidget(self.details)
         self.diagrams.currentIndexChanged.connect(
@@ -476,12 +543,15 @@ class LyricsPdfDialog(QDialog):
         self.place.setEnabled(o["diagrams"] != "none")
         layout.addWidget(
             _note(
-                "Les accords sont ceux de la grille, transposition, capodastre et "
-                "corrections compris ; les positions sont celles choisies dans "
-                "le programme."
+                translate(
+                    "LyricsDialogs",
+                    "Les accords sont ceux de la grille, transposition, capodastre et "
+                    "corrections compris ; les positions sont celles choisies dans le "
+                    "programme.",
+                )
             )
         )
-        layout.addWidget(_buttons("Exporter…", self))
+        layout.addWidget(_buttons(translate("LyricsDialogs", "Exporter…"), self))
 
     def options(self) -> dict:
         return {

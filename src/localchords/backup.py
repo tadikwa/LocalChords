@@ -18,6 +18,7 @@ from pathlib import Path
 
 from . import __version__, audio, library
 from .catalog import Catalog, CatalogError, audio_state
+from .i18n import translate
 from .project import EXTENSION, Project, ProjectError
 
 FORMAT = "localchords-backup"
@@ -87,8 +88,12 @@ def write(
     room = library.free_mb(target.parent) * 2**20
     if room < need["project_bytes"] + need["audio_bytes"] + 20 * 2**20:
         raise BackupError(
-            f"Pas assez de place sur {target.parent} : il faut environ "
-            f"{(need['project_bytes'] + need['audio_bytes']) // 2**20 + 20} Mo."
+            translate(
+                "Backup", "Pas assez de place sur {parent} : il faut environ {size} Mo."
+            ).format(
+                parent=target.parent,
+                size=(need["project_bytes"] + need["audio_bytes"]) // 2**20 + 20,
+            )
         )
     ids = [p.stem for p in projects]
     manifest = {
@@ -105,13 +110,17 @@ def write(
         fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=".localchords-", suffix=".part")
         os.close(fd)
     except OSError as exc:
-        raise BackupError(f"Impossible d'écrire dans {target.parent} : {exc.strerror or exc}") from exc
+        raise BackupError(
+            translate("Backup", "Impossible d'écrire dans {parent} : {reason}").format(
+                parent=target.parent, reason=exc.strerror or exc
+            )
+        ) from exc
     total = len(projects) + len(found)
     try:
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
             for i, path in enumerate(projects):
                 if stop and stop():
-                    raise BackupError("Sauvegarde annulée.")
+                    raise BackupError(translate("Backup", "Sauvegarde annulée."))
                 name = f"projects/{path.name}"
                 if catalog_lyrics:
                     z.write(path, name)
@@ -130,7 +139,7 @@ def write(
                     progress(i + 1, total, path.stem)
             for i, (sid, path) in enumerate(found.items()):
                 if stop and stop():
-                    raise BackupError("Sauvegarde annulée.")
+                    raise BackupError(translate("Backup", "Sauvegarde annulée."))
                 if sid not in ids:
                     continue
                 # Compressed audio does not shrink: stored as it is, faster.
@@ -149,7 +158,11 @@ def write(
         raise
     except (OSError, zipfile.BadZipFile, ValueError, sqlite3.Error, CatalogError) as exc:
         Path(tmp).unlink(missing_ok=True)
-        raise BackupError(f"La sauvegarde a échoué : {getattr(exc, 'strerror', None) or exc}") from exc
+        raise BackupError(
+            translate("Backup", "La sauvegarde a échoué : {reason}").format(
+                reason=getattr(exc, "strerror", None) or exc
+            )
+        ) from exc
     return manifest
 
 
@@ -158,13 +171,25 @@ def _open(archive: Path) -> tuple[zipfile.ZipFile, dict]:
         z = zipfile.ZipFile(archive)
         manifest = json.loads(z.read(MANIFEST))
     except (OSError, KeyError, ValueError, zipfile.BadZipFile) as exc:
-        raise BackupError(f"« {archive.name} » n'est pas une sauvegarde LocalChords lisible.") from exc
+        raise BackupError(
+            translate("Backup", "« {name} » n'est pas une sauvegarde LocalChords lisible.").format(
+                name=archive.name
+            )
+        ) from exc
     if manifest.get("format") != FORMAT:
         z.close()
-        raise BackupError(f"« {archive.name} » n'est pas une sauvegarde LocalChords.")
+        raise BackupError(
+            translate("Backup", "« {name} » n'est pas une sauvegarde LocalChords.").format(
+                name=archive.name
+            )
+        )
     if int(manifest.get("version", 0)) > VERSION:
         z.close()
-        raise BackupError(f"« {archive.name} » vient d'une version plus récente de LocalChords.")
+        raise BackupError(
+            translate(
+                "Backup", "« {name} » vient d'une version plus récente de LocalChords."
+            ).format(name=archive.name)
+        )
     return z, manifest
 
 
@@ -222,7 +247,13 @@ def restore(
     data = library.data_dir()
     folder = data / "projects"
     aside = data / "restored" / time.strftime("%Y-%m-%d_%H%M%S")
-    report = {"written": 0, "same": len(plan["same"]), "set_aside": 0, "audio": 0, "aside_folder": None}
+    report = {
+        "written": 0,
+        "same": len(plan["same"]),
+        "set_aside": 0,
+        "audio": 0,
+        "aside_folder": None,
+    }
     with z:
         names = _project_names(z)
         audio_files = {
@@ -250,9 +281,19 @@ def restore(
                     report["aside_folder"] = str(aside)
                     report["set_aside"] += 1
                     if not (take_newer and stem in plan["newer"]):
-                        (aside / f"{stem} (sauvegarde){EXTENSION}").write_bytes(raw)
+                        (
+                            aside
+                            / translate("Backup", "{stem} (sauvegarde){extension}").format(
+                                stem=stem, extension=EXTENSION
+                            )
+                        ).write_bytes(raw)
                         continue
-                    (aside / f"{stem} (ce PC){EXTENSION}").write_bytes(here.read_bytes())
+                    (
+                        aside
+                        / translate("Backup", "{stem} (ce PC){extension}").format(
+                            stem=stem, extension=EXTENSION
+                        )
+                    ).write_bytes(here.read_bytes())
                 kept = _bring_audio(z, audio_files.get(stem), project_dict, data)
                 if kept:
                     project_dict["audio"]["kept"] = kept
@@ -286,12 +327,21 @@ def restore(
             if CATALOG in z.namelist():
                 catalog.merge_personal(json.loads(z.read(CATALOG)))
             if settings and SETTINGS in z.namelist():
-                library.save_settings({**library.load_settings(), **json.loads(z.read(SETTINGS))})
+                current = library.load_settings()
+                restored = {**current, **json.loads(z.read(SETTINGS))}
+                # The interface's language is this PC's user's choice, not the backup's.
+                restored.pop("language", None)
+                if "language" in current:
+                    restored["language"] = current["language"]
+                library.save_settings(restored)
         except (OSError, ValueError, zipfile.BadZipFile, KeyError, TypeError,
                 AttributeError) as exc:  # fmt: skip
             raise BackupError(
-                f"La restauration s'est arrêtée : {getattr(exc, 'strerror', None) or exc}. Ce qui "
-                "était déjà restauré l'est entièrement ; relancer la restauration reprend le reste."
+                translate(
+                    "Backup",
+                    "La restauration s'est arrêtée : {reason}. Ce qui était déjà restauré "
+                    "l'est entièrement ; relancer la restauration reprend le reste.",
+                ).format(reason=getattr(exc, "strerror", None) or exc)
             ) from exc
     return report
 

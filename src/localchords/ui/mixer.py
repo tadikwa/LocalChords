@@ -8,7 +8,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtCore import QT_TRANSLATE_NOOP, QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -31,15 +31,24 @@ from PySide6.QtWidgets import (
 )
 
 from .. import library, stems, transcribe, worker
+from ..i18n import translate
 from ..player import Mix
 from . import theme
 from .widgets import segmented
 
-HONEST = (
+HONEST = QT_TRANSLATE_NOOP(
+    "Mixer",
     "Séparation par IA, sur cet ordinateur : jamais parfaite, un peu de chaque instrument reste "
-    "audible dans les autres pistes."
+    "audible dans les autres pistes.",
 )
-SHORT_MODE = {"karaoke": "Karaoké · 2 pistes", "musician": "Musicien · 4 pistes"}
+SHORT_MODE = {
+    "karaoke": QT_TRANSLATE_NOOP("Mixer", "Karaoké · 2 pistes"),
+    "musician": QT_TRANSLATE_NOOP("Mixer", "Musicien · 4 pistes"),
+}
+MODE_NAME = {
+    "karaoke": QT_TRANSLATE_NOOP("Mixer", "Karaoké"),
+    "musician": QT_TRANSLATE_NOOP("Mixer", "Musicien"),
+}
 ROW_WIDTH = 400  # a stem's row needs about this much to keep its slider usable
 
 
@@ -77,15 +86,19 @@ class StemRow(QWidget):
     def __init__(self, name: str):
         super().__init__()
         self.name = name
-        label = stems.NAMES[name]
+        label = translate("Stems", stems.NAMES[name])
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(6)
         self.label = QLabel(label)
         self.label.setFixedWidth(84)
         self.slider = LevelSlider()
-        self.slider.setAccessibleName(f"Volume : {label}")
-        self.slider.setToolTip(f"Volume de la piste {label} (double-clic : niveau d'origine)")
+        self.slider.setAccessibleName(translate("Mixer", "Volume : {label}").format(label=label))
+        self.slider.setToolTip(
+            translate(
+                "Mixer", "Volume de la piste {label} (double-clic : niveau d'origine)"
+            ).format(label=label)
+        )
         self.db = QLabel()
         self.db.setObjectName("caption")
         self.db.setFixedWidth(48)
@@ -93,17 +106,26 @@ class StemRow(QWidget):
         self.reset = QToolButton()
         self.reset.setIcon(theme.icon("undo", size=14))
         self.reset.setToolTip(
-            f"Remettre {label} à 0 dB (aussi : double-clic sur le curseur) ; "
-            "les autres pistes, Muet et Solo ne changent pas"
+            translate(
+                "Mixer",
+                "Remettre {label} à 0 dB (aussi : double-clic sur le curseur) ; les "
+                "autres pistes, Muet et Solo ne changent pas",
+            ).format(label=label)
         )
-        self.reset.setAccessibleName(f"Remettre {label} à 0 dB")
+        self.reset.setAccessibleName(
+            translate("Mixer", "Remettre {label} à 0 dB").format(label=label)
+        )
         self.reset.clicked.connect(lambda: self.slider.setValue(stems.UNITY))
         self.mute = QPushButton("M")
-        self.mute.setToolTip(f"Couper : {label}")
-        self.mute.setAccessibleName(f"Couper {label}")
+        self.mute.setToolTip(translate("Mixer", "Couper : {label}").format(label=label))
+        self.mute.setAccessibleName(translate("Mixer", "Couper {label}").format(label=label))
         self.solo = QPushButton("S")
-        self.solo.setToolTip(f"Écouter seule : {label} (les réglages des autres sont gardés)")
-        self.solo.setAccessibleName(f"Solo {label}")
+        self.solo.setToolTip(
+            translate(
+                "Mixer", "Écouter seule : {label} (les réglages des autres sont gardés)"
+            ).format(label=label)
+        )
+        self.solo.setAccessibleName(translate("Mixer", "Solo {label}").format(label=label))
         for b in (self.mute, self.solo):
             b.setCheckable(True)
             b.setFixedWidth(34)
@@ -148,20 +170,22 @@ class MixerPanel(QFrame):
         outer.setSpacing(8)
 
         head = QHBoxLayout()
-        title = QLabel("Mixage")
+        title = QLabel(translate("Mixer", "Mixage"))
         title.setObjectName("h2")
         self.state = QLabel()
         self.state.setObjectName("caption")
         self.more = QToolButton()
         self.more.setIcon(theme.icon("more", size=16))
-        self.more.setToolTip("Exporter, autre mode, supprimer les pistes")
-        self.more.setAccessibleName("Plus d'options du mixage")
+        self.more.setToolTip(translate("Mixer", "Exporter, autre mode, supprimer les pistes"))
+        self.more.setAccessibleName(translate("Mixer", "Plus d'options du mixage"))
         self.more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.more.setMenu(QMenu(self.more))
         self.close_button = QToolButton()
         self.close_button.setIcon(theme.icon("close", size=16))
-        self.close_button.setToolTip("Fermer le mixage (M) : le mix reste actif")
-        self.close_button.setAccessibleName("Fermer le mixage")
+        self.close_button.setToolTip(
+            translate("Mixer", "Fermer le mixage (M) : le mix reste actif")
+        )
+        self.close_button.setAccessibleName(translate("Mixer", "Fermer le mixage"))
         head.addWidget(title)
         head.addWidget(self.state)
         head.addStretch(1)
@@ -177,19 +201,20 @@ class MixerPanel(QFrame):
         col = QVBoxLayout(self.intro)
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(8)
-        ask = QLabel("Séparer les instruments de ce morceau")
+        ask = QLabel(translate("Mixer", "Séparer les instruments de ce morceau"))
         ask.setObjectName("sectionHead")
         self.mode_group = QButtonGroup(self)
         self.mode_buttons = {}
         for mode, text in SHORT_MODE.items():
+            text = translate("Mixer", text)
             b = QPushButton(text)
             b.setCheckable(True)
-            b.setToolTip(stems.MODES[mode]["label"])
+            b.setToolTip(translate("Stems", stems.MODES[mode]["label"]))
             self.mode_group.addButton(b)
             self.mode_buttons[mode] = b
         row = QHBoxLayout()
         row.addWidget(segmented(self.mode_buttons.values()))
-        self.separate = QPushButton("Séparer les instruments")
+        self.separate = QPushButton(translate("Mixer", "Séparer les instruments"))
         self.separate.setObjectName("primary")
         row.addWidget(self.separate)
         row.addStretch(1)
@@ -213,7 +238,7 @@ class MixerPanel(QFrame):
         col.setSpacing(6)
         row = QHBoxLayout()
         self.step = QLabel()
-        self.cancel = QPushButton("Annuler")
+        self.cancel = QPushButton(translate("Mixer", "Annuler"))
         row.addWidget(self.step, 1)
         row.addWidget(self.cancel)
         self.progress = QProgressBar()
@@ -235,10 +260,14 @@ class MixerPanel(QFrame):
         col.setSpacing(8)
         row = self.top = QHBoxLayout()
         self.ab_group = QButtonGroup(self)
-        self.original = QPushButton("Original")
-        self.original.setToolTip("Écouter l'enregistrement tel quel (Maj + M pour basculer)")
-        self.mixed = QPushButton("Mix personnalisé")
-        self.mixed.setToolTip("Écouter les pistes à vos niveaux (Maj + M pour basculer)")
+        self.original = QPushButton(translate("Mixer", "Original"))
+        self.original.setToolTip(
+            translate("Mixer", "Écouter l'enregistrement tel quel (Maj + M pour basculer)")
+        )
+        self.mixed = QPushButton(translate("Mixer", "Mix personnalisé"))
+        self.mixed.setToolTip(
+            translate("Mixer", "Écouter les pistes à vos niveaux (Maj + M pour basculer)")
+        )
         for b in (self.original, self.mixed):
             b.setCheckable(True)
             self.ab_group.addButton(b)
@@ -256,7 +285,7 @@ class MixerPanel(QFrame):
         self.rows.setHorizontalSpacing(24)
         self.rows.setVerticalSpacing(6)
         col.addWidget(self.rows_box)
-        self.note = QLabel(HONEST)
+        self.note = QLabel(translate("Mixer", HONEST))
         self.note.setObjectName("caption")
         self.note.setWordWrap(True)
         col.addWidget(self.note)
@@ -283,15 +312,22 @@ class MixerPanel(QFrame):
         track = self.presets_frame.layout()
         keys = [k for k in stems.presets_for(mode) if k != "original"] + ["custom"]
         for key in keys:
-            text = "Personnalisé" if key == "custom" else stems.PRESETS[key][0]
+            text = (
+                translate("Mixer", "Personnalisé")
+                if key == "custom"
+                else translate("Stems", stems.PRESETS[key][0])
+            )
             b = QPushButton(text)
             b.setCheckable(True)
             if key == "custom":
-                b.setToolTip("Revenir à votre propre réglage")
+                b.setToolTip(translate("Mixer", "Revenir à votre propre réglage"))
             elif key == "all":
                 b.setToolTip(
-                    "Toutes les pistes séparées à 0 dB, sans Muet ni Solo. Ce n'est pas "
-                    "l'enregistrement d'origine : pour lui, choisissez « Original »."
+                    translate(
+                        "Mixer",
+                        "Toutes les pistes séparées à 0 dB, sans Muet ni Solo. Ce n'est pas "
+                        "l'enregistrement d'origine : pour lui, choisissez « Original ».",
+                    )
                 )
             self.preset_group.addButton(b)
             self.preset_buttons[key] = b
@@ -355,21 +391,21 @@ class StoreDialog(QDialog):
     def __init__(self, controller: MixerController):
         super().__init__(controller.w)
         self.c = controller
-        self.setWindowTitle("Pistes séparées et modèle")
+        self.setWindowTitle(translate("Mixer", "Pistes séparées et modèle"))
         self.setMinimumWidth(560)
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
         self.model = QLabel()
         self.model.setWordWrap(True)
         self.model.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.delete_model = QPushButton("Supprimer le modèle…")
+        self.delete_model = QPushButton(translate("Mixer", "Supprimer le modèle…"))
         self.store = QLabel()
         self.store.setWordWrap(True)
         self.store.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.delete_all = QPushButton("Supprimer toutes les pistes séparées…")
+        self.delete_all = QPushButton(translate("Mixer", "Supprimer toutes les pistes séparées…"))
         self.busy = QLabel()
         self.busy.setObjectName("caption")
-        close = QPushButton("Fermer")
+        close = QPushButton(translate("Mixer", "Fermer"))
         close.clicked.connect(self.accept)
         for w, b in ((self.model, self.delete_model), (self.store, self.delete_all)):
             layout.addWidget(w)
@@ -391,37 +427,68 @@ class StoreDialog(QDialog):
         where = stems.model_path()
         if stems.model_installed():
             self.model.setText(
-                f"<b>Modèle de séparation</b> : {m['label']}, "
-                f"{stems.size_text(m['size'])}, installé dans {where.parent}."
-                f"<br>SHA-256 : <code>{m['sha256']}</code>"
+                translate(
+                    "Mixer",
+                    "<b>Modèle de séparation</b> : {label}, {size_text}, installé dans "
+                    "{parent}.<br>SHA-256 : <code>{sha256}</code>",
+                ).format(
+                    label=translate("Stems", m["label"]),
+                    size_text=stems.size_text(m["size"]),
+                    parent=where.parent,
+                    sha256=m["sha256"],
+                )
             )
         else:
             self.model.setText(
-                f"<b>Modèle de séparation</b> : {m['label']}, non installé. Il sera téléchargé "
-                f"({stems.size_text(m['size'])}, vérifié par SHA-256) à la première séparation."
+                translate(
+                    "Mixer",
+                    "<b>Modèle de séparation</b> : {label}, non installé. Il sera téléchargé "
+                    "({size_text}, vérifié par SHA-256) à la première séparation.",
+                ).format(label=translate("Stems", m["label"]), size_text=stems.size_text(m["size"]))
             )
         folders = [p for p in stems.cache_root().glob("*") if p.is_dir()]
         songs = {p.name.split("-")[0] for p in folders}
         size = stems.size_of(folders)
+        if size:
+            head = translate(
+                "Mixer",
+                "<b>Pistes séparées</b> : {size} pour %n morceau(x), dans {folder}.",
+                None,
+                len(songs),
+            ).format(size=stems.size_text(size), folder=stems.cache_root())
+        else:
+            head = translate("Mixer", "<b>Pistes séparées</b> : aucune, dans {folder}.").format(
+                folder=stems.cache_root()
+            )
         self.store.setText(
-            f"<b>Pistes séparées</b> : {stems.size_text(size) if size else 'aucune'}"
-            + (f" pour {len(songs)} morceau{'x' if len(songs) > 1 else ''}" if songs else "")
-            + f", dans {stems.cache_root()}.<br>Les morceaux, leurs accords, paroles, favoris, "
-            "collections et corrections ne sont jamais supprimés ici."
+            head
+            + "<br>"
+            + translate(
+                "Mixer",
+                "Les morceaux, leurs accords, paroles, favoris, collections et corrections ne "
+                "sont jamais supprimés ici.",
+            )
         )
         busy = self.c.busy()
-        self.busy.setText("Une séparation est en cours : attendez qu'elle finisse." if busy else "")
+        self.busy.setText(
+            translate("Mixer", "Une séparation est en cours : attendez qu'elle finisse.")
+            if busy
+            else ""
+        )
         self.delete_model.setEnabled(not busy and stems.model_path().exists())
         self.delete_all.setEnabled(not busy and size > 0)
 
     def _delete_model(self) -> None:
         if _confirm(
             self,
-            "Supprimer le modèle",
-            f"Supprimer le modèle de séparation ({stems.size_text(stems.MODEL['size'])}) ?\n\n"
-            "Les pistes déjà séparées restent utilisables. Il faudra le télécharger de nouveau "
-            "pour séparer un autre morceau.",
-            "Supprimer le modèle",
+            translate("Mixer", "Supprimer le modèle"),
+            translate(
+                "Mixer",
+                "Supprimer le modèle de séparation ({size_text}) ?\n\nLes pistes déjà "
+                "séparées restent utilisables. Il faudra le télécharger de nouveau pour "
+                "séparer un autre morceau.",
+            ).format(size_text=stems.size_text(stems.MODEL["size"])),
+            translate("Mixer", "Supprimer le modèle"),
         ):
             stems.delete_model()
         self.refresh()
@@ -430,11 +497,14 @@ class StoreDialog(QDialog):
         size = stems.total_size()
         if _confirm(
             self,
-            "Supprimer toutes les pistes",
-            f"Supprimer toutes les pistes séparées ({stems.size_text(size)}) ?\n\n"
-            "Les morceaux, accords, paroles et réglages ne sont pas touchés ; il faudra séparer "
-            "de nouveau un morceau pour le mixer. Cette suppression est définitive.",
-            "Tout supprimer",
+            translate("Mixer", "Supprimer toutes les pistes"),
+            translate(
+                "Mixer",
+                "Supprimer toutes les pistes séparées ({size_text}) ?\n\nLes morceaux, "
+                "accords, paroles et réglages ne sont pas touchés ; il faudra séparer de "
+                "nouveau un morceau pour le mixer. Cette suppression est définitive.",
+            ).format(size_text=stems.size_text(size)),
+            translate("Mixer", "Tout supprimer"),
         ):
             self.c.forget_stems()
             stems.delete_all()
@@ -531,10 +601,16 @@ class MixerController(QObject):
                 y = stems.load(folder, mode, sr, frames, lambda: self.load_token is not token)
                 self.stemsLoaded.emit(token, y, None)
             except MemoryError:
-                self.stemsLoaded.emit(token, None, "Mémoire insuffisante pour lire les pistes.")
+                self.stemsLoaded.emit(
+                    token, None, translate("Mixer", "Mémoire insuffisante pour lire les pistes.")
+                )
             except Exception as exc:  # noqa: BLE001 - a damaged cache is shown, not raised
                 if self.load_token is token:
-                    self.stemsLoaded.emit(token, None, f"Impossible de lire les pistes : {exc}")
+                    self.stemsLoaded.emit(
+                        token,
+                        None,
+                        translate("Mixer", "Impossible de lire les pistes : {exc}").format(exc=exc),
+                    )
 
         threading.Thread(target=run, daemon=True).start()
         self.refresh()
@@ -545,7 +621,9 @@ class MixerController(QObject):
         self.load_token = None
         player = self.w.player
         if error:
-            self.error = error + " Elles peuvent être séparées de nouveau."
+            self.error = translate(
+                "Mixer", "{error} Elles peuvent être séparées de nouveau."
+            ).format(error=error)
             self.folder = None
             player.use_mix(None)  # another mode's stems may still be playing
         else:
@@ -586,15 +664,17 @@ class MixerController(QObject):
         if self.busy() and self._ours():
             return  # the job's own messages keep the work page current
         if self.folder is not None and self.w.player.mix is not None:
-            p.state.setText(SHORT_MODE[self.settings["mode"]])
+            p.state.setText(translate("Mixer", SHORT_MODE[self.settings["mode"]]))
             self._show_settings()
             p.show_page(p.console)
         elif self.folder is not None:
             p.state.setText("")
             step = (
-                "Chargement des pistes séparées…"
+                translate("Mixer", "Chargement des pistes séparées…")
                 if self.w.audio_ready
-                else ("Les pistes séparées seront prêtes avec l'enregistrement.")
+                else (
+                    translate("Mixer", "Les pistes séparées seront prêtes avec l'enregistrement.")
+                )
             )
             p.show_work(step, None, cancel=False)
         else:
@@ -614,19 +694,31 @@ class MixerController(QObject):
         m = stems.MODEL
         size = stems.size_text(m["size"])
         if stems.model_installed():
-            lines.append(f"Modèle : {m['label']}, déjà installé.")
+            lines.append(
+                translate("Mixer", "Modèle : {label}, déjà installé.").format(
+                    label=translate("Stems", m["label"])
+                )
+            )
         else:
-            lines.append(f"Modèle : {m['label']}, {size} à télécharger une seule fois.")
+            lines.append(
+                translate("Mixer", "Modèle : {label}, {size} à télécharger une seule fois.").format(
+                    label=translate("Stems", m["label"]), size=size
+                )
+            )
         lines.append(
-            f"Place nécessaire : environ {stems.needed_mb(duration, mode)} Mo pour ce morceau."
+            translate("Mixer", "Place nécessaire : environ {needed_mb} Mo pour ce morceau.").format(
+                needed_mb=stems.needed_mb(duration, mode)
+            )
         )
         speed = self.w.settings.get("separation_speed")
         if isinstance(speed, (int, float)) and speed > 0:
             seconds = max(5, round(duration * speed / 5) * 5)
             lines.append(
-                f"Durée estimée : environ {_duration(seconds)} (mesurée sur cet ordinateur)."
+                translate(
+                    "Mixer", "Durée estimée : environ {duration} (mesurée sur cet ordinateur)."
+                ).format(duration=_duration(seconds))
             )
-        lines.append(HONEST)
+        lines.append(translate("Mixer", HONEST))
         p.facts.setText("\n".join(lines))
         warn = [self.error] if self.error else []
         problem = stems.space_problem(duration, mode)
@@ -634,19 +726,29 @@ class MixerController(QObject):
             warn.append(problem)
         elif stems.removable(stems.cache_root()):
             warn.append(
-                "Les données sont sur une clé USB ou une carte mémoire : l'écriture des pistes "
-                "sera plus lente et use le support."
+                translate(
+                    "Mixer",
+                    "Les données sont sur une clé USB ou une carte mémoire : l'écriture des "
+                    "pistes sera plus lente et use le support.",
+                )
             )
         if self.busy() and not self._ours():
             warn.append(
-                f"Une séparation est en cours pour « {self.job_for['title']} » : "
-                "attendez qu'elle finisse pour en lancer une autre."
+                translate(
+                    "Mixer",
+                    "Une séparation est en cours pour « {title} » : attendez qu'elle finisse "
+                    "pour en lancer une autre.",
+                ).format(title=self.job_for["title"])
             )
         p.warn.setText("\n".join(warn))
         p.warn.setVisible(bool(warn))
         audio = self.w.audio_ready
         p.separate.setEnabled(audio and not problem and not self.busy() and bool(self.fp))
-        p.separate.setText("Réessayer" if self.error else "Séparer les instruments")
+        p.separate.setText(
+            translate("Mixer", "Réessayer")
+            if self.error
+            else translate("Mixer", "Séparer les instruments")
+        )
 
     def _show_settings(self) -> None:
         p, s = self.panel, self.settings
@@ -665,8 +767,13 @@ class MixerController(QObject):
     def _show_button(self) -> None:
         active = self.w.player.mix is not None and self.settings and self.settings["on"]
         self.button.setToolTip(
-            "Mixage : séparer les instruments et régler leur volume (M)"
-            + (" ; un mix personnalisé est en cours d'écoute" if active else "")
+            translate(
+                "Mixer",
+                "Mixage : séparer les instruments et régler leur volume (M) ; un mix "
+                "personnalisé est en cours d'écoute",
+            )
+            if active
+            else translate("Mixer", "Mixage : séparer les instruments et régler leur volume (M)")
         )
 
     # The panel, opened and closed -----------------------------------------------------------------
@@ -741,7 +848,9 @@ class MixerController(QObject):
             return
         path = library.audio_file(project.audio)
         if not path.is_file():
-            self.error = f"Le fichier audio est introuvable : {path}."
+            self.error = translate("Mixer", "Le fichier audio est introuvable : {path}.").format(
+                path=path
+            )
             self.refresh()
             return
         problem = stems.space_problem(project.duration, mode)
@@ -762,10 +871,16 @@ class MixerController(QObject):
         else:
             self.download = transcribe.run(stems.download_model)
             self.panel.show_work(
-                "Téléchargement du modèle de séparation…",
+                translate("Mixer", "Téléchargement du modèle de séparation…"),
                 0.0,
-                f"{stems.MODEL['label']} : {stems.size_text(stems.MODEL['size'])}, une seule fois, "
-                "vérifié par SHA-256. La lecture reste possible pendant ce temps.",
+                translate(
+                    "Mixer",
+                    "{label} : {size_text}, une seule fois, vérifié par SHA-256. La lecture "
+                    "reste possible pendant ce temps.",
+                ).format(
+                    label=translate("Stems", stems.MODEL["label"]),
+                    size_text=stems.size_text(stems.MODEL["size"]),
+                ),
             )
         self.timer.start()
 
@@ -774,10 +889,13 @@ class MixerController(QObject):
         self.job = worker.start_separation(j["path"], j["mode"], j["fingerprint"])
         if self._ours():
             self.panel.show_work(
-                "Séparation des instruments…",
+                translate("Mixer", "Séparation des instruments…"),
                 0.0,
-                "Sur cet ordinateur, en arrière-plan : la lecture, les accords et le reste du "
-                "programme restent utilisables.",
+                translate(
+                    "Mixer",
+                    "Sur cet ordinateur, en arrière-plan : la lecture, les accords et le "
+                    "reste du programme restent utilisables.",
+                ),
             )
 
     def cancel(self) -> None:
@@ -797,7 +915,9 @@ class MixerController(QObject):
             task = self.download
             if self._ours():
                 self.panel.show_work(
-                    f"Téléchargement du modèle de séparation… {task.status}",
+                    translate("Mixer", "Téléchargement du modèle de séparation… {status}").format(
+                        status=task.status
+                    ),
                     task.progress,
                     self.panel.work_note.text(),
                 )
@@ -858,28 +978,34 @@ class MixerController(QObject):
         menu = self.panel.more.menu()
         menu.clear()
         ready = self.w.player.mix is not None and self.settings is not None
-        export = menu.addAction("Exporter le mix (FLAC ou WAV)…", self.export)
+        export = menu.addAction(translate("Mixer", "Exporter le mix (FLAC ou WAV)…"), self.export)
         export.setEnabled(ready and self.export_task is None)
         if self.settings is not None:
             other = _other(self.settings["mode"])
-            name = SHORT_MODE[other].split(" ·")[0]
+            name = translate("Mixer", MODE_NAME[other])
             if stems.cached(self.fp, other):
-                menu.addAction(f"Utiliser les pistes du mode {name}", lambda: self.use_mode(other))
+                menu.addAction(
+                    translate("Mixer", "Utiliser les pistes du mode {name}").format(name=name),
+                    lambda: self.use_mode(other),
+                )
             else:
                 action = menu.addAction(
-                    f"Séparer aussi en mode {name}…", lambda: self.separate(other)
+                    translate("Mixer", "Séparer aussi en mode {name}…").format(name=name),
+                    lambda: self.separate(other),
                 )
                 action.setEnabled(not self.busy() and self.w.audio_ready)
         menu.addSeparator()
         size = stems.size_of(stems.song_folders(self.fp))
         delete = menu.addAction(
-            f"Supprimer les pistes de ce morceau ({stems.size_text(size)})…"
+            translate("Mixer", "Supprimer les pistes de ce morceau ({size_text})…").format(
+                size_text=stems.size_text(size)
+            )
             if size
-            else "Supprimer les pistes de ce morceau",
+            else translate("Mixer", "Supprimer les pistes de ce morceau"),
             self.delete_song,
         )
         delete.setEnabled(bool(size) and not (self.busy() and self._ours()))
-        menu.addAction("Pistes séparées et modèle…", self.show_store)
+        menu.addAction(translate("Mixer", "Pistes séparées et modèle…"), self.show_store)
 
     def use_mode(self, mode: str) -> None:
         folder = stems.cached(self.fp, mode)
@@ -895,11 +1021,14 @@ class MixerController(QObject):
         size = stems.size_of(stems.song_folders(self.fp))
         if not size or not _confirm(
             self.w,
-            "Supprimer les pistes séparées",
-            f"Supprimer les pistes séparées de ce morceau ({stems.size_text(size)}) ?\n\n"
-            "Le morceau, ses accords, ses paroles et vos réglages ne sont pas touchés ; il faudra "
-            "le séparer de nouveau pour le mixer.",
-            "Supprimer les pistes",
+            translate("Mixer", "Supprimer les pistes séparées"),
+            translate(
+                "Mixer",
+                "Supprimer les pistes séparées de ce morceau ({size_text}) ?\n\nLe "
+                "morceau, ses accords, ses paroles et vos réglages ne sont pas touchés ; "
+                "il faudra le séparer de nouveau pour le mixer.",
+            ).format(size_text=stems.size_text(size)),
+            translate("Mixer", "Supprimer les pistes"),
         ):
             return
         self.forget_stems()
@@ -918,9 +1047,9 @@ class MixerController(QObject):
         safe = "".join(c for c in title if c not in '<>:"/\\|?*').strip() or "morceau"
         name, chosen = QFileDialog.getSaveFileName(
             self.w,
-            "Exporter le mix",
+            translate("Mixer", "Exporter le mix"),
             str(Path.home() / f"{safe} (mix).flac"),
-            "FLAC, sans perte (*.flac);;WAV (*.wav)",
+            translate("Mixer", "FLAC, sans perte (*.flac);;WAV (*.wav)"),
         )
         if not name:
             return
@@ -930,9 +1059,11 @@ class MixerController(QObject):
             target = target.with_name(target.name + (".wav" if "WAV" in chosen else ".flac"))
             if target.exists() and not _confirm(
                 self.w,
-                "Exporter le mix",
-                f"« {target.name} » existe déjà. Le remplacer ?",
-                "Remplacer",
+                translate("Mixer", "Exporter le mix"),
+                translate("Mixer", "« {name} » existe déjà. Le remplacer ?").format(
+                    name=target.name
+                ),
+                translate("Mixer", "Remplacer"),
             ):
                 return
         recording = library.audio_file(project.audio)
@@ -940,8 +1071,10 @@ class MixerController(QObject):
         self.export_task = transcribe.run(
             lambda t: stems.export_mix(target, recording, folder, settings, t)
         )
-        dialog = QProgressDialog("Export du mix…", "Annuler", 0, 1000, self.w)
-        dialog.setWindowTitle("Exporter le mix")
+        dialog = QProgressDialog(
+            translate("Mixer", "Export du mix…"), translate("Mixer", "Annuler"), 0, 1000, self.w
+        )
+        dialog.setWindowTitle(translate("Mixer", "Exporter le mix"))
         dialog.setMinimumDuration(300)
         dialog.canceled.connect(self.export_task.cancel)
         self.export_dialog = dialog
@@ -949,7 +1082,7 @@ class MixerController(QObject):
 
     def _poll_export(self) -> None:
         task, dialog = self.export_task, self.export_dialog
-        dialog.setLabelText(task.status or "Export du mix…")
+        dialog.setLabelText(task.status or translate("Mixer", "Export du mix…"))
         dialog.setValue(int(task.progress * 1000))
         if not task.done:
             return
@@ -957,9 +1090,15 @@ class MixerController(QObject):
         dialog.reset()
         dialog.deleteLater()
         if task.error and not task.cancelled:
-            self.w._alert(f"L'export du mix a échoué : {task.error}")
+            self.w._alert(
+                translate("Mixer", "L'export du mix a échoué : {error}").format(error=task.error)
+            )
         elif not task.error:
-            self.panel.note.setText(f"Mix exporté : {task.result}. {HONEST}")
+            self.panel.note.setText(
+                translate("Mixer", "Mix exporté : {result}. {honest}").format(
+                    result=task.result, honest=translate("Mixer", HONEST)
+                )
+            )
 
     # Quitting -------------------------------------------------------------------------------------
     def close(self) -> None:

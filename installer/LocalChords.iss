@@ -41,16 +41,37 @@ Compression=lzma2/max
 SolidCompression=yes
 OutputDir={#OutputDir}
 OutputBaseFilename=LocalChords-Setup-v{#AppVersion}
+; Windows' display language when the installer has it, else a choice that starts on English
+; (docs/LOCALISATION.md). The updater passes /LANG= in the program's own language.
+ShowLanguageDialog=auto
+UsePreviousLanguage=no
 
 [Languages]
+; The first one is the fallback for a Windows in another language.
+Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
 [Messages]
+english.WelcomeLabel2=This wizard will install [name/ver] on your computer, for your account only, without administrator rights.%n%nYour projects, your library and your backups (AppData\Local\LocalChords) are never changed or deleted by installing, updating or uninstalling.
 french.WelcomeLabel2=Cet assistant va installer [name/ver] sur votre ordinateur, pour votre compte uniquement, sans droits d'administrateur.%n%nVos projets, votre bibliothèque et vos sauvegardes (AppData\Local\LocalChords) ne sont jamais modifiés ni supprimés par l'installation, la mise à jour ou la désinstallation.
+
+[CustomMessages]
+english.Association=Open .lchords projects with LocalChords
+french.Association=Ouvrir les projets .lchords avec LocalChords
+english.FilesGroup=Files:
+french.FilesGroup=Fichiers :
+english.ProjectType=LocalChords project
+french.ProjectType=Projet LocalChords
+english.DataFolder=This folder contains your LocalChords projects (%1).%nChoose another folder for the program.
+french.DataFolder=Ce dossier contient vos projets LocalChords (%1).%nChoisissez un autre dossier pour le programme.
+english.PortableFolder=This folder contains a portable LocalChords (LocalChords.portable file).%nChoose another folder: the installed version keeps its data in %1.
+french.PortableFolder=Ce dossier contient un LocalChords portable (fichier LocalChords.portable).%nChoisissez un autre dossier : la version installée garde ses données dans %1.
+english.Uninstalled=LocalChords has been uninstalled.%n%nYour projects, your library and your backups are kept in:%n%1%n%nIf you no longer need them, delete this folder yourself.
+french.Uninstalled=LocalChords est désinstallé.%n%nVos projets, votre bibliothèque et vos sauvegardes sont conservés dans :%n%1%n%nSi vous n'en avez plus besoin, supprimez ce dossier vous-même.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "association"; Description: "Ouvrir les projets .lchords avec LocalChords"; GroupDescription: "Fichiers :"
+Name: "association"; Description: "{cm:Association}"; GroupDescription: "{cm:FilesGroup}"
 
 [Files]
 ; The folder build as the zip carries it, licences included. Never the portable marker: the
@@ -64,7 +85,7 @@ Name: "{autodesktop}\LocalChords"; Filename: "{app}\LocalChords.exe"; Tasks: des
 [Registry]
 Root: HKA; Subkey: "Software\Classes\.lchords"; ValueType: string; ValueName: ""; ValueData: "LocalChords.Project"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: association
 Root: HKA; Subkey: "Software\Classes\.lchords\OpenWithProgids"; ValueType: string; ValueName: "LocalChords.Project"; ValueData: ""; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: association
-Root: HKA; Subkey: "Software\Classes\LocalChords.Project"; ValueType: string; ValueName: ""; ValueData: "Projet LocalChords"; Flags: uninsdeletekey; Tasks: association
+Root: HKA; Subkey: "Software\Classes\LocalChords.Project"; ValueType: string; ValueName: ""; ValueData: "{cm:ProjectType}"; Flags: uninsdeletekey; Tasks: association
 Root: HKA; Subkey: "Software\Classes\LocalChords.Project\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\LocalChords.exe,0"; Tasks: association
 Root: HKA; Subkey: "Software\Classes\LocalChords.Project\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\LocalChords.exe"" ""%1"""; Tasks: association
 
@@ -92,11 +113,9 @@ function Refusal(const Dir: String): String;
 begin
   Result := '';
   if Within(Dir, DataDir) or Within(DataDir, Dir) then
-    Result := 'Ce dossier contient vos projets LocalChords (' + DataDir + ').' + #13#10 +
-      'Choisissez un autre dossier pour le programme.'
+    Result := FmtMessage(CustomMessage('DataFolder'), [DataDir])
   else if FileExists(AddBackslash(Dir) + 'LocalChords.portable') then
-    Result := 'Ce dossier contient un LocalChords portable (fichier LocalChords.portable).' + #13#10 +
-      'Choisissez un autre dossier : la version installée garde ses données dans ' + DataDir + '.';
+    Result := FmtMessage(CustomMessage('PortableFolder'), [DataDir]);
 end;
 
 { In the wizard, the folder page says it and stays open. }
@@ -135,8 +154,5 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if (CurUninstallStep = usPostUninstall) and not UninstallSilent and DirExists(DataDir) then
-    MsgBox('LocalChords est désinstallé.' + #13#10#13#10 +
-      'Vos projets, votre bibliothèque et vos sauvegardes sont conservés dans :' + #13#10 +
-      DataDir + #13#10#13#10 +
-      'Si vous n''en avez plus besoin, supprimez ce dossier vous-même.', mbInformation, MB_OK);
+    MsgBox(FmtMessage(CustomMessage('Uninstalled'), [DataDir]), mbInformation, MB_OK);
 end;

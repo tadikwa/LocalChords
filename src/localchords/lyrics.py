@@ -24,12 +24,16 @@ from bisect import bisect_right
 from collections.abc import Callable
 from pathlib import Path
 
+from PySide6.QtCore import QT_TRANSLATE_NOOP
+
 KINDS = {
-    "user": "Saisies par vous",
-    "file": "Importées depuis un fichier",
-    "embedded": "Lues dans le fichier audio",
-    "catalog": "Catalogue en ligne",
-    "transcription": "Transcription automatique (brouillon à vérifier)",
+    "user": QT_TRANSLATE_NOOP("Lyrics", "Saisies par vous"),
+    "file": QT_TRANSLATE_NOOP("Lyrics", "Importées depuis un fichier"),
+    "embedded": QT_TRANSLATE_NOOP("Lyrics", "Lues dans le fichier audio"),
+    "catalog": QT_TRANSLATE_NOOP("Lyrics", "Catalogue en ligne"),
+    "transcription": QT_TRANSLATE_NOOP(
+        "Lyrics", "Transcription automatique (brouillon à vérifier)"
+    ),
 }
 SIDE_FILES = (".lrc", ".srt", ".txt")
 _TIME = re.compile(r"\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]")

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import voicings
+from ..i18n import translate
 from . import theme
 from .diagrams import (
     MODES,
@@ -158,9 +159,19 @@ class ChordCard(QFrame):
         piano = PianoDiagram()
         piano.fit = True
         piano.setFixedSize(224, 110)
-        self.guitar = _Instrument("Guitare", guitar, "", "Accordage standard.", kind_below=True)
+        self.guitar = _Instrument(
+            translate("SongChords", "Guitare"),
+            guitar,
+            "",
+            translate("SongChords", "Accordage standard."),
+            kind_below=True,
+        )
         self.piano = _Instrument(
-            "Piano", piano, "", "Une disposition possible parmi d'autres.", kind_below=True
+            translate("SongChords", "Piano"),
+            piano,
+            "",
+            translate("SongChords", "Une disposition possible parmi d'autres."),
+            kind_below=True,
         )
         self.guitar.stepped.connect(lambda d: self._step("guitar", d))
         self.piano.stepped.connect(lambda d: self._step("piano", d))
@@ -229,14 +240,18 @@ class ChordCard(QFrame):
                 self.guitar.diagram.setToolTip(describe_fingering(f, shown.shape))
                 words.append(describe_fingering(f, shown.shape))
             else:
-                text = "Pas de position vérifiée à la guitare."
+                text = translate("SongChords", "Pas de position vérifiée à la guitare.")
                 self.guitar.diagram.set_fingering(None, shown.shape, shown.capo, text, animate)
-                self.guitar.set_place(0, 0, "Aucune position")
+                self.guitar.set_place(0, 0, translate("SongChords", "Aucune position"))
                 words.append(text)
         if self.mode != "guitar":
             v = self.piano_voicings[k]
             self.piano.diagram.set_voicing(v, shown.sound, animate=animate)
-            kind = f"son réel {shown.sound.title}" if shown.capo else v.name
+            kind = (
+                translate("SongChords", "son réel {title}").format(title=shown.sound.title)
+                if shown.capo
+                else v.name
+            )
             self.piano.set_place(k, len(self.piano_voicings), kind)
             self.piano.diagram.setToolTip(describe_voicing(v, shown.sound))
             words.append(describe_voicing(v, shown.sound))
@@ -310,7 +325,7 @@ class SongChords(QFrame):
         outer.setSpacing(6)
         head = QHBoxLayout()
         head.setSpacing(6)
-        title = QLabel("Accords du morceau")
+        title = QLabel(translate("SongChords", "Accords du morceau"))
         title.setObjectName("h2")
         self.count = QLabel()
         self.count.setObjectName("caption")
@@ -322,15 +337,26 @@ class SongChords(QFrame):
         self.view_buttons = {}
         group = QButtonGroup(self)
         tips = {
-            "all": "Chaque accord du morceau une fois, dans l'ordre où il arrive. "
-            "Rien à lancer : cliquer un accord l'affiche dans le panneau.",
-            "next": "L'accord en cours et les suivants, qui avancent avec la lecture.",
+            "all": translate(
+                "SongChords",
+                "Chaque accord du morceau une fois, dans l'ordre où il arrive. Rien à "
+                "lancer : cliquer un accord l'affiche dans le panneau.",
+            ),
+            "next": translate(
+                "SongChords", "L'accord en cours et les suivants, qui avancent avec la lecture."
+            ),
         }
-        for view, text in zip(VIEWS, ("Tous les accords", "À venir"), strict=True):
+        for view, text in zip(
+            VIEWS,
+            (translate("SongChords", "Tous les accords"), translate("SongChords", "À venir")),
+            strict=True,
+        ):
             b = QPushButton(text)
             b.setCheckable(True)
             b.setToolTip(tips[view])
-            b.setAccessibleName(f"Accords du morceau : {text.lower()}")
+            b.setAccessibleName(
+                translate("SongChords", "Accords du morceau : {lower}").format(lower=text.lower())
+            )
             group.addButton(b)
             self.view_buttons[view] = b
             b.clicked.connect(lambda _=False, v=view: self._choose_view(v))
@@ -339,10 +365,20 @@ class SongChords(QFrame):
         head.addSpacing(8)
         self.mode_buttons = {}
         group = QButtonGroup(self)
-        for mode, text in zip(MODES, ("Guitare", "Piano", "Les deux"), strict=True):
+        for mode, text in zip(
+            MODES,
+            (
+                translate("SongChords", "Guitare"),
+                translate("SongChords", "Piano"),
+                translate("SongChords", "Les deux"),
+            ),
+            strict=True,
+        ):
             b = QPushButton(text)
             b.setCheckable(True)
-            b.setAccessibleName(f"Accords du morceau : {text.lower()}")
+            b.setAccessibleName(
+                translate("SongChords", "Accords du morceau : {lower}").format(lower=text.lower())
+            )
             group.addButton(b)
             self.mode_buttons[mode] = b
             b.clicked.connect(lambda _=False, m=mode: self._choose_mode(m))
@@ -357,15 +393,17 @@ class SongChords(QFrame):
         self.hide_button = QToolButton()
         self.hide_button.setObjectName("step")
         self.hide_button.setIcon(theme.icon("close", size=14))
-        self.hide_button.setAccessibleName("Masquer les accords du morceau")
-        self.hide_button.setToolTip("Masquer les accords du morceau (T)")
+        self.hide_button.setAccessibleName(
+            translate("SongChords", "Masquer les accords du morceau")
+        )
+        self.hide_button.setToolTip(translate("SongChords", "Masquer les accords du morceau (T)"))
         self.hide_button.clicked.connect(lambda: self.set_state("hidden"))
         head.addWidget(self.resize_button)
         head.addWidget(self.hide_button)
         outer.addLayout(head)
 
         self.scroll = _Strip()
-        self.scroll.setAccessibleName("Accords du morceau")
+        self.scroll.setAccessibleName(translate("SongChords", "Accords du morceau"))
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.inner = QWidget()
@@ -412,11 +450,13 @@ class SongChords(QFrame):
             policy.ScrollBarAsNeeded if compact else policy.ScrollBarAlwaysOff
         )
         self.resize_button.setIcon(theme.icon("grow" if compact else "shrink", size=14))
-        self.resize_button.setAccessibleName("Agrandir" if compact else "Réduire")
+        self.resize_button.setAccessibleName(
+            "Agrandir" if compact else translate("SongChords", "Réduire")
+        )
         self.resize_button.setToolTip(
-            "Agrandir : tous les accords sur plusieurs rangées"
+            translate("SongChords", "Agrandir : tous les accords sur plusieurs rangées")
             if compact
-            else "Réduire : une rangée qui défile"
+            else translate("SongChords", "Réduire : une rangée qui défile")
         )
         self.flow.invalidate()
         self.inner.updateGeometry()
@@ -484,11 +524,13 @@ class SongChords(QFrame):
             card.hide()
         if self.view == "all":
             n = len(items)
-            self.count.setText(f"{n} accord{'s' if n > 1 else ''} différent{'s' if n > 1 else ''}")
-            self.empty.setText("Aucun accord dans ce morceau.")
+            self.count.setText(translate("SongChords", "%n accord(s) différent(s)", None, n))
+            self.empty.setText(translate("SongChords", "Aucun accord dans ce morceau."))
         else:
-            self.count.setText("l'accord en cours et les suivants")
-            self.empty.setText("Plus d'accord à venir : c'est la fin du morceau.")
+            self.count.setText(translate("SongChords", "l'accord en cours et les suivants"))
+            self.empty.setText(
+                translate("SongChords", "Plus d'accord à venir : c'est la fin du morceau.")
+            )
         self.empty.setVisible(not items)
         self.flow.invalidate()
         self.scroll.updateGeometry()  # the strip asks for the cards' new height

@@ -8,10 +8,24 @@ from pathlib import Path
 
 import numpy as np
 
+from .i18n import translate
+
 AUDIO_EXTENSIONS = (
-    ".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wma", ".aif", ".aiff",
-    ".mp4", ".webm", ".mka",
-)  # fmt: skip
+    ".mp3",
+    ".wav",
+    ".flac",
+    ".m4a",
+    ".aac",
+    ".ogg",
+    ".oga",
+    ".opus",
+    ".wma",
+    ".aif",
+    ".aiff",
+    ".mp4",
+    ".webm",
+    ".mka",
+)
 
 
 class AudioError(Exception):
@@ -40,11 +54,16 @@ def _open(path: Path):
     try:
         return av.open(str(path))
     except FileNotFoundError as exc:
-        raise AudioError(f"Fichier introuvable : {path}") from exc
+        raise AudioError(
+            translate("Audio", "Fichier introuvable : {path}").format(path=path)
+        ) from exc
     except (av.FFmpegError, OSError, ValueError) as exc:
         raise AudioError(
-            f"Impossible de lire « {path.name} » : le fichier est endommagé ou son format "
-            "n'est pas reconnu."
+            translate(
+                "Audio",
+                "Impossible de lire « {name} » : le fichier est endommagé ou son format "
+                "n'est pas reconnu.",
+            ).format(name=path.name)
         ) from exc
 
 
@@ -61,7 +80,11 @@ def decode(
     layout = {1: "mono", 2: "stereo"}[channels]
     with _open(path) as container:
         if not container.streams.audio:
-            raise AudioError(f"« {path.name} » ne contient pas de piste audio.")
+            raise AudioError(
+                translate("Audio", "« {name} » ne contient pas de piste audio.").format(
+                    name=path.name
+                )
+            )
         stream = container.streams.audio[0]
         stream.thread_type = "AUTO"
         resampler = av.AudioResampler(format="flt", layout=layout, rate=sr)
@@ -78,10 +101,14 @@ def decode(
             # A truncated file still plays up to the damage, as other players do.
             if not parts:
                 raise AudioError(
-                    f"Impossible de décoder « {path.name} » : le fichier est endommagé."
+                    translate(
+                        "Audio", "Impossible de décoder « {name} » : le fichier est endommagé."
+                    ).format(name=path.name)
                 ) from exc
     if not parts:
-        raise AudioError(f"« {path.name} » ne contient aucun son décodable.")
+        raise AudioError(
+            translate("Audio", "« {name} » ne contient aucun son décodable.").format(name=path.name)
+        )
     return np.concatenate(parts)
 
 

@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
     QAbstractTableModel,
     QEventLoop,
     QFile,
@@ -53,37 +54,77 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import audio, backup, library
+from .. import audio, backup, i18n, library
 from .. import catalog as C
 from .. import lyrics as L
 from ..chords import key_name
+from ..i18n import translate
 from ..project import Project, ProjectError
 from . import theme
-from .widgets import fmt_time, segmented
+from .widgets import fmt_time, language_menu, segmented
 
-MONTHS = ("janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.",
-          "nov.", "déc.")  # fmt: skip
-ESTIMATED = (
+MONTHS = (
+    QT_TRANSLATE_NOOP("Library", "janv."),
+    QT_TRANSLATE_NOOP("Library", "févr."),
+    QT_TRANSLATE_NOOP("Library", "mars"),
+    QT_TRANSLATE_NOOP("Library", "avr."),
+    QT_TRANSLATE_NOOP("Library", "mai"),
+    QT_TRANSLATE_NOOP("Library", "juin"),
+    QT_TRANSLATE_NOOP("Library", "juil."),
+    QT_TRANSLATE_NOOP("Library", "août"),
+    QT_TRANSLATE_NOOP("Library", "sept."),
+    QT_TRANSLATE_NOOP("Library", "oct."),
+    QT_TRANSLATE_NOOP("Library", "nov."),
+    QT_TRANSLATE_NOOP("Library", "déc."),
+)
+ESTIMATED = QT_TRANSLATE_NOOP(
+    "Library",
     "Date estimée d'après le fichier du projet : il a été créé avant la v1.4, qui retient "
-    "ces dates."
+    "ces dates.",
 )
 AUDIO_TEXT = {
-    "kept": ("Conservé", "Une copie est gardée dans le dossier de LocalChords."),
-    "ok": ("Disponible", "Le fichier audio d'origine est à sa place."),
-    "offline": ("Disque absent", "Le disque ou le partage réseau de ce fichier n'est pas connecté. "
-                "Rien n'est supprimé : le morceau se rejoue quand il revient."),
-    "missing": ("Introuvable", "Le fichier audio a été déplacé, renommé ou supprimé. La grille, "
-                "les corrections et les paroles restent consultables."),
-    "unknown": ("…", "Pas encore vérifié."),
-}  # fmt: skip
+    "kept": (
+        QT_TRANSLATE_NOOP("Library", "Conservé"),
+        QT_TRANSLATE_NOOP("Library", "Une copie est gardée dans le dossier de LocalChords."),
+    ),
+    "ok": (
+        QT_TRANSLATE_NOOP("Library", "Disponible"),
+        QT_TRANSLATE_NOOP("Library", "Le fichier audio d'origine est à sa place."),
+    ),
+    "offline": (
+        QT_TRANSLATE_NOOP("Library", "Disque absent"),
+        QT_TRANSLATE_NOOP(
+            "Library",
+            "Le disque ou le partage réseau de ce fichier n'est pas "
+            "connecté. Rien n'est supprimé : le morceau se rejoue quand il revient.",
+        ),
+    ),
+    "missing": (
+        QT_TRANSLATE_NOOP("Library", "Introuvable"),
+        QT_TRANSLATE_NOOP(
+            "Library",
+            "Le fichier audio a été déplacé, renommé ou supprimé. La "
+            "grille, les corrections et les paroles restent consultables.",
+        ),
+    ),
+    "unknown": ("…", QT_TRANSLATE_NOOP("Library", "Pas encore vérifié.")),
+}
 # (key, header, sort it gives when clicked)
 COLUMNS = [
-    ("favorite", "", None), ("title", "Titre", "title"), ("artist", "Artiste", "artist"),
-    ("genre", "Genre", "genre"), ("year", "Année", "year"), ("duration", "Durée", "duration"),
-    ("key", "Tonalité", "key"), ("bpm", "Tempo", "bpm"), ("chords", "Accords", None),
-    ("lyrics", "Paroles", None), ("audio", "Audio", None), ("added", "Ajouté", "added"),
-    ("opened", "Ouvert", "opened"),
-]  # fmt: skip
+    ("favorite", "", None),
+    ("title", QT_TRANSLATE_NOOP("Library", "Titre"), "title"),
+    ("artist", QT_TRANSLATE_NOOP("Library", "Artiste"), "artist"),
+    ("genre", QT_TRANSLATE_NOOP("Library", "Genre"), "genre"),
+    ("year", QT_TRANSLATE_NOOP("Library", "Année"), "year"),
+    ("duration", QT_TRANSLATE_NOOP("Library", "Durée"), "duration"),
+    ("key", QT_TRANSLATE_NOOP("Library", "Tonalité"), "key"),
+    ("bpm", QT_TRANSLATE_NOOP("Library", "Tempo"), "bpm"),
+    ("chords", QT_TRANSLATE_NOOP("Library", "Accords"), None),
+    ("lyrics", QT_TRANSLATE_NOOP("Library", "Paroles"), None),
+    ("audio", QT_TRANSLATE_NOOP("Library", "Audio"), None),
+    ("added", QT_TRANSLATE_NOOP("Library", "Ajouté"), "added"),
+    ("opened", QT_TRANSLATE_NOOP("Library", "Ouvert"), "opened"),
+]
 NARROW_HIDDEN = ("year", "chords", "added")  # the columns that go first on a narrow window
 TIGHT_HIDDEN = ("genre", "bpm", "lyrics", "audio", "opened")  # then these, so nothing is cut
 VIEW_ICONS = {
@@ -91,21 +132,28 @@ VIEW_ICONS = {
     "col": "collection",
 }  # fmt: skip
 COUNT_ROLE = Qt.ItemDataRole.UserRole + 1
-VIEWS = {"all": "Tous les morceaux", "fav": "Favoris", "recent": "Récemment ouverts",
-         "latest": "Derniers ajouts", "hidden": "Retirés de la bibliothèque"}  # fmt: skip
+VIEWS = {
+    "all": QT_TRANSLATE_NOOP("Library", "Tous les morceaux"),
+    "fav": QT_TRANSLATE_NOOP("Library", "Favoris"),
+    "recent": QT_TRANSLATE_NOOP("Library", "Récemment ouverts"),
+    "latest": QT_TRANSLATE_NOOP("Library", "Derniers ajouts"),
+    "hidden": QT_TRANSLATE_NOOP("Library", "Retirés de la bibliothèque"),
+}
 
 
 def day(ts: float | None, estimated: bool = False) -> str:
     if not ts:
         return "—"
     t = time.localtime(ts)
-    return f"{'≈ ' if estimated else ''}{t.tm_mday} {MONTHS[t.tm_mon - 1]} {t.tm_year}"
+    month = translate("Library", MONTHS[t.tm_mon - 1])
+    text = translate("Library", "{day} {month} {year}").format(
+        day=t.tm_mday, month=month, year=t.tm_year
+    )
+    return f"≈ {text}" if estimated else text
 
 
 def megabytes(n: int) -> str:
-    return (
-        f"{n / 2**30:.1f} Go".replace(".", ",") if n >= 2**30 else f"{max(1, round(n / 2**20))} Mo"
-    )
+    return i18n.size(n)
 
 
 def trash(path: Path) -> bool:
@@ -131,7 +179,7 @@ def run_task(parent: QWidget, title: str, fn, cancellable: bool = True):
         finally:
             state["done"] = True
 
-    dialog = QProgressDialog(title, "Annuler", 0, 0, parent)
+    dialog = QProgressDialog(title, translate("Library", "Annuler"), 0, 0, parent)
     dialog.setWindowTitle(title)
     dialog.setWindowModality(Qt.WindowModality.WindowModal)
     dialog.setMinimumDuration(300)
@@ -228,18 +276,18 @@ class SongModel(QAbstractTableModel):
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):  # noqa: N802
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return COLUMNS[section][1]
+            return translate("Library", COLUMNS[section][1])
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.ToolTipRole:
-            return "Favori" if section == 0 else None
+            return translate("Library", "Favori") if section == 0 else None
         return None
 
     def text(self, s: dict, key: str) -> str:
         if key == "title":
-            return s["title"] or "Sans titre"
+            return s["title"] or translate("Library", "Sans titre")
         if key == "artist":
             return s["artist"] or "—"
         if key == "genre":
-            return s["shown_genre"] or "Non renseigné"
+            return C.shown(s["shown_genre"] or "") or translate("Library", "Non renseigné")
         if key == "year":
             return str(s["year"]) if s["year"] else "—"
         if key == "duration":
@@ -251,11 +299,15 @@ class SongModel(QAbstractTableModel):
         if key == "chords":
             return str(s["chords"]) if s["chords"] else "—"
         if key == "lyrics":
-            return "Oui" if s["lyrics"] else "—"
+            return translate("Library", "Oui") if s["lyrics"] else "—"
         if key == "audio":
             if s["project_state"] != "ok":
-                return "Projet absent" if s["project_state"] == "missing" else "Projet illisible"
-            return AUDIO_TEXT[s["audio_state"]][0]
+                return (
+                    translate("Library", "Projet absent")
+                    if s["project_state"] == "missing"
+                    else translate("Library", "Projet illisible")
+                )
+            return translate("Library", AUDIO_TEXT[s["audio_state"]][0])
         if key == "added":
             return day(s["added_at"], s["added_estimated"])
         if key == "opened":
@@ -264,24 +316,35 @@ class SongModel(QAbstractTableModel):
 
     def tip(self, s: dict, key: str) -> str | None:
         if key == "favorite":
-            return "Retirer des favoris" if s["favorite"] else "Ajouter aux favoris"
+            return (
+                translate("Library", "Retirer des favoris")
+                if s["favorite"]
+                else translate("Library", "Ajouter aux favoris")
+            )
         if key == "genre" and not s["shown_genre"]:
-            return "Genre non renseigné : clic droit pour le choisir."
+            return translate("Library", "Genre non renseigné : clic droit pour le choisir.")
         if key == "genre" and s["genre"] is None:
-            return "D'après les informations du fichier audio."
+            return translate("Library", "D'après les informations du fichier audio.")
         if key == "lyrics" and s["lyrics"]:
-            return L.KINDS.get(s["lyrics"], "Paroles")
+            return translate(
+                "Lyrics", L.KINDS.get(s["lyrics"], QT_TRANSLATE_NOOP("Lyrics", "Paroles"))
+            )
         if key in ("key", "bpm", "chords") and not s["analyzed"]:
-            return "Pas encore analysé."
+            return translate("Library", "Pas encore analysé.")
         if key == "audio":
             if s["project_state"] == "missing":
-                return "Le fichier du projet n'est plus dans le dossier de LocalChords."
+                return translate(
+                    "Library", "Le fichier du projet n'est plus dans le dossier de LocalChords."
+                )
             if s["project_state"] == "unreadable":
-                return "Le fichier du projet est endommagé ou vient d'une version plus récente."
+                return translate(
+                    "Library",
+                    "Le fichier du projet est endommagé ou vient d'une version plus récente.",
+                )
             where = s["audio_path"] or ""
-            return f"{AUDIO_TEXT[s['audio_state']][1]}\n{where}".strip()
+            return f"{translate('Library', AUDIO_TEXT[s['audio_state']][1])}\n{where}".strip()
         if key == "added" and s["added_estimated"] or key == "opened" and s["opened_estimated"]:
-            return ESTIMATED
+            return translate("Library", ESTIMATED)
         if key == "title":
             return " — ".join(x for x in (s["title"], s["artist"], s["album"]) if x)
         return None
@@ -298,7 +361,11 @@ class SongModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.ToolTipRole:
             return self.tip(s, key)
         if role == Qt.ItemDataRole.AccessibleTextRole and key == "favorite":
-            return "Favori" if s["favorite"] else "Pas favori"
+            return (
+                translate("Library", "Favori")
+                if s["favorite"]
+                else translate("Library", "Pas favori")
+            )
         if role == Qt.ItemDataRole.ForegroundRole:
             if s["project_state"] != "ok":
                 return QColor(theme.TEXT_3)
@@ -349,12 +416,14 @@ class CardDelegate(QStyledItemDelegate):
         p.setPen(QColor(theme.TEXT_2))
         small = p.fontMetrics()
         y = text.top() + fm.height() + small.ascent() + 2
-        who = s["artist"] or "Artiste non renseigné"
+        who = s["artist"] or translate("Library", "Artiste non renseigné")
         p.drawText(
             text.left(), y, small.elidedText(who, Qt.TextElideMode.ElideRight, text.width() + 28)
         )
         facts = [m.text(s, "key"), m.text(s, "bpm"), m.text(s, "duration")]
-        line = " · ".join(f for f in facts if f != "—") or "Pas encore analysé"
+        line = " · ".join(f for f in facts if f != "—") or translate(
+            "Library", "Pas encore analysé"
+        )
         y += small.height() + 4
         p.drawText(
             text.left(), y, small.elidedText(line, Qt.TextElideMode.ElideRight, text.width() + 28)
@@ -366,7 +435,10 @@ class CardDelegate(QStyledItemDelegate):
             p.drawText(text.left(), y, m.text(s, "audio"))
         else:
             p.setPen(QColor(theme.TEXT_3))
-            extra = [s["shown_genre"] or "", "paroles" if s["lyrics"] else ""]
+            extra = [
+                C.shown(s["shown_genre"] or ""),
+                translate("Library", "paroles") if s["lyrics"] else "",
+            ]
             line = " · ".join(x for x in extra if x)
             elide = Qt.TextElideMode.ElideRight
             p.drawText(text.left(), y, small.elidedText(line, elide, text.width() + 28))
@@ -502,7 +574,7 @@ class LibraryPage(QWidget):
         self.batch_text = QLabel()
         self.batch_text.setObjectName("muted")
         self.batch_text.setWordWrap(True)
-        self.batch_cancel = QPushButton("Arrêter")
+        self.batch_cancel = QPushButton(translate("Library", "Arrêter"))
         batch_row.addWidget(self.batch_text, 1)
         batch_row.addWidget(self.batch_cancel)
         self.batch_box.hide()
@@ -535,7 +607,7 @@ class LibraryPage(QWidget):
         layout = QVBoxLayout(side)
         layout.setContentsMargins(12, 18, 12, 12)
         layout.setSpacing(8)
-        name = QLabel("Ma bibliothèque")
+        name = QLabel(translate("Library", "Ma bibliothèque"))
         name.setObjectName("h2")
         layout.addWidget(name)
         self.side = SideList()
@@ -546,15 +618,19 @@ class LibraryPage(QWidget):
         self.side.currentItemChanged.connect(self._side_changed)
         self.side.itemDoubleClicked.connect(lambda item: self._rename_collection(item))
         layout.addWidget(self.side, 1)
-        new = QPushButton("Nouvelle collection")
+        new = QPushButton(translate("Library", "Nouvelle collection"))
         new.setObjectName("link")
         new.setIcon(theme.icon("plus", theme.SELECT, 14))
-        new.setToolTip("Créer une collection ; on peut aussi y glisser des morceaux")
+        new.setToolTip(
+            translate("Library", "Créer une collection ; on peut aussi y glisser des morceaux")
+        )
         new.clicked.connect(lambda: self.new_collection())
         layout.addWidget(new, 0, Qt.AlignmentFlag.AlignLeft)
-        place = "Tout reste sur votre ordinateur."
+        place = translate("Library", "Tout reste sur votre ordinateur.")
         if library.portable_dir() == library.data_dir():
-            place = "Mode portable : tout reste dans le dossier Data, à côté du programme."
+            place = translate(
+                "Library", "Mode portable : tout reste dans le dossier Data, à côté du programme."
+            )
         self.place = QLabel(place)
         self.place.setObjectName("caption")
         self.place.setWordWrap(True)
@@ -575,46 +651,63 @@ class LibraryPage(QWidget):
         row.addLayout(titles)
         row.addStretch(1)
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Rechercher un titre, un artiste, un genre, une étiquette…")
+        self.search.setPlaceholderText(
+            translate("Library", "Rechercher un titre, un artiste, un genre, une étiquette…")
+        )
         self.search.setClearButtonEnabled(True)
         self.search.addAction(
             theme.icon("search", theme.TEXT_2, 16), QLineEdit.ActionPosition.LeadingPosition
         )
-        self.search.setToolTip("Rechercher (Ctrl + F)")
+        self.search.setToolTip(translate("Library", "Rechercher (Ctrl + F)"))
         self.search.setMinimumWidth(200)
         self.search.setMaximumWidth(460)
-        self.search.setAccessibleName("Rechercher dans la bibliothèque")
+        self.search.setAccessibleName(translate("Library", "Rechercher dans la bibliothèque"))
         self.search.textChanged.connect(lambda: self.search_timer.start())
         row.addWidget(self.search, 2)
         self.add_button = QToolButton()
         self.add_button.setObjectName("primary")
-        self.add_button.setText("Ajouter un morceau")
-        self.add_button.setAccessibleName("Ajouter un morceau")
+        self.add_button.setText(translate("Library", "Ajouter un morceau"))
+        self.add_button.setAccessibleName(translate("Library", "Ajouter un morceau"))
         self.add_button.setIcon(theme.icon("plus", theme.ON_ACCENT))
         self.add_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.add_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.add_button.setToolTip(
-            "Un fichier audio (Ctrl + O), un lien, ou glissez des fichiers ici"
+            translate(
+                "Library", "Un fichier audio (Ctrl + O), un lien, ou glissez des fichiers ici"
+            )
         )
         add = QMenu(self)
-        add.addAction("Fichier audio ou projet…", self.openRequested.emit)
-        add.addAction("Lien (YouTube et autres sites)…", self.linkRequested.emit)
+        add.addAction(translate("Library", "Fichier audio ou projet…"), self.openRequested.emit)
+        add.addAction(
+            translate("Library", "Lien (YouTube et autres sites)…"), self.linkRequested.emit
+        )
         self.add_button.setMenu(add)
         row.addWidget(self.add_button)
         self.menu_button = QToolButton()
         self.menu_button.setIcon(theme.icon("more"))
         self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.menu_button.setToolTip("Sauvegarde, restauration et autres options")
-        self.menu_button.setAccessibleName("Options de la bibliothèque")
+        self.menu_button.setToolTip(
+            translate("Library", "Sauvegarde, restauration et autres options")
+        )
+        self.menu_button.setAccessibleName(translate("Library", "Options de la bibliothèque"))
         menu = QMenu(self)
-        menu.addAction("Sauvegarder la bibliothèque…", self.backup)
-        menu.addAction("Restaurer une sauvegarde…", self.restore)
+        menu.addAction(translate("Library", "Sauvegarder la bibliothèque…"), self.backup)
+        menu.addAction(translate("Library", "Restaurer une sauvegarde…"), self.restore)
         menu.addSeparator()
-        menu.addAction("Retrouver les fichiers audio manquants…", lambda: self.find_in_folder(None))
-        menu.addAction("Ouvrir le dossier de LocalChords", lambda: self._reveal(library.data_dir()))
+        menu.addAction(
+            translate("Library", "Retrouver les fichiers audio manquants…"),
+            lambda: self.find_in_folder(None),
+        )
+        menu.addAction(
+            translate("Library", "Ouvrir le dossier de LocalChords"),
+            lambda: self._reveal(library.data_dir()),
+        )
         menu.addSeparator()
-        menu.addAction("Raccourcis clavier", self.shortcutsRequested.emit)
-        menu.addAction("À propos de LocalChords", self.aboutRequested.emit)
+        language_menu(menu, self.settings)
+        menu.addAction(
+            translate("Library", "Raccourcis clavier"), self.shortcutsRequested.emit
+        ).setObjectName("shortcuts")  # the updater puts its entries just above
+        menu.addAction(translate("Library", "À propos de LocalChords"), self.aboutRequested.emit)
         self.menu_button.setMenu(menu)
         row.addWidget(self.menu_button)
         return row
@@ -629,14 +722,18 @@ class LibraryPage(QWidget):
         row.setSpacing(8)
         self.filter_rows.addLayout(row)
         self.genre_box = QComboBox()
-        self.genre_box.setAccessibleName("Genre")
+        self.genre_box.setAccessibleName(translate("Library", "Genre"))
         self.tag_box = QComboBox()
-        self.tag_box.setAccessibleName("Étiquette")
+        self.tag_box.setAccessibleName(translate("Library", "Étiquette"))
         self.state_box = QComboBox()
-        self.state_box.setAccessibleName("État")
-        for text, value in (("Tous les états", None), ("Avec paroles", "lyrics"),
-                            ("Sans paroles", "nolyrics"), ("Audio introuvable", "missing"),
-                            ("Audio conservé", "kept")):  # fmt: skip
+        self.state_box.setAccessibleName(translate("Library", "État"))
+        for text, value in (
+            (translate("Library", "Tous les états"), None),
+            (translate("Library", "Avec paroles"), "lyrics"),
+            (translate("Library", "Sans paroles"), "nolyrics"),
+            (translate("Library", "Audio introuvable"), "missing"),
+            (translate("Library", "Audio conservé"), "kept"),
+        ):
             self.state_box.addItem(text, value)
         for combo in (self.genre_box, self.tag_box, self.state_box):
             combo.currentIndexChanged.connect(self.refresh)
@@ -644,19 +741,19 @@ class LibraryPage(QWidget):
         row = QHBoxLayout()
         row.setSpacing(8)
         self.filter_rows.addLayout(row, 1)
-        self.clear_filters = QPushButton("Effacer les filtres")
+        self.clear_filters = QPushButton(translate("Library", "Effacer les filtres"))
         self.clear_filters.setObjectName("link")
         self.clear_filters.clicked.connect(self.reset_filters)
         row.addWidget(self.clear_filters)
         row.addStretch(1)
-        sort_label = QLabel("Trier par")
+        sort_label = QLabel(translate("Library", "Trier par"))
         sort_label.setObjectName("caption")
         row.addWidget(sort_label)
         self.sort_box = QComboBox()
-        self.sort_box.setAccessibleName("Trier par")
+        self.sort_box.setAccessibleName(translate("Library", "Trier par"))
         for value, text in C.SORTS.items():
-            self.sort_box.addItem(text, value)
-        self.sort_box.addItem("Ordre de la collection", "order")
+            self.sort_box.addItem(translate("Catalog", text), value)
+        self.sort_box.addItem(translate("Library", "Ordre de la collection"), "order")
         self.order_index = self.sort_box.count() - 1
         sort = self.settings.get("library_sort", "title")
         self.sort_box.setCurrentIndex(max(0, self.sort_box.findData(sort)))
@@ -670,12 +767,12 @@ class LibraryPage(QWidget):
         row.addWidget(self.desc)
         self.view_list = QToolButton()
         self.view_list.setIcon(theme.icon("rows", on=None))
-        self.view_list.setToolTip("Liste")
-        self.view_list.setAccessibleName("Affichage en liste")
+        self.view_list.setToolTip(translate("Library", "Liste"))
+        self.view_list.setAccessibleName(translate("Library", "Affichage en liste"))
         self.view_cards = QToolButton()
         self.view_cards.setIcon(theme.icon("tiles", on=None))
-        self.view_cards.setToolTip("Cartes")
-        self.view_cards.setAccessibleName("Affichage en cartes")
+        self.view_cards.setToolTip(translate("Library", "Cartes"))
+        self.view_cards.setAccessibleName(translate("Library", "Affichage en cartes"))
         for b, mode in ((self.view_list, "list"), (self.view_cards, "cards")):
             b.setCheckable(True)
             b.clicked.connect(lambda _=False, m=mode: self.set_mode(m))
@@ -687,7 +784,7 @@ class LibraryPage(QWidget):
         t = SongTable()
         t.setModel(self.model)
         t.setObjectName("songs")
-        t.setAccessibleName("Morceaux")
+        t.setAccessibleName(translate("Library", "Morceaux"))
         t.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         t.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         t.setShowGrid(False)
@@ -775,26 +872,39 @@ class LibraryPage(QWidget):
         title = QLabel("LocalChords")
         title.setObjectName("h1")
         lead = QLabel(
-            "Glissez un morceau dans cette fenêtre : ses accords apparaissent en grille et "
-            "défilent avec la lecture. Chaque morceau analysé reste ensuite ici, avec ses "
-            "corrections et ses paroles."
+            translate(
+                "Library",
+                "Glissez un morceau dans cette fenêtre : ses accords apparaissent en "
+                "grille et défilent avec la lecture. Chaque morceau analysé reste "
+                "ensuite ici, avec ses corrections et ses paroles.",
+            )
         )
         lead.setObjectName("muted")
         lead.setWordWrap(True)
-        self.open_button = QPushButton("Ouvrir un morceau…")  # amber: « Ajouter », just above
+        self.open_button = QPushButton(
+            translate("Library", "Ouvrir un morceau…")
+        )  # amber: « Ajouter », just above
         self.open_button.setToolTip("Ctrl + O")
         self.open_button.clicked.connect(self.openRequested)
-        self.link_button = QPushButton("Importer un lien…")
+        self.link_button = QPushButton(translate("Library", "Importer un lien…"))
         self.link_button.setToolTip(
-            "YouTube et autres sites, pour les contenus que vous avez le droit de télécharger"
+            translate(
+                "Library",
+                "YouTube et autres sites, pour les contenus que vous avez le droit de télécharger",
+            )
         )
         self.link_button.clicked.connect(self.linkRequested)
         buttons = QHBoxLayout()
         buttons.addWidget(self.open_button)
         buttons.addWidget(self.link_button)
         buttons.addStretch()
-        formats = QLabel("MP3, WAV, FLAC, M4A, OGG, OPUS… Une sauvegarde de bibliothèque se "
-                         "restaure depuis le menu Options, en haut à droite.")  # fmt: skip
+        formats = QLabel(
+            translate(
+                "Library",
+                "MP3, WAV, FLAC, M4A, OGG, OPUS… Une sauvegarde de bibliothèque se "
+                "restaure depuis le menu Options, en haut à droite.",
+            )
+        )
         formats.setObjectName("caption")
         formats.setWordWrap(True)
         layout.addWidget(title)
@@ -889,33 +999,54 @@ class LibraryPage(QWidget):
             )
             self.heading.setText(name)
         else:
-            self.heading.setText(VIEWS[kind])
-        n = f"{shown} morceau" + ("x" if shown > 1 else "")
+            self.heading.setText(translate("Library", VIEWS[kind]))
         if shown != total and kind not in ("recent", "latest"):
-            n += f" sur {total}"
+            n = translate("Library", "%n morceau(x) sur {total}", None, shown).format(total=total)
+        else:
+            n = translate("Library", "%n morceau(x)", None, shown)
         if self.scanning:
-            n += " · lecture des projets…"
+            n = translate("Library", "{count} · lecture des projets…").format(count=n)
         self.count.setText(n)
 
     def _show_empty(self, kind: str, filtered: bool) -> None:
         if filtered:
-            text = "Aucun morceau ne correspond à cette recherche ou à ces filtres."
-            action, fn = "Effacer la recherche et les filtres", self.reset_filters
+            text = translate(
+                "Library", "Aucun morceau ne correspond à cette recherche ou à ces filtres."
+            )
+            action, fn = (
+                translate("Library", "Effacer la recherche et les filtres"),
+                self.reset_filters,
+            )
         elif kind == "fav":
-            text = ("Aucun favori pour l'instant. Cliquez sur l'étoile d'un morceau, dans la liste "
-                    "ou sur sa page, pour le retrouver ici d'un clic.")  # fmt: skip
-            action, fn = "Voir tous les morceaux", lambda: self.select_view(("all",))
+            text = translate(
+                "Library",
+                "Aucun favori pour l'instant. Cliquez sur l'étoile d'un morceau, dans la "
+                "liste ou sur sa page, pour le retrouver ici d'un clic.",
+            )
+            action, fn = (
+                translate("Library", "Voir tous les morceaux"),
+                lambda: self.select_view(("all",)),
+            )
         elif kind == "col":
-            text = ("Cette collection est vide. Faites un clic droit sur un morceau, puis "
-                    "« Ajouter à la collection ». Un morceau peut être dans plusieurs "
-                    "collections.")  # fmt: skip
-            action, fn = "Voir tous les morceaux", lambda: self.select_view(("all",))
+            text = translate(
+                "Library",
+                "Cette collection est vide. Faites un clic droit sur un morceau, puis « "
+                "Ajouter à la collection ». Un morceau peut être dans plusieurs "
+                "collections.",
+            )
+            action, fn = (
+                translate("Library", "Voir tous les morceaux"),
+                lambda: self.select_view(("all",)),
+            )
         elif kind == "hidden":
-            text = "Aucun morceau retiré de la bibliothèque."
-            action, fn = "Voir tous les morceaux", lambda: self.select_view(("all",))
+            text = translate("Library", "Aucun morceau retiré de la bibliothèque.")
+            action, fn = (
+                translate("Library", "Voir tous les morceaux"),
+                lambda: self.select_view(("all",)),
+            )
         else:
-            text = "Aucun morceau ici pour l'instant."
-            action, fn = "Ajouter un morceau…", self.openRequested.emit
+            text = translate("Library", "Aucun morceau ici pour l'instant.")
+            action, fn = translate("Library", "Ajouter un morceau…"), self.openRequested.emit
         self.empty_text.setText(text)
         self.empty_action.setText(action)
         self._empty_fn = fn
@@ -935,29 +1066,33 @@ class LibraryPage(QWidget):
         if hidden:
             entries.append(("hidden",))
         for key in entries:
-            text = VIEWS[key[0]] if key[0] != "hidden" else "Retirés"
+            text = (
+                translate("Library", VIEWS[key[0]])
+                if key[0] != "hidden"
+                else translate("Library", "Retirés")
+            )
             item = QListWidgetItem(text)
             if key[0] in counts:
-                item.setToolTip(f"{counts[key[0]]} morceau" + ("x" if counts[key[0]] > 1 else ""))
+                item.setToolTip(translate("Library", "%n morceau(x)", None, counts[key[0]]))
                 item.setData(COUNT_ROLE, counts[key[0]])
             color = theme.ACCENT if key[0] == "fav" else theme.TEXT_2
             item.setIcon(theme.icon(VIEW_ICONS[key[0]], color, 16, on=None))
             item.setData(Qt.ItemDataRole.UserRole, key)
             side.addItem(item)
-        head = QListWidgetItem("Collections")
+        head = QListWidgetItem(translate("Library", "Collections"))
         head.setFlags(Qt.ItemFlag.NoItemFlags)
         head.setForeground(QColor(theme.TEXT_2))
         head.setFont(theme.app_font(theme.SIZE_CAPTION, 600))
         head.setSizeHint(QSize(0, 40))  # a little air above the collections
         side.addItem(head)
         if not collections:
-            none = QListWidgetItem("Aucune pour l'instant")
+            none = QListWidgetItem(translate("Library", "Aucune pour l'instant"))
             none.setFlags(Qt.ItemFlag.NoItemFlags)
             none.setForeground(QColor(theme.TEXT_3))
             side.addItem(none)
         for c in collections:
             item = QListWidgetItem(c["name"])
-            item.setToolTip(f"{c['count']} morceau" + ("x" if c["count"] > 1 else ""))
+            item.setToolTip(translate("Library", "%n morceau(x)", None, c["count"]))
             item.setData(COUNT_ROLE, c["count"])
             item.setIcon(theme.icon("collection", theme.TEXT_2, 16, on=None))
             item.setData(Qt.ItemDataRole.UserRole, ("col", c["cid"]))
@@ -984,9 +1119,17 @@ class LibraryPage(QWidget):
             box.blockSignals(False)
 
         genres = sorted({s["shown_genre"] for s in songs if s["shown_genre"]}, key=C.folded)
-        fill(self.genre_box, "Tous les genres", [(g, g) for g in genres] + [("Non renseigné", "")])
+        fill(
+            self.genre_box,
+            translate("Library", "Tous les genres"),
+            [(C.shown(g), g) for g in genres] + [(translate("Library", "Non renseigné"), "")],
+        )
         tags = sorted({t for s in songs for t in s["tags"]}, key=C.folded)
-        fill(self.tag_box, "Toutes les étiquettes", [(t, t) for t in tags])
+        fill(
+            self.tag_box,
+            translate("Library", "Toutes les étiquettes"),
+            [(C.shown(t), t) for t in tags],
+        )
         self.tag_box.setVisible(bool(tags))
 
     def _restore_selection(self, ids: set[str]) -> None:
@@ -1064,7 +1207,11 @@ class LibraryPage(QWidget):
     def _show_direction(self) -> None:
         down = self.desc.isChecked()
         self.desc.setIcon(theme.icon("sort_down" if down else "sort_up", on=None))
-        self.desc.setToolTip("Ordre décroissant" if down else "Ordre croissant")
+        self.desc.setToolTip(
+            translate("Library", "Ordre décroissant")
+            if down
+            else translate("Library", "Ordre croissant")
+        )
         self.desc.setAccessibleName(self.desc.toolTip())
 
     def _header_clicked(self, section: int) -> None:
@@ -1104,8 +1251,11 @@ class LibraryPage(QWidget):
         file = self.project_file(song)
         if song["project_state"] == "missing" or not file.exists():
             self._say(
-                "Le fichier de ce projet n'est plus dans le dossier de LocalChords "
-                f"({file.parent}). S'il revient, le morceau se rouvre tel quel."
+                translate(
+                    "Library",
+                    "Le fichier de ce projet n'est plus dans le dossier de LocalChords "
+                    "({parent}). S'il revient, le morceau se rouvre tel quel.",
+                ).format(parent=file.parent)
             )
             return
         self.projectRequested.emit(file)
@@ -1135,32 +1285,53 @@ class LibraryPage(QWidget):
         one = songs[0] if len(songs) == 1 else None
         menu = QMenu(self)
         if one:
-            menu.addAction("Ouvrir", lambda: self.open_song(one))
+            menu.addAction(translate("Library", "Ouvrir"), lambda: self.open_song(one))
             menu.addSeparator()
         fav = all(s["favorite"] for s in songs)
-        menu.addAction(theme.icon("star", theme.ACCENT, 16),
-                       "Retirer des favoris" if fav else "Ajouter aux favoris",
-                       lambda: self.toggle_favorite(songs))  # fmt: skip
-        self._collections_menu(menu.addMenu("Ajouter à la collection"), ids)
+        menu.addAction(
+            theme.icon("star", theme.ACCENT, 16),
+            translate("Library", "Retirer des favoris")
+            if fav
+            else translate("Library", "Ajouter aux favoris"),
+            lambda: self.toggle_favorite(songs),
+        )
+        self._collections_menu(menu.addMenu(translate("Library", "Ajouter à la collection")), ids)
         if self.view_key[0] == "col":
             cid = self.view_key[1]
             menu.addAction(
-                "Retirer de cette collection", lambda: self._remove_from_collection(cid, ids)
+                translate("Library", "Retirer de cette collection"),
+                lambda: self._remove_from_collection(cid, ids),
             )
             if one:
-                menu.addAction("Monter    Alt + ↑", lambda: self.move_selected(-1))
-                menu.addAction("Descendre    Alt + ↓", lambda: self.move_selected(1))
-        self._genre_menu(menu.addMenu("Genre"), songs)
-        self._tags_menu(menu.addMenu("Étiquettes"), songs)
-        self._audio_menu(menu.addMenu("Fichier audio"), songs)
+                menu.addAction(
+                    translate("Library", "Monter    Alt + ↑"), lambda: self.move_selected(-1)
+                )
+                menu.addAction(
+                    translate("Library", "Descendre    Alt + ↓"), lambda: self.move_selected(1)
+                )
+        self._genre_menu(menu.addMenu(translate("Library", "Genre")), songs)
+        self._tags_menu(menu.addMenu(translate("Library", "Étiquettes")), songs)
+        self._audio_menu(menu.addMenu(translate("Library", "Fichier audio")), songs)
         menu.addSeparator()
         if self.view_key[0] == "hidden":
-            menu.addAction("Remettre dans la bibliothèque", lambda: self._hide(ids, False))
+            menu.addAction(
+                translate("Library", "Remettre dans la bibliothèque"),
+                lambda: self._hide(ids, False),
+            )
         else:
-            remove = menu.addAction("Retirer de la bibliothèque", lambda: self._hide(ids, True))
-            remove.setToolTip("Le morceau n'apparaît plus ; son analyse et son audio restent. "
-                              "Il revient s'il est rouvert, ou depuis « Retirés ».")  # fmt: skip
-        menu.addAction("Supprimer l'analyse…", lambda: self.delete_projects(songs))
+            remove = menu.addAction(
+                translate("Library", "Retirer de la bibliothèque"), lambda: self._hide(ids, True)
+            )
+            remove.setToolTip(
+                translate(
+                    "Library",
+                    "Le morceau n'apparaît plus ; son analyse et son audio restent. Il "
+                    "revient s'il est rouvert, ou depuis « Retirés ».",
+                )
+            )
+        menu.addAction(
+            translate("Library", "Supprimer l'analyse…"), lambda: self.delete_projects(songs)
+        )
         menu.setToolTipsVisible(True)
         menu.exec(where)
 
@@ -1169,7 +1340,9 @@ class LibraryPage(QWidget):
             menu.addAction(c["name"], lambda cid=c["cid"]: self._add_to_collection(cid, ids))
         if not menu.isEmpty():
             menu.addSeparator()
-        menu.addAction("Nouvelle collection…", lambda: self.new_collection(ids))
+        menu.addAction(
+            translate("Library", "Nouvelle collection…"), lambda: self.new_collection(ids)
+        )
 
     def _add_to_collection(self, cid: int, ids: list[str]) -> None:
         if self._write(self.catalog.add_to_collection, cid, ids):
@@ -1197,19 +1370,25 @@ class LibraryPage(QWidget):
         ids = [s["id"] for s in songs]
         one = songs[0] if len(songs) == 1 else None
         file_genre = one["file_genre"] if one else None
-        label = f"D'après le fichier ({file_genre})" if file_genre else "D'après le fichier"
+        label = (
+            translate("Library", "D'après le fichier ({file_genre})").format(file_genre=file_genre)
+            if file_genre
+            else translate("Library", "D'après le fichier")
+        )
         from_file = menu.addAction(label, lambda: self._set_genre(ids, None))
-        none = menu.addAction("Non renseigné", lambda: self._set_genre(ids, ""))
+        none = menu.addAction(
+            translate("Library", "Non renseigné"), lambda: self._set_genre(ids, "")
+        )
         menu.addSeparator()
         known = list(C.GENRES) + [g for g in self.catalog.genres() if g not in C.GENRES]
         current = one["shown_genre"] if one else None
         for g in known:
-            action = menu.addAction(g, lambda g=g: self._set_genre(ids, g))
+            action = menu.addAction(C.shown(g), lambda g=g: self._set_genre(ids, g))
             if one and one["genre"] is not None and current == g:
                 action.setCheckable(True)
                 action.setChecked(True)
         menu.addSeparator()
-        menu.addAction("Autre…", lambda: self._other_genre(ids))
+        menu.addAction(translate("Library", "Autre…"), lambda: self._other_genre(ids))
         if one:
             for action, on in ((from_file, one["genre"] is None), (none, one["genre"] == "")):
                 action.setCheckable(True)
@@ -1220,7 +1399,9 @@ class LibraryPage(QWidget):
             self.refresh()
 
     def _other_genre(self, ids) -> None:
-        text, ok = QInputDialog.getText(self, "Genre", "Genre de ces morceaux :")
+        text, ok = QInputDialog.getText(
+            self, translate("Library", "Genre"), translate("Library", "Genre de ces morceaux :")
+        )
         if ok and text.strip():
             self._set_genre(ids, text.strip())
 
@@ -1229,12 +1410,12 @@ class LibraryPage(QWidget):
         tags = sorted(set(C.TAGS) | set(self.catalog.tags()), key=C.folded)
         for tag in tags:
             have = all(C.folded(tag) in {C.folded(t) for t in s["tags"]} for s in songs)
-            action = menu.addAction(tag)
+            action = menu.addAction(C.shown(tag))
             action.setCheckable(True)
             action.setChecked(have)
             action.triggered.connect(lambda _=False, t=tag, h=have: self._tag(ids, t, not h))
         menu.addSeparator()
-        menu.addAction("Nouvelle étiquette…", lambda: self._new_tag(ids))
+        menu.addAction(translate("Library", "Nouvelle étiquette…"), lambda: self._new_tag(ids))
 
     def _tag(self, ids, tag: str, on: bool) -> None:
         fn = self.catalog.add_tag if on else self.catalog.remove_tag
@@ -1243,7 +1424,9 @@ class LibraryPage(QWidget):
 
     def _new_tag(self, ids) -> None:
         text, ok = QInputDialog.getText(
-            self, "Nouvelle étiquette", "Étiquette, par exemple « Pour le concert » :"
+            self,
+            translate("Library", "Nouvelle étiquette"),
+            translate("Library", "Étiquette, par exemple « Pour le concert » :"),
         )
         if ok and text.strip():
             self._tag(ids, text.strip(), True)
@@ -1267,7 +1450,11 @@ class LibraryPage(QWidget):
 
     # Collections -------------------------------------------------------------------------------
     def new_collection(self, ids: list[str] | None = None) -> None:
-        name, ok = QInputDialog.getText(self, "Nouvelle collection", "Nom de la collection :")
+        name, ok = QInputDialog.getText(
+            self,
+            translate("Library", "Nouvelle collection"),
+            translate("Library", "Nom de la collection :"),
+        )
         if not ok or not name.strip():
             return
         try:
@@ -1289,9 +1476,10 @@ class LibraryPage(QWidget):
         if not key or key[0] != "col":
             return
         menu = QMenu(self)
-        menu.addAction("Renommer…", lambda: self._rename_collection(item))
+        menu.addAction(translate("Library", "Renommer…"), lambda: self._rename_collection(item))
         menu.addAction(
-            "Supprimer la collection…", lambda: self._delete_collection(key[1], item.text())
+            translate("Library", "Supprimer la collection…"),
+            lambda: self._delete_collection(key[1], item.text()),
         )
         menu.exec(self.side.viewport().mapToGlobal(pos))
 
@@ -1300,7 +1488,10 @@ class LibraryPage(QWidget):
         if not key or key[0] != "col":
             return
         name, ok = QInputDialog.getText(
-            self, "Renommer la collection", "Nouveau nom :", text=item.text()
+            self,
+            translate("Library", "Renommer la collection"),
+            translate("Library", "Nouveau nom :"),
+            text=item.text(),
         )
         changed = ok and name.strip() and name.strip() != item.text()
         if changed and self._write(self.catalog.rename_collection, key[1], name):
@@ -1308,10 +1499,13 @@ class LibraryPage(QWidget):
 
     def _delete_collection(self, cid: int, name: str) -> None:
         if self._confirm(
-            "Supprimer la collection",
-            f"Supprimer la collection « {name} » ?\n\nSes morceaux restent dans la bibliothèque, "
-            "avec leurs analyses et leurs fichiers audio.",
-            "Supprimer la collection",
+            translate("Library", "Supprimer la collection"),
+            translate(
+                "Library",
+                "Supprimer la collection « {name} » ?\n\nSes morceaux restent dans la "
+                "bibliothèque, avec leurs analyses et leurs fichiers audio.",
+            ).format(name=name),
+            translate("Library", "Supprimer la collection"),
         ) and self._write(self.catalog.delete_collection, cid):
             self.refresh()
 
@@ -1321,20 +1515,28 @@ class LibraryPage(QWidget):
         can_keep = [s for s in songs if s["audio_state"] == "ok"]
         if can_keep:
             size = sum(s["audio_size"] or 0 for s in can_keep)
-            text = "Conserver une copie dans la bibliothèque"
+            text = translate("Library", "Conserver une copie dans la bibliothèque")
             menu.addAction(text + (f" ({megabytes(size)})" if size else "") + "…",
                            lambda: self.keep_copies(can_keep))  # fmt: skip
         lost = [s for s in songs if s["audio_state"] in ("missing", "offline")]
         if one and one["project_state"] == "ok":
-            menu.addAction("Localiser le fichier…", lambda: self.locate(one))
+            menu.addAction(translate("Library", "Localiser le fichier…"), lambda: self.locate(one))
         if lost:
-            menu.addAction("Rechercher dans un dossier…", lambda: self.find_in_folder(lost))
+            menu.addAction(
+                translate("Library", "Rechercher dans un dossier…"),
+                lambda: self.find_in_folder(lost),
+            )
         kept = [s for s in songs if s["kept"]]
         if kept:
-            menu.addAction("Supprimer la copie conservée…", lambda: self.drop_copies(kept))
+            menu.addAction(
+                translate("Library", "Supprimer la copie conservée…"),
+                lambda: self.drop_copies(kept),
+            )
         if one:
             path = library.audio_file({"path": one["audio_path"], "kept": one["kept"]})
-            show = menu.addAction("Afficher dans l'Explorateur", lambda: self._reveal(path))
+            show = menu.addAction(
+                translate("Library", "Afficher dans l'Explorateur"), lambda: self._reveal(path)
+            )
             show.setEnabled(one["audio_state"] in ("ok", "kept"))
         if menu.isEmpty():
             menu.setEnabled(False)
@@ -1348,7 +1550,11 @@ class LibraryPage(QWidget):
             project.save(file)
             self.catalog.store(file, project)
         except (ProjectError, OSError, C.CatalogError) as exc:
-            self._say(f"« {song['title']} » n'a pas pu être modifié : {exc}")
+            self._say(
+                translate("Library", "« {title} » n'a pas pu être modifié : {exc}").format(
+                    title=song["title"], exc=exc
+                )
+            )
             return None
         self.audioChanged.emit(file, dict(project.audio))
         return file, project
@@ -1363,14 +1569,22 @@ class LibraryPage(QWidget):
         total = sum(sizes)
         where = library.data_dir() / "audio"
         free = library.free_mb(library.data_dir()) * 2**20
-        what = f"« {songs[0]['title']} »" if len(songs) == 1 else f"ces {len(songs)} morceaux"
-        text = (
-            f"Garder une copie de l'audio de {what} dans le dossier de LocalChords ?\n\n"
-            f"Place nécessaire : {megabytes(total)} (libre : {megabytes(free)}), dans {where}.\n\n"
-            "Le fichier d'origine n'est ni déplacé ni supprimé. La copie permet de rejouer le "
-            "morceau même si l'original disparaît, et suit le dossier Data en mode portable."
+        what = (
+            translate("Library", "« {title} »").format(title=songs[0]["title"])
+            if len(songs) == 1
+            else translate("Library", "ces {count} morceaux").format(count=len(songs))
         )
-        if not self._confirm("Conserver une copie", text, "Copier"):
+        text = translate(
+            "Library",
+            "Garder une copie de l'audio de {what} dans le dossier de LocalChords "
+            "?\n\nPlace nécessaire : {megabytes} (libre : {megabytes2}), dans "
+            "{where}.\n\nLe fichier d'origine n'est ni déplacé ni supprimé. La copie "
+            "permet de rejouer le morceau même si l'original disparaît, et suit le "
+            "dossier Data en mode portable.",
+        ).format(what=what, megabytes=megabytes(total), megabytes2=megabytes(free), where=where)
+        if not self._confirm(
+            translate("Library", "Conserver une copie"), text, translate("Library", "Copier")
+        ):
             return
 
         def work(progress, stop):
@@ -1378,7 +1592,12 @@ class LibraryPage(QWidget):
             for i, s in enumerate(songs):
                 if stop():
                     break
-                progress(f"Copie de « {s['title']} »… ({i + 1} sur {len(songs)})", i / len(songs))
+                progress(
+                    translate("Library", "Copie de « {title} »… ({number} sur {count})").format(
+                        title=s["title"], number=i + 1, count=len(songs)
+                    ),
+                    i / len(songs),
+                )
                 file = self.project_file(s)
                 try:
                     project = Project.load(file)
@@ -1391,10 +1610,14 @@ class LibraryPage(QWidget):
                     errors.append(f"{s['title']} : {exc}")
             return done, errors
 
-        done, errors = run_task(self, "Conserver une copie", work)
+        done, errors = run_task(self, translate("Library", "Conserver une copie"), work)
         self._stored(done)
         if errors:
-            self._say("Certaines copies n'ont pas été faites :\n\n" + "\n".join(errors))
+            self._say(
+                translate("Library", "Certaines copies n'ont pas été faites :\n\n{errors}").format(
+                    errors="\n".join(errors)
+                )
+            )
 
     def _stored(self, done: list[tuple[Path, Project]]) -> None:
         for file, project in done:
@@ -1406,14 +1629,29 @@ class LibraryPage(QWidget):
     def drop_copies(self, songs: list[dict]) -> None:
         alone = [s for s in songs if not Path(s["audio_path"]).is_file()
                  or library.managed(Path(s["audio_path"]))]  # fmt: skip
-        what = f"« {songs[0]['title']} »" if len(songs) == 1 else f"de {len(songs)} morceaux"
-        text = (f"Supprimer la copie audio conservée {what} ? Elle part à la Corbeille.\n\n"
-                "Les fichiers d'origine ne sont pas touchés, ni l'analyse.")  # fmt: skip
+        what = (
+            translate("Library", "« {title} »").format(title=songs[0]["title"])
+            if len(songs) == 1
+            else translate("Library", "de {count} morceaux").format(count=len(songs))
+        )
+        text = translate(
+            "Library",
+            "Supprimer la copie audio conservée {what} ? Elle part à la "
+            "Corbeille.\n\nLes fichiers d'origine ne sont pas touchés, ni l'analyse.",
+        ).format(what=what)
         if alone:
-            text += (f"\n\nAttention : pour {len(alone)} d'entre eux l'original est "
-                     "introuvable. Sans la copie, ils ne pourront plus être écoutés (la grille "
-                     "reste).")  # fmt: skip
-        if not self._confirm("Supprimer la copie conservée", text, "Supprimer la copie"):
+            text += translate(
+                "Library",
+                "\n\nAttention : pour %n d'entre eux l'original est introuvable. Sans "
+                "la copie, ils ne pourront plus être écoutés (la grille reste).",
+                None,
+                len(alone),
+            )
+        if not self._confirm(
+            translate("Library", "Supprimer la copie conservée"),
+            text,
+            translate("Library", "Supprimer la copie"),
+        ):
             return
         failed = []
         for s in songs:
@@ -1424,14 +1662,22 @@ class LibraryPage(QWidget):
             self._edit_project(s, lambda p: p.audio.pop("kept", None))
         self.refresh()
         if failed:
-            self._say("Ces copies n'ont pas pu être mises à la Corbeille : " + ", ".join(failed))
+            self._say(
+                translate(
+                    "Library", "Ces copies n'ont pas pu être mises à la Corbeille : {files}"
+                ).format(files=", ".join(failed))
+            )
 
     def locate(self, song: dict) -> None:
         start = Path(song["audio_path"]).parent
         path, _ = QFileDialog.getOpenFileName(
-            self, f"Où est « {song['title']} » ?", str(start) if start.is_dir() else "",
-            "Audio (" + " ".join(f"*{e}" for e in audio.AUDIO_EXTENSIONS) + ")",
-        )  # fmt: skip
+            self,
+            translate("Library", "Où est « {title} » ?").format(title=song["title"]),
+            str(start) if start.is_dir() else "",
+            translate("Library", "Audio ({patterns})").format(
+                patterns=" ".join(f"*{e}" for e in audio.AUDIO_EXTENSIONS)
+            ),
+        )
         if not path:
             return
         file = self.project_file(song)
@@ -1442,9 +1688,13 @@ class LibraryPage(QWidget):
             same = False
         if not same:
             self._say(
-                "Ce fichier n'est pas l'enregistrement analysé : son contenu diffère. Il n'est pas "
-                "associé, pour que la grille ne tombe pas sur un autre morceau.\n\nPour l'utiliser "
-                "quand même, ouvrez le morceau puis « Localiser le fichier… »."
+                translate(
+                    "Library",
+                    "Ce fichier n'est pas l'enregistrement analysé : son contenu diffère. Il "
+                    "n'est pas associé, pour que la grille ne tombe pas sur un autre "
+                    "morceau.\n\nPour l'utiliser quand même, ouvrez le morceau puis « "
+                    "Localiser le fichier… ».",
+                )
             )
             return
         self._edit_project(song, lambda p: p.audio.__setitem__("path", str(Path(path))))
@@ -1457,10 +1707,21 @@ class LibraryPage(QWidget):
             songs = [s for s in self.catalog.songs()
                      if s["audio_state"] in lost and s["project_state"] == "ok"]  # fmt: skip
         if not songs:
-            self._say("Aucun fichier audio n'est introuvable : tous les morceaux se jouent.")
+            self._say(
+                translate(
+                    "Library",
+                    "Aucun fichier audio n'est introuvable : tous les morceaux se jouent.",
+                )
+            )
             return
         folder = QFileDialog.getExistingDirectory(
-            self, f"Dans quel dossier chercher ({len(songs)} fichier(s) manquant(s)) ?"
+            self,
+            translate(
+                "Library",
+                "Dans quel dossier chercher (%n fichier(s) manquant(s)) ?",
+                None,
+                len(songs),
+            ),
         )
         if not folder:
             return
@@ -1476,11 +1737,13 @@ class LibraryPage(QWidget):
 
         def work(progress, stop):
             def seen(n, root):
-                progress(f"{n} fichiers examinés… {root}")
+                progress(
+                    translate("Library", "{n} fichiers examinés… {root}").format(n=n, root=root)
+                )
 
             return library.find_moved(Path(folder), wanted, stop=stop, progress=seen)
 
-        found = run_task(self, "Rechercher les fichiers audio", work)
+        found = run_task(self, translate("Library", "Rechercher les fichiers audio"), work)
         by_id = {s["id"]: s for s in songs}
         for sid, path in found.items():
             self._edit_project(
@@ -1489,11 +1752,23 @@ class LibraryPage(QWidget):
         self.refresh()
         if found:
             self._say(
-                f"{len(found)} fichier(s) retrouvé(s) sur {len(wanted)} dans {folder}.", info=True
+                translate(
+                    "Library",
+                    "%n fichier(s) retrouvé(s) sur {total} dans {folder}.",
+                    None,
+                    len(found),
+                ).format(total=len(wanted), folder=folder),
+                info=True,
             )
         else:
-            self._say(f"Aucun des fichiers manquants n'est dans {folder} ni ses sous-dossiers. "
-                      "Seul ce dossier a été examiné.", info=True)  # fmt: skip
+            self._say(
+                translate(
+                    "Library",
+                    "Aucun des fichiers manquants n'est dans {folder} ni ses sous-dossiers. "
+                    "Seul ce dossier a été examiné.",
+                ).format(folder=folder),
+                info=True,
+            )
 
     def _reveal(self, path: Path) -> None:
         try:
@@ -1502,28 +1777,41 @@ class LibraryPage(QWidget):
             elif path.is_dir():
                 subprocess.Popen(["explorer", str(path)])  # noqa: S603, S607
         except OSError as exc:
-            self._say(f"L'Explorateur ne s'ouvre pas : {exc}")
+            self._say(translate("Library", "L'Explorateur ne s'ouvre pas : {exc}").format(exc=exc))
 
     # Deleting ----------------------------------------------------------------------------------
     def _ask_delete(self, songs: list[dict], managed: list[dict]) -> bool | None:
         """None to cancel, else whether LocalChords' own copies of the audio go too."""
-        what = f"de « {songs[0]['title']} »" if len(songs) == 1 else f"de {len(songs)} morceaux"
+        what = (
+            translate("Library", "de « {title} »").format(title=songs[0]["title"])
+            if len(songs) == 1
+            else translate("Library", "de {count} morceaux").format(count=len(songs))
+        )
         box = QMessageBox(self)
-        box.setWindowTitle("Supprimer l'analyse")
+        box.setWindowTitle(translate("Library", "Supprimer l'analyse"))
         box.setIcon(QMessageBox.Icon.Warning)
         box.setText(
-            f"Supprimer l'analyse {what} ?\n\nAccords, corrections, positions et paroles partent à "
-            "la Corbeille, et le morceau quitte la bibliothèque, ses collections et ses favoris. "
-            "Les fichiers audio d'origine ne sont jamais supprimés."
+            translate(
+                "Library",
+                "Supprimer l'analyse {what} ?\n\nAccords, corrections, positions et "
+                "paroles partent à la Corbeille, et le morceau quitte la bibliothèque, "
+                "ses collections et ses favoris. Les fichiers audio d'origine ne sont "
+                "jamais supprimés.",
+            ).format(what=what)
         )
         also = None
         if managed:
             size = sum(s["audio_size"] or 0 for s in managed)
             also = QCheckBox(
-                f"Mettre aussi à la Corbeille l'audio gardé par LocalChords ({megabytes(size)})"
+                translate(
+                    "Library",
+                    "Mettre aussi à la Corbeille l'audio gardé par LocalChords ({megabytes})",
+                ).format(megabytes=megabytes(size))
             )
             box.setCheckBox(also)
-        delete = box.addButton("Supprimer l'analyse", QMessageBox.ButtonRole.DestructiveRole)
+        delete = box.addButton(
+            translate("Library", "Supprimer l'analyse"), QMessageBox.ButtonRole.DestructiveRole
+        )
         box.addButton(QMessageBox.StandardButton.Cancel)
         box.setDefaultButton(QMessageBox.StandardButton.Cancel)
         box.exec()
@@ -1554,8 +1842,12 @@ class LibraryPage(QWidget):
         self.projectsReplaced.emit(gone)
         self.refresh()
         if failed:
-            self._say("Ces analyses n'ont pas pu être mises à la Corbeille, elles restent : "
-                      + ", ".join(failed))  # fmt: skip
+            self._say(
+                translate(
+                    "Library",
+                    "Ces analyses n'ont pas pu être mises à la Corbeille, elles restent : {files}",
+                ).format(files=", ".join(failed))
+            )
 
     # Backups -----------------------------------------------------------------------------------
     def _task_catalog(self):
@@ -1568,17 +1860,27 @@ class LibraryPage(QWidget):
         dialog = BackupDialog(self.catalog, self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        name = f"LocalChords - bibliothèque {time.strftime('%Y-%m-%d')}.zip"
+        name = translate("Library", "LocalChords - bibliothèque {strftime}.zip").format(
+            strftime=time.strftime("%Y-%m-%d")
+        )
         start = self.settings.get("backup_folder") or str(Path.home() / "Documents")
         path, _ = QFileDialog.getSaveFileName(
-            self, "Enregistrer la sauvegarde", str(Path(start) / name), "Sauvegarde (*.zip)"
+            self,
+            translate("Library", "Enregistrer la sauvegarde"),
+            str(Path(start) / name),
+            translate("Library", "Sauvegarde (*.zip)"),
         )
         if not path:
             return
         target = Path(path)
         if library.data_dir() in target.resolve().parents:
-            self._say("Choisissez un autre dossier que celui de LocalChords : une sauvegarde sert "
-                      "justement si ce dossier est perdu.")  # fmt: skip
+            self._say(
+                translate(
+                    "Library",
+                    "Choisissez un autre dossier que celui de LocalChords : une sauvegarde "
+                    "sert justement si ce dossier est perdu.",
+                )
+            )
             return
         self.remember("backup_folder", str(target.parent))
         with_audio, lyrics = dialog.audio.isChecked(), dialog.lyrics.isChecked()
@@ -1587,36 +1889,50 @@ class LibraryPage(QWidget):
             catalog, own = self._task_catalog()
             try:
                 return backup.write(
-                    target, catalog, with_audio=with_audio, catalog_lyrics=lyrics, stop=stop,
-                    progress=lambda i, n, what: progress(f"{i} sur {n} : {what}", i / max(1, n)),
-                )  # fmt: skip
+                    target,
+                    catalog,
+                    with_audio=with_audio,
+                    catalog_lyrics=lyrics,
+                    stop=stop,
+                    progress=lambda i, n, what: progress(
+                        translate("Library", "{i} sur {n} : {what}").format(i=i, n=n, what=what),
+                        i / max(1, n),
+                    ),
+                )
             finally:
                 if own:
                     catalog.close()
 
         try:
-            manifest = run_task(self, "Sauvegarder la bibliothèque", work)
+            manifest = run_task(self, translate("Library", "Sauvegarder la bibliothèque"), work)
         except backup.BackupError as exc:
             self._say(str(exc))
             return
         size = megabytes(target.stat().st_size)
-        text = (
-            f"Sauvegarde enregistrée : {target}\n\n{manifest['projects']} analyses, "
-            f"{manifest['audio']} fichiers audio, {size}. Gardez-la ailleurs que sur ce disque "
-            "(clé USB, autre disque). C'est une copie privée : ne la partagez pas."
-        )
+        text = translate(
+            "Library",
+            "Sauvegarde enregistrée : {target}\n\n{projects} analyses, {audio} "
+            "fichiers audio, {size}. Gardez-la ailleurs que sur ce disque (clé USB, "
+            "autre disque). C'est une copie privée : ne la partagez pas.",
+        ).format(target=target, projects=manifest["projects"], audio=manifest["audio"], size=size)
         if manifest.get("left_out"):
-            text += (
-                f"\n\n{len(manifest['left_out'])} analyse(s) illisible(s) n'y sont pas : leurs "
-                "paroles ne pouvaient pas être vérifiées. Pour les inclure, cochez « Inclure "
-                "les paroles venues du catalogue en ligne »."
+            text += translate(
+                "Library",
+                "\n\n%n analyse(s) illisible(s) n'y sont pas : leurs paroles ne "
+                "pouvaient pas être vérifiées. Pour les inclure, cochez « Inclure les "
+                "paroles venues du catalogue en ligne ».",
+                None,
+                len(manifest["left_out"]),
             )
         self._say(text, info=True)
 
     def restore(self) -> None:
         start = self.settings.get("backup_folder") or str(Path.home() / "Documents")
         path, _ = QFileDialog.getOpenFileName(
-            self, "Restaurer une sauvegarde", start, "Sauvegarde (*.zip)"
+            self,
+            translate("Library", "Restaurer une sauvegarde"),
+            start,
+            translate("Library", "Sauvegarde (*.zip)"),
         )
         if not path:
             return
@@ -1635,9 +1951,14 @@ class LibraryPage(QWidget):
             catalog, own = self._task_catalog()
             try:
                 return backup.restore(
-                    archive, catalog, take_newer=take_newer, settings=settings,
-                    progress=lambda i, n, what: progress(f"{i} sur {n}", i / max(1, n)),
-                )  # fmt: skip
+                    archive,
+                    catalog,
+                    take_newer=take_newer,
+                    settings=settings,
+                    progress=lambda i, n, what: progress(
+                        translate("Library", "{i} sur {n}").format(i=i, n=n), i / max(1, n)
+                    ),
+                )
             finally:
                 if own:
                     catalog.close()
@@ -1647,7 +1968,9 @@ class LibraryPage(QWidget):
         # The song open in the window is not saved over what the restore writes, even meanwhile.
         self.projectsReplaced.emit([folder / f"{s}.lchords" for s in replaced])
         try:
-            report = run_task(self, "Restaurer la bibliothèque", work, cancellable=False)
+            report = run_task(
+                self, translate("Library", "Restaurer la bibliothèque"), work, cancellable=False
+            )
         except (backup.BackupError, C.CatalogError) as exc:
             self._say(str(exc))
             self.start_scan()
@@ -1655,11 +1978,17 @@ class LibraryPage(QWidget):
         if settings:
             self.settingsRestored.emit()
         self.start_scan()
-        text = (f"Restauration terminée : {report['written']} analyses écrites, {report['same']} "
-                f"déjà présentes, {report['audio']} fichiers audio.")  # fmt: skip
+        text = translate(
+            "Library",
+            "Restauration terminée : {written} analyses écrites, {same} déjà "
+            "présentes, {audio} fichiers audio.",
+        ).format(written=report["written"], same=report["same"], audio=report["audio"])
         if report["set_aside"]:
-            text += (f"\n\n{report['set_aside']} morceaux différaient : la version non retenue est "
-                     f"gardée, rien n'est perdu :\n{report['aside_folder']}")  # fmt: skip
+            text += translate(
+                "Library",
+                "\n\n{set_aside} morceaux différaient : la version non retenue est gardée, "
+                "rien n'est perdu :\n{aside_folder}",
+            ).format(set_aside=report["set_aside"], aside_folder=report["aside_folder"])
         self._say(text, info=True)
 
     # Messages ----------------------------------------------------------------------------------
@@ -1685,38 +2014,54 @@ class LibraryPage(QWidget):
 class BackupDialog(QDialog):
     def __init__(self, catalog: C.Catalog, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Sauvegarder la bibliothèque")
+        self.setWindowTitle(translate("Library", "Sauvegarder la bibliothèque"))
         self.setMinimumWidth(520)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(10)
         size = backup.estimate(catalog, with_audio=True)
         lead = QLabel(
-            f"Un seul fichier .zip réunit vos {size['projects']} analyses (accords, corrections, "
-            "positions, paroles), vos favoris, genres, étiquettes, collections et préférences, "
-            "pour les retrouver après une réinstallation ou sur un autre PC.\n\n"
-            "C'est une copie privée, pour vous : ce n'est pas un moyen de partager des morceaux."
+            translate(
+                "Library",
+                "Un seul fichier .zip réunit vos {projects} analyses (accords, "
+                "corrections, positions, paroles), vos favoris, genres, étiquettes, "
+                "collections et préférences, pour les retrouver après une réinstallation "
+                "ou sur un autre PC.\n\nC'est une copie privée, pour vous : ce n'est pas "
+                "un moyen de partager des morceaux.",
+            ).format(projects=size["projects"])
         )
         lead.setWordWrap(True)
         layout.addWidget(lead)
         self.audio = QCheckBox(
-            f"Inclure les fichiers audio ({size['audio']} fichiers, environ "
-            f"{megabytes(size['audio_bytes'])} de plus)"
+            translate(
+                "Library",
+                "Inclure les fichiers audio ({audio} fichiers, environ {megabytes} de plus)",
+            ).format(audio=size["audio"], megabytes=megabytes(size["audio_bytes"]))
         )
         self.audio.setEnabled(size["audio"] > 0)
         layout.addWidget(self.audio)
         if size["without_audio"]:
-            note = QLabel(f"{size['without_audio']} morceaux n'ont pas d'audio disponible : seule "
-                          "leur analyse est sauvegardée.")  # fmt: skip
+            note = QLabel(
+                translate(
+                    "Library",
+                    "{without_audio} morceaux n'ont pas d'audio disponible : seule leur "
+                    "analyse est sauvegardée.",
+                ).format(without_audio=size["without_audio"])
+            )
             note.setObjectName("caption")
             note.setWordWrap(True)
             layout.addWidget(note)
-        self.lyrics = QCheckBox("Inclure les paroles venues du catalogue en ligne (LRCLIB)")
+        self.lyrics = QCheckBox(
+            translate("Library", "Inclure les paroles venues du catalogue en ligne (LRCLIB)")
+        )
         self.lyrics.setChecked(True)
         lyrics_note = QLabel(
-            "Elles restent réservées à votre usage : une fois restaurées, LocalChords ne les "
-            "exporte toujours pas. Décochez si la sauvegarde doit quitter votre ordinateur pour "
-            "quelqu'un d'autre."
+            translate(
+                "Library",
+                "Elles restent réservées à votre usage : une fois restaurées, "
+                "LocalChords ne les exporte toujours pas. Décochez si la sauvegarde doit "
+                "quitter votre ordinateur pour quelqu'un d'autre.",
+            )
         )
         lyrics_note.setObjectName("caption")
         lyrics_note.setWordWrap(True)
@@ -1731,12 +2076,17 @@ class BackupDialog(QDialog):
 
         def update_total():
             n = size["project_bytes"] + (size["audio_bytes"] if self.audio.isChecked() else 0)
-            self.total.setText(f"Taille estimée : {megabytes(n)}")
+            self.total.setText(
+                translate("Library", "Taille estimée : {megabytes}").format(megabytes=megabytes(n))
+            )
 
         self.audio.toggled.connect(update_total)
         update_total()
         buttons = QDialogButtonBox()
-        buttons.addButton("Choisir où l'enregistrer…", QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons.addButton(
+            translate("Library", "Choisir où l'enregistrer…"),
+            QDialogButtonBox.ButtonRole.AcceptRole,
+        )
         buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -1746,42 +2096,75 @@ class BackupDialog(QDialog):
 class RestoreDialog(QDialog):
     def __init__(self, plan: dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Restaurer une sauvegarde")
+        self.setWindowTitle(translate("Library", "Restaurer une sauvegarde"))
         self.setMinimumWidth(520)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(10)
         m = plan["manifest"]
-        made = day(m.get("created_at")) if m.get("created_at") else "date inconnue"
+        made = (
+            day(m.get("created_at"))
+            if m.get("created_at")
+            else translate("Library", "date inconnue")
+        )
         lines = [
-            f"Sauvegarde du {made} ({m.get('program', 'LocalChords')}).",
+            translate("Library", "Sauvegarde du {made} ({program}).").format(
+                made=made, program=m.get("program", "LocalChords")
+            ),
             "",
-            f"• {len(plan['new'])} analyses nouvelles sur ce PC seront ajoutées ;",
-            f"• {len(plan['same'])} sont déjà là, identiques : rien ne change ;",
-            f"• {len(plan['differ'])} existent ici avec un autre contenu.",
+            translate(
+                "Library",
+                "• %n analyses nouvelles sur ce PC seront ajoutées ;",
+                None,
+                len(plan["new"]),
+            ),
+            translate(
+                "Library",
+                "• %n sont déjà là, identiques : rien ne change ;",
+                None,
+                len(plan["same"]),
+            ),
+            translate(
+                "Library", "• %n existent ici avec un autre contenu.", None, len(plan["differ"])
+            ),
             "",
-            "Favoris, étiquettes et collections s'ajoutent à ceux d'ici, sans doublon. "
-            "Rien de ce PC n'est écrasé sans être gardé.",
+            translate(
+                "Library",
+                "Favoris, étiquettes et collections s'ajoutent à ceux d'ici, sans "
+                "doublon. Rien de ce PC n'est écrasé sans être gardé.",
+            ),
         ]
         text = QLabel("\n".join(lines))
         text.setWordWrap(True)
         layout.addWidget(text)
         self.newer = QCheckBox(
-            f"Pour ceux qui diffèrent, prendre la version la plus récente ({len(plan['newer'])} "
-            "dans la sauvegarde)"
+            translate(
+                "Library",
+                "Pour ceux qui diffèrent, prendre la version la plus récente (%n dans "
+                "la sauvegarde)",
+                None,
+                len(plan["newer"]),
+            )
         )
         self.newer.setVisible(bool(plan["differ"]))
         layout.addWidget(self.newer)
-        note = QLabel("Sinon la version de ce PC reste. Dans les deux cas, l'autre version est "
-                      "gardée dans le dossier « restored » de LocalChords.")  # fmt: skip
+        note = QLabel(
+            translate(
+                "Library",
+                "Sinon la version de ce PC reste. Dans les deux cas, l'autre version est "
+                "gardée dans le dossier « restored » de LocalChords.",
+            )
+        )
         note.setObjectName("caption")
         note.setWordWrap(True)
         note.setVisible(bool(plan["differ"]))
         layout.addWidget(note)
-        self.settings = QCheckBox("Reprendre aussi les préférences de la sauvegarde")
+        self.settings = QCheckBox(
+            translate("Library", "Reprendre aussi les préférences de la sauvegarde")
+        )
         layout.addWidget(self.settings)
         buttons = QDialogButtonBox()
-        buttons.addButton("Restaurer", QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons.addButton(translate("Library", "Restaurer"), QDialogButtonBox.ButtonRole.AcceptRole)
         buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)

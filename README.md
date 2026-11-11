@@ -5,13 +5,15 @@
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)](#installer)
 [![Construction](https://github.com/tadikwa/LocalChords/actions/workflows/release.yml/badge.svg)](https://github.com/tadikwa/LocalChords/actions/workflows/release.yml)
 
+[English](README.en.md) · **Français**
+
 Une grille d'accords lisible et synchronisée avec la lecture, sur votre PC Windows, avec les diagrammes de
 guitare et de piano de l'accord joué. Vous déposez un morceau, les accords apparaissent par mesures et
 défilent pendant l'écoute. Tout se passe sur votre ordinateur : l'audio n'est envoyé nulle part, aucun compte,
 aucun abonnement.
 
 **[⬇ Télécharger la dernière version](https://github.com/tadikwa/LocalChords/releases/latest)** (Windows 10
-ou 11, 64 bits, gratuit, hors ligne)
+ou 11, 64 bits, gratuit, hors ligne). L'interface est en **français et en anglais** (1.7).
 
 ## Découvrez LocalChords en une minute
 
@@ -68,6 +70,24 @@ libres réellement séparés par le programme : « Monkeys At Typewriters » (Sj
 - **Mixage des instruments** (1.6) : séparez un morceau en pistes (voix, batterie, basse, autres) sur votre
   PC, puis baissez ou coupez-en une pendant la lecture : chanter sans la voix, jouer la basse à la place
   de la basse, travailler avec moins de batterie. Grille, paroles et diagrammes restent synchronisés.
+- **Interface en français et en anglais** (1.7) : voir [Langue](#langue--language).
+
+## Langue / Language
+
+**Menu ☰ → Langue / Language** : *Automatique*, *Français* ou *English*. Automatique suit la langue
+d'affichage de Windows : français sur un Windows français, anglais sinon. Le changement s'applique au
+prochain démarrage, et le choix est gardé.
+
+- Si vous utilisiez LocalChords avant la 1.7, il reste en français tant que vous ne choisissez pas autre chose.
+- Seule l'interface change de langue. **Vos données jamais** : titres, artistes, paroles, étiquettes, noms
+  de collections et noms d'accords restent tels quels. La notation **Do, Ré, Mi** est un réglage à part
+  (menu ☰), indépendant de la langue.
+- Les exports (PDF, texte) suivent la langue de l'interface, sans toucher aux accords ni aux paroles.
+- L'installateur demande sa langue (français ou anglais), et la mise à jour depuis le programme le lance
+  dans la vôtre.
+- Les genres et étiquettes proposés par LocalChords s'affichent traduits, et la recherche les trouve dans
+  les deux langues ; les vôtres restent comme vous les avez écrits.
+- Pour les traducteurs : [docs/LOCALISATION.md](docs/LOCALISATION.md).
 
 ## Ma bibliothèque (1.4)
 
@@ -300,9 +320,9 @@ prenez **l'un des trois** fichiers :
 
 | Fichier | Pour qui | Comment |
 |---|---|---|
-| `LocalChords-Setup-v1.6.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
-| `LocalChords-v1.6-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
-| `LocalChords-v1.6-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
+| `LocalChords-Setup-v1.7.exe` (environ 225 Mo) | **recommandé** | Double-cliquez et suivez l'assistant. Pour votre compte, sans droits d'administrateur ; menu Démarrer, désinstallation depuis Paramètres → Applications ([détail](docs/INSTALLATEUR.md)). |
+| `LocalChords-v1.7-portable.exe` (environ 300 Mo) | sans installation | Téléchargez-le, double-cliquez. Un seul fichier, à garder où vous voulez. |
+| `LocalChords-v1.7-windows-x64.zip` (environ 300 Mo) | sans installation, démarrage rapide | Clic droit sur le zip → « Extraire tout », puis ouvrez le dossier `LocalChords` et lancez `LocalChords.exe`. |
 
 Même programme, mêmes résultats. **Vos données ne bougent pas** : quel que soit le fichier choisi, vos
 morceaux, votre bibliothèque et vos sauvegardes restent dans `%LOCALAPPDATA%\LocalChords`. Installer,
@@ -317,7 +337,7 @@ ou chercher une mise à jour si vous l'avez permis).
 **Au premier lancement**, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : le
 programme n'est pas signé. Cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 Pour vérifier le fichier, son empreinte SHA-256 figure dans `SHA256SUMS.txt` sur la page de la version
-(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.6.exe`).
+(PowerShell : `Get-FileHash .\LocalChords-Setup-v1.7.exe`).
 
 ### Mises à jour (1.5.1)
 
@@ -377,6 +397,7 @@ l'exécutable unique ou du dossier : voir [docs/PORTABLE.md](docs/PORTABLE.md). 
 | Deuxième avis | Menu ☰ → Comparer avec : un autre moteur, les passages en désaccord, et vous choisissez. |
 | Importer un lien | Accueil → « Importer un lien ». |
 | Notes en Do, Ré, Mi | Menu ☰. |
+| Langue de l'interface | Menu ☰ → Langue / Language. |
 
 **Raccourcis :** F1 les affiche tous. Espace lecture, ← → temps, Ctrl + ← → mesure, Entrée corriger,
 Ctrl + Z annuler, `D` diagrammes, `Maj + D` épingler l'accord, `Échap` suivre la lecture, `K` paroles,
@@ -430,6 +451,6 @@ de morceau) : on les supprime depuis le mixage. En mode portable, tout cela est 
 ### Pour les développeurs
 
 Construire : `scripts\build.ps1`. Tester : `.venv\Scripts\python -m pytest`. Documentation technique :
-[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), mises à jour : [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md), séparation et mixage : [docs/SEPARATION.md](docs/SEPARATION.md), notes de version : [docs/NOTES-v1.6.1.md](docs/NOTES-v1.6.1.md), [docs/NOTES-v1.6.md](docs/NOTES-v1.6.md), [docs/NOTES-v1.5.1.md](docs/NOTES-v1.5.1.md), [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
+[docs/TECHNIQUE.md](docs/TECHNIQUE.md), design : [docs/DESIGN.md](docs/DESIGN.md), installateur : [docs/INSTALLATEUR.md](docs/INSTALLATEUR.md), localisation : [docs/LOCALISATION.md](docs/LOCALISATION.md), mises à jour : [docs/MISES-A-JOUR.md](docs/MISES-A-JOUR.md), séparation et mixage : [docs/SEPARATION.md](docs/SEPARATION.md), notes de version : [docs/NOTES-v1.7.md](docs/NOTES-v1.7.md), [docs/NOTES-v1.6.1.md](docs/NOTES-v1.6.1.md), [docs/NOTES-v1.6.md](docs/NOTES-v1.6.md), [docs/NOTES-v1.5.1.md](docs/NOTES-v1.5.1.md), [docs/NOTES-v1.5.md](docs/NOTES-v1.5.md), [docs/NOTES-v1.4.md](docs/NOTES-v1.4.md), [docs/NOTES-v1.3.1.md](docs/NOTES-v1.3.1.md), [docs/NOTES-v1.3.md](docs/NOTES-v1.3.md), [docs/NOTES-v1.2.1.md](docs/NOTES-v1.2.1.md) et [docs/NOTES-v1.2.md](docs/NOTES-v1.2.md).
 Licences : LocalChords est sous licence MIT ([LICENSE](LICENSE)) ; composants tiers dans
 [LICENCES-TIERS.md](LICENCES-TIERS.md).

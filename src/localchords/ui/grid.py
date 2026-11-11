@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor, QFontMetricsF, QPainter, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from ..export import chord_text
+from ..i18n import translate
 from ..project import Project
 from . import theme
 
@@ -52,7 +53,7 @@ class ChordGrid(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(False)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        self.setAccessibleName("Grille d'accords")
+        self.setAccessibleName(translate("Grid", "Grille d'accords"))
 
     # Content -----------------------------------------------------------------------------------
     def set_project(self, project: Project | None) -> None:

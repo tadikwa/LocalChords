@@ -9,12 +9,10 @@ from urllib.parse import urlsplit
 
 import numpy as np
 from PySide6.QtCore import (
-    QLibraryInfo,
     QObject,
     QPropertyAnimation,
     Qt,
     QTimer,
-    QTranslator,
     Signal,
 )
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence, QPixmap, QShortcut
@@ -40,10 +38,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, audio, engines, export, identify, library, voicings, worker
+from .. import __version__, audio, engines, export, i18n, identify, library, voicings, worker
 from .. import catalog as C
 from .. import lyrics as L
 from ..chords import key_name, parse, spell_tonic, symbol
+from ..i18n import translate
 from ..player import Player, device_sample_rate
 from ..project import EXTENSION, Project, ProjectError, decode_waveform
 from . import theme
@@ -57,7 +56,7 @@ from .pdf import write_chord_sheet, write_pdf
 from .songchords import UPCOMING, Item, SongChords, chord_key
 from .update_banner import UpdateController
 from .waveform import Waveform
-from .widgets import ElidedLabel, Stepper, fmt_time
+from .widgets import ElidedLabel, Stepper, fmt_time, language_menu
 
 AUDIO_FILTER = "Audio (" + " ".join(f"*{e}" for e in audio.AUDIO_EXTENSIONS) + ")"
 SIDE_PANEL_WIDTH = 1280
@@ -83,7 +82,11 @@ class AudioLoader(QObject):
             except audio.AudioError as exc:
                 self.finished.emit(token, None, str(exc))
             except MemoryError:
-                self.finished.emit(token, None, "Mémoire insuffisante pour charger ce morceau.")
+                self.finished.emit(
+                    token,
+                    None,
+                    translate("MainWindow", "Mémoire insuffisante pour charger ce morceau."),
+                )
 
         threading.Thread(target=run, daemon=True).start()
         return token
@@ -116,8 +119,8 @@ class SongPage(QWidget):
         row.setSpacing(8)
         self.home = QToolButton()
         self.home.setIcon(theme.icon("home"))
-        self.home.setToolTip("Retour à l'accueil")
-        self.home.setAccessibleName("Accueil")
+        self.home.setToolTip(translate("MainWindow", "Retour à l'accueil"))
+        self.home.setAccessibleName(translate("MainWindow", "Accueil"))
         row.addWidget(self.home)
         titles = QVBoxLayout()
         titles.setSpacing(0)
@@ -133,57 +136,63 @@ class SongPage(QWidget):
         # Now and next: what to play without reading the grid.
         self.now = QLabel("—")
         self.now.setObjectName("chordNow")
-        self.now.setAccessibleName("Accord en cours")
+        self.now.setAccessibleName(translate("MainWindow", "Accord en cours"))
         self.now.setMinimumWidth(96)
         self.now.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.next = QLabel("")
         self.next.setObjectName("chordNext")
-        self.next.setAccessibleName("Accord suivant")
+        self.next.setAccessibleName(translate("MainWindow", "Accord suivant"))
         self.next.setMinimumWidth(80)
         row.addWidget(self.now)
         row.addWidget(self.next)
         row.addStretch(2)
         self.key_button = QToolButton()
         self.key_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.key_button.setAccessibleName("Tonalité")
+        self.key_button.setAccessibleName(translate("MainWindow", "Tonalité"))
         self.rhythm_button = QToolButton()
-        self.rhythm_button.setAccessibleName("Tempo et mesure")
-        self.rhythm_button.setToolTip("Corriger le tempo, la mesure ou le décalage de la grille")
+        self.rhythm_button.setAccessibleName(translate("MainWindow", "Tempo et mesure"))
+        self.rhythm_button.setToolTip(
+            translate("MainWindow", "Corriger le tempo, la mesure ou le décalage de la grille")
+        )
         self.undo = QToolButton()
         self.undo.setIcon(theme.icon("undo"))
-        self.undo.setToolTip("Annuler la dernière correction (Ctrl + Z)")
-        self.undo.setAccessibleName("Annuler")
+        self.undo.setToolTip(translate("MainWindow", "Annuler la dernière correction (Ctrl + Z)"))
+        self.undo.setAccessibleName(translate("MainWindow", "Annuler"))
         self.redo = QToolButton()
         self.redo.setIcon(theme.icon("redo"))
-        self.redo.setToolTip("Rétablir (Ctrl + Y)")
-        self.redo.setAccessibleName("Rétablir")
+        self.redo.setToolTip(translate("MainWindow", "Rétablir (Ctrl + Y)"))
+        self.redo.setAccessibleName(translate("MainWindow", "Rétablir"))
         self.export = QToolButton()
-        self.export.setText("Exporter")
+        self.export.setText(translate("MainWindow", "Exporter"))
         self.export.setIcon(theme.icon("export"))
         self.export.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.export.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.export.setToolTip("Exporter (Ctrl + E)")
+        self.export.setToolTip(translate("MainWindow", "Exporter (Ctrl + E)"))
         self.diagrams_button = QToolButton()
         self.diagrams_button.setIcon(theme.icon("diagram"))
         self.diagrams_button.setCheckable(True)
-        self.diagrams_button.setToolTip("Diagrammes de guitare et de piano (D)")
-        self.diagrams_button.setAccessibleName("Diagrammes d'accords")
+        self.diagrams_button.setToolTip(
+            translate("MainWindow", "Diagrammes de guitare et de piano (D)")
+        )
+        self.diagrams_button.setAccessibleName(translate("MainWindow", "Diagrammes d'accords"))
         self.chords_button = QToolButton()
         self.chords_button.setIcon(theme.icon("cards"))
         self.chords_button.setCheckable(True)
-        self.chords_button.setToolTip("Accords du morceau : tous, ou ceux à venir (T)")
-        self.chords_button.setAccessibleName("Accords du morceau")
+        self.chords_button.setToolTip(
+            translate("MainWindow", "Accords du morceau : tous, ou ceux à venir (T)")
+        )
+        self.chords_button.setAccessibleName(translate("MainWindow", "Accords du morceau"))
         self.star = QToolButton()
         self.star.setCheckable(True)
         self.star.setObjectName("star")
         self.star.setIcon(theme.icon("star_line", theme.TEXT_2))
-        self.star.setToolTip("Ajouter aux favoris")
-        self.star.setAccessibleName("Favori")
+        self.star.setToolTip(translate("MainWindow", "Ajouter aux favoris"))
+        self.star.setAccessibleName(translate("MainWindow", "Favori"))
         self.menu = QToolButton()
         self.menu.setIcon(theme.icon("menu"))
         self.menu.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.menu.setToolTip("Plus d'options")
-        self.menu.setAccessibleName("Plus d'options")
+        self.menu.setToolTip(translate("MainWindow", "Plus d'options"))
+        self.menu.setAccessibleName(translate("MainWindow", "Plus d'options"))
         # Undo and redo step aside on a narrow window (Ctrl + Z and Ctrl + Y stay).
         self.history = QWidget()
         history = QHBoxLayout(self.history)
@@ -218,7 +227,7 @@ class SongPage(QWidget):
         self.banner_action.setObjectName("primary")
         self.banner_close = QToolButton()
         self.banner_close.setIcon(theme.icon("close", size=14))
-        self.banner_close.setAccessibleName("Fermer le message")
+        self.banner_close.setAccessibleName(translate("MainWindow", "Fermer le message"))
         banner_row.addWidget(self.banner_text, 1)
         banner_row.addWidget(self.banner_action)
         banner_row.addWidget(self.banner_close)
@@ -238,7 +247,7 @@ class SongPage(QWidget):
         self.middle = QStackedWidget()
         self.grid = ChordGrid()
         self.scroll = GridScroll()
-        self.scroll.setAccessibleName("Grille d'accords")
+        self.scroll.setAccessibleName(translate("MainWindow", "Grille d'accords"))
         self.scroll.setWidget(self.grid)
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -288,14 +297,14 @@ class SongPage(QWidget):
         controls.setSpacing(8)
         self.back = QToolButton()
         self.back.setIcon(theme.icon("prev"))
-        self.back.setToolTip("Revenir au début (Début)")
-        self.back.setAccessibleName("Revenir au début")
+        self.back.setToolTip(translate("MainWindow", "Revenir au début (Début)"))
+        self.back.setAccessibleName(translate("MainWindow", "Revenir au début"))
         self.play = QToolButton()
         self.play.setObjectName("play")
         self.play.setIcon(theme.icon("play", theme.ON_ACCENT, 22))
         self.play.setIconSize(self.play.iconSize() * 1.3)
-        self.play.setToolTip("Lecture / pause (Espace)")
-        self.play.setAccessibleName("Lecture")
+        self.play.setToolTip(translate("MainWindow", "Lecture / pause (Espace)"))
+        self.play.setAccessibleName(translate("MainWindow", "Lecture"))
         self.time = QLabel("0:00 / 0:00")
         self.time.setObjectName("time")
         self.place = QLabel(" ")
@@ -313,87 +322,104 @@ class SongPage(QWidget):
         controls.addWidget(clock_box)
         controls.addStretch(1)
 
-        self.loop_button = QPushButton(" Boucle")
+        self.loop_button = QPushButton(translate("MainWindow", " Boucle"))
         self.loop_button.setIcon(theme.icon("loop", size=16))
         self.loop_button.setCheckable(True)
-        self.loop_button.setAccessibleName("Boucle")
-        self.loop_button.setToolTip("Boucler la sélection, ou arrêter la boucle (L)")
+        self.loop_button.setAccessibleName(translate("MainWindow", "Boucle"))
+        self.loop_button.setToolTip(
+            translate("MainWindow", "Boucler la sélection, ou arrêter la boucle (L)")
+        )
         self.loop_a = QPushButton("A")
-        self.loop_a.setToolTip("Début de boucle à la position actuelle (A)")
-        self.loop_a.setAccessibleName("Début de boucle")
+        self.loop_a.setToolTip(
+            translate("MainWindow", "Début de boucle à la position actuelle (A)")
+        )
+        self.loop_a.setAccessibleName(translate("MainWindow", "Début de boucle"))
         self.loop_b = QPushButton("B")
-        self.loop_b.setToolTip("Fin de boucle à la position actuelle (B)")
-        self.loop_b.setAccessibleName("Fin de boucle")
+        self.loop_b.setToolTip(translate("MainWindow", "Fin de boucle à la position actuelle (B)"))
+        self.loop_b.setAccessibleName(translate("MainWindow", "Fin de boucle"))
         for w in (self.loop_a, self.loop_b, self.loop_button):
             controls.addWidget(w)
 
         self.speed = Stepper(
-            "Vitesse",
+            translate("MainWindow", "Vitesse"),
             0,
             len(SPEEDS) - 1,
             SPEEDS.index(1.0),
-            lambda i: f"{round(SPEEDS[i] * 100)} %",
-            "Ralentir sans changer la hauteur (- / +)",
+            lambda i: translate("MainWindow", "{percent} %").format(percent=round(SPEEDS[i] * 100)),
+            translate("MainWindow", "Ralentir sans changer la hauteur (- / +)"),
         )
         controls.addWidget(self.speed)
         self.transpose = Stepper(
-            "Transposer",
+            translate("MainWindow", "Transposer"),
             -12,
             12,
             0,
             lambda v: f"{v:+d}" if v else "0",
-            "Transposer la grille, en demi-tons (Ctrl + ↑ / ↓).",
+            translate("MainWindow", "Transposer la grille, en demi-tons (Ctrl + ↑ / ↓)."),
         )
         controls.addWidget(self.transpose)
         # Right next to the transposition, so whether the sound follows is never a guess.
         self.audio_button = QPushButton()
         self.audio_button.setIcon(theme.icon("volume", size=16))
         self.audio_button.setCheckable(True)
-        self.audio_button.setAccessibleName("Transposer également l'audio")
+        self.audio_button.setAccessibleName(translate("MainWindow", "Transposer également l'audio"))
         self.audio_button.toggled.connect(self._show_audio_state)
         # Its label must not set the window's minimum width: it gives way first (adapt_to_width).
         self.audio_button.setMinimumWidth(36)
         self._show_audio_state(False)
         controls.addWidget(self.audio_button)
         self.capo = Stepper(
-            "Capo", 0, 11, 0, str, "Case du capodastre : la grille montre les formes à jouer."
+            translate("MainWindow", "Capo"),
+            0,
+            11,
+            0,
+            str,
+            translate("MainWindow", "Case du capodastre : la grille montre les formes à jouer."),
         )
         controls.addWidget(self.capo)
         self.mixer_button = QPushButton()
         self.mixer_button.setIcon(theme.icon("mixer", size=16))
         self.mixer_button.setCheckable(True)
-        self.mixer_button.setAccessibleName("Mixage")
-        self.mixer_button.setToolTip("Mixage : séparer les instruments et régler leur volume (M)")
+        self.mixer_button.setAccessibleName(translate("MainWindow", "Mixage"))
+        self.mixer_button.setToolTip(
+            translate("MainWindow", "Mixage : séparer les instruments et régler leur volume (M)")
+        )
         self.mixer_button.setMinimumWidth(36)
         controls.addWidget(self.mixer_button)
 
         # How the chords are written: asked for rarely, kept one click away.
         self.display = QToolButton()
-        self.display.setText("Affichage")
+        self.display.setText(translate("MainWindow", "Affichage"))
         self.display.setIcon(theme.icon("sliders", size=16))
-        self.display.setAccessibleName("Affichage des accords")
+        self.display.setAccessibleName(translate("MainWindow", "Affichage des accords"))
         self.display.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.display.setToolTip("Niveau de détail, altérations et accords courts")
+        self.display.setToolTip(
+            translate("MainWindow", "Niveau de détail, altérations et accords courts")
+        )
         self.display.setMenu(QMenu(self.display))
         self.detail_actions = self._choices(
-            "Accords",
+            translate("MainWindow", "Accords"),
             (
-                ("Complets", "full"),
-                ("Simplifiés (accords de base)", "simple"),
-                ("Complets, avec analyse des degrés", "analysis"),
+                (translate("MainWindow", "Complets"), "full"),
+                (translate("MainWindow", "Simplifiés (accords de base)"), "simple"),
+                (translate("MainWindow", "Complets, avec analyse des degrés"), "analysis"),
             ),
         )
         self.accidental_actions = self._choices(
-            "Altérations",
-            (("Selon la tonalité", "auto"), ("Dièses (♯)", "sharps"), ("Bémols (♭)", "flats")),
+            translate("MainWindow", "Altérations"),
+            (
+                (translate("MainWindow", "Selon la tonalité"), "auto"),
+                (translate("MainWindow", "Dièses (♯)"), "sharps"),
+                (translate("MainWindow", "Bémols (♭)"), "flats"),
+            ),
         )
         self.smooth_actions = self._choices(
-            "Accords très courts",
+            translate("MainWindow", "Accords très courts"),
             (
-                ("Tous les afficher", 1),
-                ("Ignorer sous 2 temps", 2),
-                ("Ignorer sous 3 temps", 3),
-                ("Ignorer sous 4 temps", 4),
+                (translate("MainWindow", "Tous les afficher"), 1),
+                (translate("MainWindow", "Ignorer sous 2 temps"), 2),
+                (translate("MainWindow", "Ignorer sous 3 temps"), 3),
+                (translate("MainWindow", "Ignorer sous 4 temps"), 4),
             ),
         )
         controls.addWidget(self.display)
@@ -403,8 +429,8 @@ class SongPage(QWidget):
         self.volume = QSlider(Qt.Orientation.Horizontal)
         self.volume.setRange(0, 100)
         self.volume.setFixedWidth(64)
-        self.volume.setAccessibleName("Volume")
-        self.volume.setToolTip("Volume")
+        self.volume.setAccessibleName(translate("MainWindow", "Volume"))
+        self.volume.setToolTip(translate("MainWindow", "Volume"))
         controls.addWidget(self.volume_icon)
         controls.addWidget(self.volume)
         layout.addWidget(bottom)
@@ -412,13 +438,23 @@ class SongPage(QWidget):
         self.adapt_to_width(1360)
 
     def _show_audio_state(self, on: bool) -> None:
-        self._audio_text = " Son transposé" if on else " Son d'origine"
+        self._audio_text = (
+            translate("MainWindow", " Son transposé")
+            if on
+            else translate("MainWindow", " Son d'origine")
+        )
         self.audio_button.setText(self._audio_text if self._audio_wide else "")
         self.audio_button.setToolTip(
-            "Transposer également l'audio : activé. Cliquer pour n'entendre que l'original."
+            translate(
+                "MainWindow",
+                "Transposer également l'audio : activé. Cliquer pour n'entendre que l'original.",
+            )
             if on
-            else "Transposer également l'audio : désactivé, seule la grille change. "
-            "Cliquer pour que le son suive la transposition, à la même vitesse."
+            else translate(
+                "MainWindow",
+                "Transposer également l'audio : désactivé, seule la grille change. "
+                "Cliquer pour que le son suive la transposition, à la même vitesse.",
+            )
         )
 
     _audio_wide = True
@@ -444,7 +480,7 @@ class SongPage(QWidget):
         theme.restyle(self.display)  # the style sheet frames it only with its text
         self._audio_wide = width >= 1240  # narrower, the icon and its highlight say it
         self.audio_button.setText(self._audio_text if self._audio_wide else "")
-        self.mixer_button.setText(" Mixage" if self._audio_wide else "")
+        self.mixer_button.setText(translate("MainWindow", " Mixage") if self._audio_wide else "")
         for widget in (self.volume, self.volume_icon):
             widget.setVisible(width >= 1160)
         for widget in (self.loop_a, self.loop_b):
@@ -545,7 +581,7 @@ class MainWindow(QMainWindow):
         column.addWidget(self.updates.banner)  # above both pages: seen wherever the user is
         column.addWidget(self.stack, 1)
         self.setCentralWidget(central)
-        self.drop_hint = QLabel("Déposez le morceau ici", self.stack)
+        self.drop_hint = QLabel(translate("MainWindow", "Déposez le morceau ici"), self.stack)
         self.drop_hint.setObjectName("drop")
         self.drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop_hint.hide()
@@ -639,54 +675,88 @@ class MainWindow(QMainWindow):
         s.positions.changed.connect(self._positions_changed)
 
         export_menu = QMenu(self)
-        export_menu.addAction("Texte (.txt)…", lambda: self.export_as("txt"))
-        export_menu.addAction("ChordPro (.cho)…", lambda: self.export_as("cho"))
-        export_menu.addAction("PDF (.pdf)…", lambda: self.export_as("pdf"))
+        export_menu.addAction(
+            translate("MainWindow", "Texte (.txt)…"), lambda: self.export_as("txt")
+        )
+        export_menu.addAction(
+            translate("MainWindow", "ChordPro (.cho)…"), lambda: self.export_as("cho")
+        )
+        export_menu.addAction(translate("MainWindow", "PDF (.pdf)…"), lambda: self.export_as("pdf"))
         export_menu.addSeparator()
-        export_menu.addAction("Fiche des accords (PDF)…", self.export_sheet)
+        export_menu.addAction(
+            translate("MainWindow", "Fiche des accords (PDF)…"), self.export_sheet
+        )
         s.export.setMenu(export_menu)
 
         menu = QMenu(self)
-        menu.addAction("Ouvrir un morceau…", self.choose_file, QKeySequence.StandardKey.Open)
-        menu.addAction("Importer un lien…", self.ask_link)
         menu.addAction(
-            "Enregistrer une copie du projet…", self.save_as, QKeySequence.StandardKey.Save
+            translate("MainWindow", "Ouvrir un morceau…"),
+            self.choose_file,
+            QKeySequence.StandardKey.Open,
+        )
+        menu.addAction(translate("MainWindow", "Importer un lien…"), self.ask_link)
+        menu.addAction(
+            translate("MainWindow", "Enregistrer une copie du projet…"),
+            self.save_as,
+            QKeySequence.StandardKey.Save,
         )
         menu.addSeparator()
-        analyze = menu.addMenu("Réanalyser avec")
+        analyze = menu.addMenu(translate("MainWindow", "Réanalyser avec"))
         for engine in engines.ENGINES.values():
-            action = analyze.addAction(engine.label, lambda e=engine.name: self.reanalyze(e))
-            action.setToolTip(engine.description)
+            action = analyze.addAction(
+                translate("Engines", engine.label), lambda e=engine.name: self.reanalyze(e)
+            )
+            action.setToolTip(translate("Engines", engine.description))
         analyze.setToolTipsVisible(True)
-        compare = menu.addMenu("Comparer avec")
+        compare = menu.addMenu(translate("MainWindow", "Comparer avec"))
         for engine in engines.ENGINES.values():
-            compare.addAction(engine.label, lambda e=engine.name: self.compare_with(e))
-        menu.addAction("Progressions répétées…", self.show_progressions)
-        menu.addAction("Pistes séparées et modèle de séparation…", lambda: self.mixer.show_store())
-        self.reset_action = menu.addAction("Effacer toutes les corrections", self.reset_edits)
+            compare.addAction(
+                translate("Engines", engine.label), lambda e=engine.name: self.compare_with(e)
+            )
+        menu.addAction(translate("MainWindow", "Progressions répétées…"), self.show_progressions)
+        menu.addAction(
+            translate("MainWindow", "Pistes séparées et modèle de séparation…"),
+            lambda: self.mixer.show_store(),
+        )
+        self.reset_action = menu.addAction(
+            translate("MainWindow", "Effacer toutes les corrections"), self.reset_edits
+        )
         menu.addSeparator()
-        self.latin_action = QAction("Notes en Do, Ré, Mi", self, checkable=True)
+        self.latin_action = QAction(
+            translate("MainWindow", "Notes en Do, Ré, Mi"), self, checkable=True
+        )
         self.latin_action.setChecked(bool(self.settings.get("latin")))
         self.latin_action.toggled.connect(self._latin_changed)
         menu.addAction(self.latin_action)
-        self.bass_action = QAction("Afficher les basses (C/E)", self, checkable=True)
+        self.bass_action = QAction(
+            translate("MainWindow", "Afficher les basses (C/E)"), self, checkable=True
+        )
         self.bass_action.setChecked(bool(self.settings.get("show_bass", True)))
         self.bass_action.toggled.connect(self._bass_changed)
         menu.addAction(self.bass_action)
         self.auto_lyrics_action = QAction(
-            "Rechercher automatiquement les paroles des morceaux", self, checkable=True
+            translate("MainWindow", "Rechercher automatiquement les paroles des morceaux"),
+            self,
+            checkable=True,
         )
         self.auto_lyrics_action.setChecked(self.settings.get("lyrics_auto") is True)
         self.auto_lyrics_action.setToolTip(
-            "Pour un morceau sans paroles dont le titre et l'artiste sont connus : seuls le titre, "
-            "l'artiste, l'album et la durée sont envoyés à LRCLIB (lrclib.net), jamais l'audio."
+            translate(
+                "MainWindow",
+                "Pour un morceau sans paroles dont le titre et l'artiste sont connus : "
+                "seuls le titre, l'artiste, l'album et la durée sont envoyés à LRCLIB "
+                "(lrclib.net), jamais l'audio.",
+            )
         )
         self.auto_lyrics_action.toggled.connect(lambda on: self.lyrics.allow_auto(on))
         menu.addAction(self.auto_lyrics_action)
         menu.setToolTipsVisible(True)
         menu.addSeparator()
-        menu.addAction("Raccourcis clavier", self.show_shortcuts)
-        menu.addAction("À propos de LocalChords", self.show_about)
+        language_menu(menu, self.settings)
+        menu.addAction(
+            translate("MainWindow", "Raccourcis clavier"), self.show_shortcuts
+        ).setObjectName("shortcuts")  # the updater puts its entries just above
+        menu.addAction(translate("MainWindow", "À propos de LocalChords"), self.show_about)
         s.menu.setMenu(menu)
 
         def shortcut(keys, fn):
@@ -735,9 +805,12 @@ class MainWindow(QMainWindow):
     def choose_file(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Ouvrir un morceau",
+            translate("MainWindow", "Ouvrir un morceau"),
             "",
-            f"{AUDIO_FILTER};;Projets LocalChords (*{EXTENSION});;Tous les fichiers (*)",
+            translate(
+                "MainWindow",
+                "{audio_filter};;Projets LocalChords (*{extension});;Tous les fichiers (*)",
+            ).format(audio_filter=AUDIO_FILTER, extension=EXTENSION),
         )
         self.open_paths([Path(p) for p in paths])
 
@@ -772,9 +845,12 @@ class MainWindow(QMainWindow):
     def ask_link(self) -> None:
         url, ok = QInputDialog.getText(
             self,
-            "Importer un lien",
-            "Adresse de la vidéo ou du morceau.\n"
-            "N'importez que des contenus que vous avez le droit de télécharger.",
+            translate("MainWindow", "Importer un lien"),
+            translate(
+                "MainWindow",
+                "Adresse de la vidéo ou du morceau.\nN'importez que des contenus que vous "
+                "avez le droit de télécharger.",
+            ),
         )
         if ok and url.strip():
             self.import_link(url.strip())
@@ -782,7 +858,11 @@ class MainWindow(QMainWindow):
     def import_link(self, url: str) -> None:
         parts = urlsplit(url)
         if parts.scheme not in ("http", "https") or not parts.hostname:
-            self._alert("Ce n'est pas une adresse web valide (http:// ou https://).")
+            self._alert(
+                translate(
+                    "MainWindow", "Ce n'est pas une adresse web valide (http:// ou https://)."
+                )
+            )
             return
         try:
             known = self.catalog.find_url(url)
@@ -796,8 +876,14 @@ class MainWindow(QMainWindow):
         folder = library.data_dir() / "downloads"
         folder.mkdir(exist_ok=True)
         self.download_job = worker.start_download(url, folder)
-        dialog = QProgressDialog("Connexion au site…", "Annuler", 0, 1000, self)
-        dialog.setWindowTitle("Importer un lien")
+        dialog = QProgressDialog(
+            translate("MainWindow", "Connexion au site…"),
+            translate("MainWindow", "Annuler"),
+            0,
+            1000,
+            self,
+        )
+        dialog.setWindowTitle(translate("MainWindow", "Importer un lien"))
         dialog.setWindowModality(Qt.WindowModality.WindowModal)
         dialog.setMinimumDuration(0)
         dialog.setAutoClose(False)
@@ -864,14 +950,20 @@ class MainWindow(QMainWindow):
             self.batch_current = (project, saved)
             self.batch_job = worker.start(path, engine)
             self.home.batch_text.setText(
-                f"Analyse par lots : {self.batch_done + 1} sur {self.batch_total}, « {path.name} »"
+                translate(
+                    "MainWindow", "Analyse par lots : {number} sur {batch_total}, « {name} »"
+                ).format(number=self.batch_done + 1, batch_total=self.batch_total, name=path.name)
             )
             return
         self.batch_job = None
         self.batch_timer.stop()
-        text = f"Analyse par lots terminée : {self.batch_total} morceaux."
+        text = translate(
+            "MainWindow", "Analyse par lots terminée : %n morceau(x).", None, self.batch_total
+        )
         if self.batch_errors:
-            text += " Problèmes : " + " ; ".join(self.batch_errors)
+            text = translate("MainWindow", "{done} Problèmes : {problems}").format(
+                done=text, problems=" ; ".join(self.batch_errors)
+            )
         self.home.batch_text.setText(text)
         self.home.batch_cancel.hide()
         self.home.refresh()
@@ -970,7 +1062,11 @@ class MainWindow(QMainWindow):
             self._alert(str(exc))
             return
         except OSError as exc:
-            self._alert(f"Impossible d'ouvrir « {path.name} » : {exc.strerror or exc}")
+            self._alert(
+                translate("MainWindow", "Impossible d'ouvrir « {name} » : {reason}").format(
+                    name=path.name, reason=exc.strerror or exc
+                )
+            )
             return
         self._show_project(project, saved)
         if known:
@@ -1036,7 +1132,11 @@ class MainWindow(QMainWindow):
         self._apply_pitch()
         s.scroll.verticalScrollBar().setValue(0)
         self.stack.setCurrentWidget(s)
-        self.setWindowTitle(f"{project.audio.get('title') or ''} : LocalChords")
+        self.setWindowTitle(
+            translate("MainWindow", "{title} : LocalChords").format(
+                title=project.audio.get("title") or ""
+            )
+        )
         self._content_changed(save=False)
         self.mixer.song_opened()
         self._load_audio(library.audio_file(project.audio))
@@ -1045,8 +1145,11 @@ class MainWindow(QMainWindow):
         self._set_transport_enabled(False)
         if not path.is_file():
             self._banner(
-                f"Le fichier audio est introuvable : {path}. La grille reste consultable.",
-                "Localiser le fichier…",
+                translate(
+                    "MainWindow",
+                    "Le fichier audio est introuvable : {path}. La grille reste consultable.",
+                ).format(path=path),
+                translate("MainWindow", "Localiser le fichier…"),
                 self.locate_audio,
             )
             return
@@ -1056,7 +1159,7 @@ class MainWindow(QMainWindow):
         if token is not self.audio_token or self.project is None:
             return
         if error:
-            self._banner(error, "Localiser le fichier…", self.locate_audio)
+            self._banner(error, translate("MainWindow", "Localiser le fichier…"), self.locate_audio)
             return
         self.player.load(y)
         self.audio_ready = True
@@ -1072,7 +1175,9 @@ class MainWindow(QMainWindow):
         self.mixer.audio_loaded()
 
     def locate_audio(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Localiser le fichier audio", "", AUDIO_FILTER)
+        path, _ = QFileDialog.getOpenFileName(
+            self, translate("MainWindow", "Localiser le fichier audio"), "", AUDIO_FILTER
+        )
         if not path or self.project is None:
             return
         chosen = Path(path)
@@ -1084,9 +1189,12 @@ class MainWindow(QMainWindow):
         if known and not same:
             answer = QMessageBox.question(
                 self,
-                "Autre fichier ?",
-                "Ce fichier n'est pas celui qui a été analysé : la grille risque de ne pas lui "
-                "correspondre. L'utiliser quand même ?",
+                translate("MainWindow", "Autre fichier ?"),
+                translate(
+                    "MainWindow",
+                    "Ce fichier n'est pas celui qui a été analysé : la grille risque de ne "
+                    "pas lui correspondre. L'utiliser quand même ?",
+                ),
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
@@ -1119,13 +1227,17 @@ class MainWindow(QMainWindow):
         s.progress_bar.show()
         if not self.project or not self.project.analysis["segments"]:
             s.middle.setCurrentWidget(s.status_page)
-            s.status_text.setText("Analyse en cours…")
-            s.status_detail.setText("Préparation…")
-            s.status_button.setText("Annuler")
+            s.status_text.setText(translate("MainWindow", "Analyse en cours…"))
+            s.status_detail.setText(translate("MainWindow", "Préparation…"))
+            s.status_button.setText(translate("MainWindow", "Annuler"))
             s.status_button.show()
             self._retarget(s.status_button, self.cancel_analysis)
         else:
-            self._banner("Nouvelle analyse en cours…", "Annuler", self.cancel_analysis)
+            self._banner(
+                translate("MainWindow", "Nouvelle analyse en cours…"),
+                translate("MainWindow", "Annuler"),
+                self.cancel_analysis,
+            )
 
     def _retarget(self, button: QPushButton, fn) -> None:
         self._button_actions[button] = fn
@@ -1146,9 +1258,9 @@ class MainWindow(QMainWindow):
         self.song.banner.hide()
         if self.project and not self.project.analysis["segments"]:
             self._show_status(
-                "Analyse annulée",
-                "Le morceau reste écoutable.",
-                "Relancer l'analyse",
+                translate("MainWindow", "Analyse annulée"),
+                translate("MainWindow", "Le morceau reste écoutable."),
+                translate("MainWindow", "Relancer l'analyse"),
                 lambda: self.start_analysis(self.job_path, self.job_engine),
             )
 
@@ -1212,9 +1324,9 @@ class MainWindow(QMainWindow):
             _log(details)
         if self.project and not self.project.analysis["segments"]:
             self._show_status(
-                "Analyse impossible",
+                translate("MainWindow", "Analyse impossible"),
                 text,
-                "Réessayer",
+                translate("MainWindow", "Réessayer"),
                 lambda: self.start_analysis(self.job_path, self.job_engine),
             )
         else:
@@ -1226,7 +1338,9 @@ class MainWindow(QMainWindow):
             return
         path = library.audio_file(self.project.audio)
         if not path.is_file():
-            self._alert("Le fichier audio est introuvable : localisez-le d'abord.")
+            self._alert(
+                translate("MainWindow", "Le fichier audio est introuvable : localisez-le d'abord.")
+            )
             return
         self.start_analysis(path, engine)
         self.compare_engine = engine
@@ -1234,21 +1348,31 @@ class MainWindow(QMainWindow):
     def _keep_compared(self, engine: str, analysis: dict) -> bool:
         """Show how the two grids differ; True to adopt the new one."""
         a = self.project.agreement_with(analysis)
-        label = engines.ENGINES[engine].label
+        label = translate("Engines", engines.ENGINES[engine].label)
         spots = [fmt_time(t) for t in _spaced(a["differences"])][:12]
-        text = (
-            f"Le moteur « {label} » est d'accord avec la grille actuelle sur "
-            f"{a['exact']:.0%} des temps, et sur {a['triads']:.0%} si l'on ne regarde "
-            "que les accords de base."
-        )
+        text = translate(
+            "MainWindow",
+            "Le moteur « {label} » est d'accord avec la grille actuelle sur "
+            "{exact:.0%} des temps, et sur {triads:.0%} si l'on ne regarde que les "
+            "accords de base.",
+        ).format(label=label, exact=a["exact"], triads=a["triads"])
         if spots:
-            text += "\n\nPassages à écouter : " + ", ".join(spots) + "."
-        text += "\n\nVos corrections sont conservées dans les deux cas."
+            text += "\n\n" + translate("MainWindow", "Passages à écouter : {spots}.").format(
+                spots=", ".join(spots)
+            )
+        text += "\n\n" + translate(
+            "MainWindow", "Vos corrections sont conservées dans les deux cas."
+        )
         box = QMessageBox(self)
-        box.setWindowTitle("Comparer deux moteurs")
+        box.setWindowTitle(translate("MainWindow", "Comparer deux moteurs"))
         box.setText(text)
-        keep = box.addButton("Garder la grille actuelle", QMessageBox.ButtonRole.RejectRole)
-        box.addButton(f"Utiliser « {label} »", QMessageBox.ButtonRole.AcceptRole)
+        keep = box.addButton(
+            translate("MainWindow", "Garder la grille actuelle"), QMessageBox.ButtonRole.RejectRole
+        )
+        box.addButton(
+            translate("MainWindow", "Utiliser « {label} »").format(label=label),
+            QMessageBox.ButtonRole.AcceptRole,
+        )
         box.exec()
         return box.clickedButton() is not keep
 
@@ -1262,7 +1386,9 @@ class MainWindow(QMainWindow):
             return
         path = library.audio_file(self.project.audio)
         if not path.is_file():
-            self._alert("Le fichier audio est introuvable : localisez-le d'abord.")
+            self._alert(
+                translate("MainWindow", "Le fichier audio est introuvable : localisez-le d'abord.")
+            )
             return
         self.settings["engine"] = engine
         library.save_settings(self.settings)
@@ -1288,9 +1414,9 @@ class MainWindow(QMainWindow):
                 self.settings.get("engine", engines.DEFAULT_ENGINE),
             )
             self._show_status(
-                "Ce morceau n'est pas encore analysé",
+                translate("MainWindow", "Ce morceau n'est pas encore analysé"),
                 "",
-                "Lancer l'analyse",
+                translate("MainWindow", "Lancer l'analyse"),
                 lambda: self.start_analysis(self.job_path, self.job_engine),
             )
         # Nothing to say about the song's key or tempo before there is an analysis.
@@ -1330,7 +1456,11 @@ class MainWindow(QMainWindow):
 
     def _bar_text(self, beat: int) -> str:
         place = self.project.bar_position(beat)
-        return f"mesure {place[0]}" if place and place[0] else "introduction"
+        return (
+            translate("MainWindow", "mesure {bar}").format(bar=place[0])
+            if place and place[0]
+            else "introduction"
+        )
 
     def _update_song_chords(self) -> None:
         """Every chord once, in the order it first comes: worked out here, not during playback."""
@@ -1371,7 +1501,11 @@ class MainWindow(QMainWindow):
             if shown is None:
                 continue
             first = max(0, segments[i].start_beat)
-            place = "en cours" if i == index else self._bar_text(segments[i].start_beat)
+            place = (
+                translate("MainWindow", "en cours")
+                if i == index
+                else self._bar_text(segments[i].start_beat)
+            )
             items.append(Item(shown, grid[first], place, current=i == index))
             if len(items) == UPCOMING:
                 break
@@ -1423,9 +1557,11 @@ class MainWindow(QMainWindow):
         # What sounds; with a capo, the shapes the hands play are named apart.
         label = key["label"] if key else None
         short = key_name(label, int(project.view["transpose"]), latin=latin)
-        text = f"Tonalité : {short}"
+        text = translate("MainWindow", "Tonalité : {short}").format(short=short)
         if key and project.view["capo"]:
-            text += f" · formes {key_name(label, shift, latin=latin)}"
+            text += " · " + translate("MainWindow", "formes {key}").format(
+                key=key_name(label, shift, latin=latin)
+            )
         s.set_fact(s.key_button, text, short)
         menu = QMenu(self)
         if key:
@@ -1438,7 +1574,7 @@ class MainWindow(QMainWindow):
                 action.setCheckable(True)
                 action.setChecked(candidate == key["label"])
             menu.addSeparator()
-            all_keys = menu.addMenu("Autre tonalité")
+            all_keys = menu.addMenu(translate("MainWindow", "Autre tonalité"))
             for mode in ("maj", "min"):
                 for pc in range(12):
                     label = f"{spell_tonic(pc, mode)}:{mode}"
@@ -1446,7 +1582,9 @@ class MainWindow(QMainWindow):
                         key_name(label, shift, latin=latin), lambda c=label: self._set_key(c)
                     )
             if project.edits.get("key"):
-                menu.addAction("Revenir à l'estimation", lambda: self._set_key(None))
+                menu.addAction(
+                    translate("MainWindow", "Revenir à l'estimation"), lambda: self._set_key(None)
+                )
         s.key_button.setMenu(menu)
         tempo = project.tempo()
         meter = project.meter()
@@ -1454,23 +1592,43 @@ class MainWindow(QMainWindow):
         unsure = []
         fit = project.analysis.get("grid_fit")
         if not project.edits["grid"] and fit is not None and fit < 0.7:
-            unsure.append("le tempo semble varier : la grille est approximative")
+            unsure.append(
+                translate("MainWindow", "le tempo semble varier : la grille est approximative")
+            )
         if not meter.get("edited") and float(meter.get("confidence", 1.0)) < 0.25:
-            unsure.append("mesure incertaine")
+            unsure.append(translate("MainWindow", "mesure incertaine"))
         mark = "  ?" if unsure else ""
-        s.set_fact(s.rhythm_button, f"{bpm} · {meter['beats_per_bar']} temps{mark}", bpm + mark)
-        tip = "Corriger le tempo, la mesure ou le décalage de la grille"
-        s.rhythm_button.setToolTip(f"{tip}\nÀ vérifier : {', '.join(unsure)}." if unsure else tip)
+        s.set_fact(
+            s.rhythm_button,
+            translate("MainWindow", "{bpm} · {beats_per_bar} temps{mark}").format(
+                bpm=bpm, beats_per_bar=meter["beats_per_bar"], mark=mark
+            ),
+            bpm + mark,
+        )
+        tip = translate("MainWindow", "Corriger le tempo, la mesure ou le décalage de la grille")
+        s.rhythm_button.setToolTip(
+            translate("MainWindow", "{tip}\nÀ vérifier : {unsure}.").format(
+                tip=tip, unsure=", ".join(unsure)
+            )
+            if unsure
+            else tip
+        )
 
     def _key_tooltip(self, key: dict) -> str:
         project = self.project
         latin = bool(project.view.get("latin"))
         shift = project.sounding_shift()
         others = [key_name(c, shift, latin=latin) for c in key["candidates"] if c != key["label"]]
-        origin = "choisie par vous" if key["source"] == "given" else "estimée d'après les accords"
-        text = f"Tonalité {origin}."
+        origin = (
+            translate("MainWindow", "choisie par vous")
+            if key["source"] == "given"
+            else translate("MainWindow", "estimée d'après les accords")
+        )
+        text = translate("MainWindow", "Tonalité {origin}.").format(origin=origin)
         if others:
-            text += f"\nAutres lectures possibles : {', '.join(others)}."
+            text += translate("MainWindow", "\nAutres lectures possibles : {others}.").format(
+                others=", ".join(others)
+            )
         regions = project.key_regions()
         if len(regions) > 1:
             grid = project.grid()
@@ -1478,7 +1636,9 @@ class MainWindow(QMainWindow):
                 f"{key_name(r['label'], shift, latin=latin)} ({fmt_time(grid[r['start_beat']])})"
                 for r in regions
             ]
-            text += "\nChangements de tonalité : " + " → ".join(parts) + "."
+            text += "\n" + translate("MainWindow", "Changements de tonalité : {changes}.").format(
+                changes=" → ".join(parts)
+            )
         return text
 
     def _view(self, **values) -> None:
@@ -1538,7 +1698,9 @@ class MainWindow(QMainWindow):
         s = self.song
         playing = self.player.playing
         s.play.setIcon(theme.icon("pause" if playing else "play", theme.ON_ACCENT, 22))
-        s.play.setAccessibleName("Pause" if playing else "Lecture")
+        s.play.setAccessibleName(
+            translate("MainWindow", "Pause") if playing else translate("MainWindow", "Lecture")
+        )
 
     def seek(self, seconds: float) -> None:
         self.player.seek(seconds)
@@ -1591,7 +1753,7 @@ class MainWindow(QMainWindow):
         s = self.song
         s.grid.set_playhead(position)
         s.waveform.set_position(position)
-        if s.play.accessibleName() == "Pause" and not self.player.playing:
+        if s.play.accessibleName() == translate("MainWindow", "Pause") and not self.player.playing:
             self._update_play_icon()
         s.time.setText(f"{fmt_time(position)} / {fmt_time(self.project.duration)}")
         beat = self.project.beat_at(position)
@@ -1610,7 +1772,9 @@ class MainWindow(QMainWindow):
         if beat >= 0 and project.analysis["segments"]:
             position = project.bar_position(beat)
             if position and position[0]:
-                place = f"mesure {position[0]} · temps {position[1]}"
+                place = translate("MainWindow", "mesure {bar} · temps {beat}").format(
+                    bar=position[0], beat=position[1]
+                )
             elif position:
                 place = "introduction"
         s.place.setText(place)
@@ -1652,12 +1816,16 @@ class MainWindow(QMainWindow):
             self._sync_selection()
             beat = project.beat_at(self.player.position)
             segment = next((x for x in segments if x.start_beat <= beat < x.end_beat), None)
-        status = "Suit la lecture"
+        status = translate("MainWindow", "Suit la lecture")
         if pinned:
             place = project.bar_position(beat)
-            status = f"Épinglé : mesure {place[0]}" if place and place[0] else "Épinglé"
+            status = (
+                translate("MainWindow", "Épinglé : mesure {bar}").format(bar=place[0])
+                if place and place[0]
+                else translate("MainWindow", "Épinglé")
+            )
         elif segment is None and beat < 0 and segments:
-            segment, status = segments[0], "Premier accord du morceau"
+            segment, status = segments[0], translate("MainWindow", "Premier accord du morceau")
         shown = self._shown(segment) if segment is not None else None
         empty = "N.C." if segment is not None else "—"
         s.panel.show_chord(shown, status, pinned, empty)
@@ -1815,10 +1983,12 @@ class MainWindow(QMainWindow):
         project = self.project
         menu = QMenu(self)
         selection = self.song.grid.selection or (beat, beat)
-        menu.addAction("Corriger l'accord…", lambda: self.edit_chord(*selection))
+        menu.addAction(
+            translate("MainWindow", "Corriger l'accord…"), lambda: self.edit_chord(*selection)
+        )
         segment = project.segment_at_beat(beat)
         if segment and segment.candidates:
-            alternatives = menu.addMenu("Remplacer par")
+            alternatives = menu.addMenu(translate("MainWindow", "Remplacer par"))
             key = project.key()
             for label in segment.candidates[:6]:
                 if label == segment.chord or parse(label) is None:
@@ -1838,9 +2008,13 @@ class MainWindow(QMainWindow):
                 )
         menu.addSeparator()
         menu.addAction(
-            "Boucler la sélection", self.toggle_loop_key if not self.player.loop else self._reloop
+            translate("MainWindow", "Boucler la sélection"),
+            self.toggle_loop_key if not self.player.loop else self._reloop,
         )
-        menu.addAction("La première mesure commence ici", lambda: self._downbeat_here(beat))
+        menu.addAction(
+            translate("MainWindow", "La première mesure commence ici"),
+            lambda: self._downbeat_here(beat),
+        )
         menu.exec(where)
 
     def _reloop(self) -> None:
@@ -1867,8 +2041,11 @@ class MainWindow(QMainWindow):
             return
         answer = QMessageBox.question(
             self,
-            "Effacer les corrections",
-            "Revenir à l'analyse d'origine ? Vous pourrez encore annuler avec Ctrl + Z.",
+            translate("MainWindow", "Effacer les corrections"),
+            translate(
+                "MainWindow",
+                "Revenir à l'analyse d'origine ? Vous pourrez encore annuler avec Ctrl + Z.",
+            ),
         )
         if answer == QMessageBox.StandardButton.Yes:
             self.project.reset_edits()
@@ -1888,7 +2065,11 @@ class MainWindow(QMainWindow):
         try:
             self.project.save(self.project_file)
         except OSError as exc:
-            self._alert(f"La sauvegarde a échoué : {exc.strerror or exc}")
+            self._alert(
+                translate("MainWindow", "La sauvegarde a échoué : {reason}").format(
+                    reason=exc.strerror or exc
+                )
+            )
             return
         self._index(self.project_file, self.project, opened=self._index_on_save)
         self._index_on_save = False
@@ -1914,7 +2095,11 @@ class MainWindow(QMainWindow):
         star.setIcon(
             theme.icon("star", theme.ACCENT) if on else theme.icon("star_line", theme.TEXT_2)
         )
-        star.setToolTip("Retirer des favoris" if on else "Ajouter aux favoris")
+        star.setToolTip(
+            translate("MainWindow", "Retirer des favoris")
+            if on
+            else translate("MainWindow", "Ajouter aux favoris")
+        )
 
     def _star_toggled(self, on: bool) -> None:
         file = self.project_file
@@ -1930,7 +2115,11 @@ class MainWindow(QMainWindow):
             self.song.star.blockSignals(True)
             self.song.star.setChecked(not on)
             self.song.star.blockSignals(False)
-            self._alert(f"Le favori n'a pas pu être enregistré : {exc}")
+            self._alert(
+                translate("MainWindow", "Le favori n'a pas pu être enregistré : {exc}").format(
+                    exc=exc
+                )
+            )
         self._show_star()
 
     def _enter(self) -> None:
@@ -1977,22 +2166,36 @@ class MainWindow(QMainWindow):
             return
         suggested = (self.project.audio.get("title") or "projet") + EXTENSION
         path, _ = QFileDialog.getSaveFileName(
-            self, "Enregistrer une copie du projet", suggested, f"Projet LocalChords (*{EXTENSION})"
+            self,
+            translate("MainWindow", "Enregistrer une copie du projet"),
+            suggested,
+            translate("MainWindow", "Projet LocalChords (*{extension})").format(
+                extension=EXTENSION
+            ),
         )
         if path:
             try:
                 self.project.save(Path(path), shared=True)  # leaves the program: no catalog lyrics
             except OSError as exc:
-                self._alert(f"Enregistrement impossible : {exc.strerror or exc}")
+                self._alert(
+                    translate("MainWindow", "Enregistrement impossible : {reason}").format(
+                        reason=exc.strerror or exc
+                    )
+                )
 
     def export_as(self, kind: str) -> None:
         if not self.project or not self.project.analysis["segments"]:
-            self._alert("Il n'y a pas encore de grille à exporter.")
+            self._alert(translate("MainWindow", "Il n'y a pas encore de grille à exporter."))
             return
-        titles = {"txt": "Texte", "cho": "ChordPro", "pdf": "PDF"}
-        suggested = f"{self.project.audio.get('title') or 'accords'}.{kind}"
+        titles = {"txt": translate("MainWindow", "Texte"), "cho": "ChordPro", "pdf": "PDF"}
+        suggested = (
+            f"{self.project.audio.get('title') or translate('MainWindow', 'accords')}.{kind}"
+        )
         path, _ = QFileDialog.getSaveFileName(
-            self, f"Exporter en {titles[kind]}", suggested, f"{titles[kind]} (*.{kind})"
+            self,
+            translate("MainWindow", "Exporter en {format}").format(format=titles[kind]),
+            suggested,
+            f"{titles[kind]} (*.{kind})",
         )
         if path:
             self.export_to(Path(path), kind)
@@ -2009,12 +2212,16 @@ class MainWindow(QMainWindow):
                 )
                 path.write_text(text, encoding="utf-8")
         except OSError as exc:
-            self._alert(f"Export impossible : {exc.strerror or exc}")
+            self._alert(
+                translate("MainWindow", "Export impossible : {reason}").format(
+                    reason=exc.strerror or exc
+                )
+            )
 
     def export_sheet(self) -> None:
         """Every chord of the song with its diagrams, on paper."""
         if not self.project or not self.project.analysis["segments"]:
-            self._alert("Il n'y a pas encore de grille à exporter.")
+            self._alert(translate("MainWindow", "Il n'y a pas encore de grille à exporter."))
             return
         chords = self.song.chords
         dialog = SheetDialog(chords.mode, bool(self.settings.get("sheet_grid", False)), self)
@@ -2022,9 +2229,11 @@ class MainWindow(QMainWindow):
             return
         mode, grid = dialog.mode, dialog.grid.isChecked()
         self._remember("sheet_grid", grid)
-        suggested = f"{self.project.audio.get('title') or 'morceau'} - accords.pdf"
+        suggested = translate("MainWindow", "{title} - accords.pdf").format(
+            title=self.project.audio.get("title") or "morceau"
+        )
         path, _ = QFileDialog.getSaveFileName(
-            self, "Exporter la fiche des accords", suggested, "PDF (*.pdf)"
+            self, translate("MainWindow", "Exporter la fiche des accords"), suggested, "PDF (*.pdf)"
         )
         if path:
             self.export_sheet_to(Path(path), mode, grid)
@@ -2035,7 +2244,11 @@ class MainWindow(QMainWindow):
                 self.project, path, self.song.chords.all_items, mode, grid, self.song.positions
             )
         except OSError as exc:
-            self._alert(f"Export impossible : {exc.strerror or exc}")
+            self._alert(
+                translate("MainWindow", "Export impossible : {reason}").format(
+                    reason=exc.strerror or exc
+                )
+            )
 
     # Messages ----------------------------------------------------------------------------------
     def _alert(self, text: str) -> None:
@@ -2058,13 +2271,16 @@ class MainWindow(QMainWindow):
     def show_about(self) -> None:
         QMessageBox.about(
             self,
-            "À propos de LocalChords",
-            f"<b>LocalChords {__version__}</b><br>Grille d'accords locale et synchronisée.<br><br>"
-            "Reconnaissance : chordotomy, lv-chordia, Beat This!, librosa.<br>"
-            "Interface : Qt (PySide6). Audio : PyAV (FFmpeg), PortAudio.<br>"
-            "Le détail des licences est dans LICENCES-TIERS.md, dans le dossier _internal.<br><br>"
-            "L'audio n'est jamais envoyé nulle part. Les accords sont extraits automatiquement : "
-            "vérifiez-les à l'oreille.",
+            translate("MainWindow", "À propos de LocalChords"),
+            translate(
+                "MainWindow",
+                "<b>LocalChords {version}</b><br>Grille d'accords locale et "
+                "synchronisée.<br><br>Reconnaissance : chordotomy, lv-chordia, Beat "
+                "This!, librosa.<br>Interface : Qt (PySide6). Audio : PyAV (FFmpeg), "
+                "PortAudio.<br>Le détail des licences est dans LICENCES-TIERS.md, dans "
+                "le dossier _internal.<br><br>L'audio n'est jamais envoyé nulle part. "
+                "Les accords sont extraits automatiquement : vérifiez-les à l'oreille.",
+            ).format(version=__version__),
         )
 
     def closeEvent(self, event):
@@ -2096,24 +2312,32 @@ class ProgressionsDialog(QDialog):
 
     def __init__(self, project: Project, seek, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Progressions répétées")
+        self.setWindowTitle(translate("MainWindow", "Progressions répétées"))
         self.setMinimumWidth(460)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(8)
         found = project.progressions()
         if not found:
-            layout.addWidget(QLabel("Aucune suite d'accords ne se répète dans ce morceau."))
+            layout.addWidget(
+                QLabel(
+                    translate("MainWindow", "Aucune suite d'accords ne se répète dans ce morceau.")
+                )
+            )
         grid = project.grid()
         for item in found:
             chords = "  ".join(export.chord_text(project, s) for s in item["symbols"])
             b = QPushButton(f"{chords}     × {item['count']}")
             b.setObjectName("recent")
-            b.setToolTip("Aller à sa première apparition")
+            b.setToolTip(translate("MainWindow", "Aller à sa première apparition"))
             at = grid[item["start_beats"][0]]
             b.clicked.connect(lambda _=False, t=at: (seek(t), self.accept()))
             layout.addWidget(b)
-        note = QLabel("Repérées d'après les accords affichés : à vérifier à l'oreille.")
+        note = QLabel(
+            translate(
+                "MainWindow", "Repérées d'après les accords affichés : à vérifier à l'oreille."
+            )
+        )
         note.setObjectName("caption")
         layout.addWidget(note)
 
@@ -2131,10 +2355,9 @@ def app_instance() -> QApplication:
     app.setStyleSheet(theme.QSS)
     app.setApplicationName("LocalChords")
     app.setFont(theme.app_font(13))
-    # Qt's own buttons (Yes/No, Cancel) in French, like the rest of the program.
-    if not hasattr(app, "_french"):
-        app._french = QTranslator(app)
-        folder = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
-        if app._french.load("qtbase_fr", folder):
-            app.installTranslator(app._french)
+    # The interface's language, with Qt's own buttons (Yes/No, Cancel) in it too.
+    settings = library.load_settings()
+    if i18n.migrate(settings, library.existing_user()):
+        library.save_settings(settings)
+    i18n.install(app, i18n.resolve(settings["language"]))
     return app

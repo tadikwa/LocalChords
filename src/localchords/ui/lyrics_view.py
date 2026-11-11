@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
     QEasingCurve,
     QObject,
     QPointF,
@@ -42,21 +43,22 @@ from PySide6.QtWidgets import (
 
 from .. import audio, export, identify, library, lyrics_online, transcribe
 from .. import lyrics as L
+from ..i18n import translate
 from . import theme
 from .widgets import ElidedLabel, Stepper, fmt_time
 
 MODES = {
-    "grid": "Grille seule",
-    "strip": "Grille et paroles",
-    "lyrics": "Paroles",
-    "sheet": "Paroles et accords",
+    "grid": QT_TRANSLATE_NOOP("LyricsView", "Grille seule"),
+    "strip": QT_TRANSLATE_NOOP("LyricsView", "Grille et paroles"),
+    "lyrics": QT_TRANSLATE_NOOP("LyricsView", "Paroles"),
+    "sheet": QT_TRANSLATE_NOOP("LyricsView", "Paroles et accords"),
 }
 SIZES = (12, 48)
 MANUAL_SCROLL_PAUSE = 5.0  # seconds without following after the user scrolls by hand
 MOTIONS = {
-    "animated": "Animée (recommandée)",
-    "simple": "Simple : surbrillance seule",
-    "off": "Désactivée",
+    "animated": QT_TRANSLATE_NOOP("LyricsView", "Animée (recommandée)"),
+    "simple": QT_TRANSLATE_NOOP("LyricsView", "Simple : surbrillance seule"),
+    "off": QT_TRANSLATE_NOOP("LyricsView", "Désactivée"),
 }
 # The moving lyrics (docs/DESIGN.md): the line sung comes forward, the others step back by
 # distance, the words light up as they are sung. Everything is read from the player's clock.
@@ -128,9 +130,10 @@ def sung_pen(x: float, em: float, f: float, base: str = theme.TEXT) -> QPen:
     return QPen(QBrush(g), 1)
 
 
-NOT_EXPORTABLE = (
+NOT_EXPORTABLE = QT_TRANSLATE_NOOP(
+    "LyricsView",
     "Paroles d'un catalogue en ligne : consultables ici, mais pas exportables. Saisissez, "
-    "importez ou transcrivez vos propres paroles pour les exporter."
+    "importez ou transcrivez vos propres paroles pour les exporter.",
 )
 
 
@@ -629,15 +632,20 @@ class LyricsSheet(QWidget):
         chord = self._chord_at(pos) if self.chords_on else None
         if chord is not None:
             menu.addAction(
-                f"Aller à {chord['label']} ({fmt_time(chord['time'])})",
+                translate("LyricsView", "Aller à {label} ({fmt_time})").format(
+                    label=chord["label"], fmt_time=fmt_time(chord["time"])
+                ),
                 lambda: self.seekRequested.emit(chord["time"]),
             )
             reset = menu.addAction(
-                "Replacer automatiquement", lambda: self.chordReset.emit(chord["key"])
+                translate("LyricsView", "Replacer automatiquement"),
+                lambda: self.chordReset.emit(chord["key"]),
             )
             reset.setEnabled(chord["how"] == "manual")
             menu.addSeparator()
-            hint = menu.addAction("Glissez le nom de l'accord sur un mot pour le déplacer")
+            hint = menu.addAction(
+                translate("LyricsView", "Glissez le nom de l'accord sur un mot pour le déplacer")
+            )
             hint.setEnabled(False)
         else:
             ln = self._line_at(pos.y())
@@ -647,17 +655,21 @@ class LyricsSheet(QWidget):
             line, start = row["line"], row["start"]
             if start is not None:
                 menu.addAction(
-                    f"Lire depuis cette ligne ({fmt_time(start)})",
+                    translate("LyricsView", "Lire depuis cette ligne ({fmt_time})").format(
+                        fmt_time=fmt_time(start)
+                    ),
                     lambda: self.seekRequested.emit(start),
                 )
             menu.addAction(
-                f"Faire commencer la ligne ici ({fmt_time(self.player_position())})",
+                translate("LyricsView", "Faire commencer la ligne ici ({fmt_time})").format(
+                    fmt_time=fmt_time(self.player_position())
+                ),
                 lambda: self.lineAction.emit(line, "here"),
             )
             for text, action in (
-                ("Commencer 0,1 s plus tôt", "earlier"),
-                ("Commencer 0,1 s plus tard", "later"),
-                ("Retirer l'horodatage de la ligne", "clear"),
+                (translate("LyricsView", "Commencer 0,1 s plus tôt"), "earlier"),
+                (translate("LyricsView", "Commencer 0,1 s plus tard"), "later"),
+                (translate("LyricsView", "Retirer l'horodatage de la ligne"), "clear"),
             ):
                 item = menu.addAction(text, lambda a=action: self.lineAction.emit(line, a))
                 item.setEnabled(start is not None)
@@ -724,8 +736,10 @@ class LyricsPrompt(QWidget):
         self.close = QToolButton()
         self.close.setObjectName("step")
         self.close.setIcon(theme.icon("close", size=12))
-        self.close.setToolTip("Masquer pour ce morceau")
-        self.close.setAccessibleName("Masquer l'invitation aux paroles pour ce morceau")
+        self.close.setToolTip(translate("LyricsView", "Masquer pour ce morceau"))
+        self.close.setAccessibleName(
+            translate("LyricsView", "Masquer l'invitation aux paroles pour ce morceau")
+        )
         row.addWidget(self.close)
         self.buttons: list[QPushButton] = []
         self._fns: list = []
@@ -779,36 +793,45 @@ class LyricsPage(QWidget):
         row.addWidget(self.origin, 1)
         row.addWidget(self.badge)
         self.get = QToolButton()
-        self.get.setText("Obtenir les paroles")
+        self.get.setText(translate("LyricsView", "Obtenir les paroles"))
         # Text only: the style sheet frames it like its neighbours.
         self.get.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         self.get.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.get.setMenu(QMenu(self.get))
-        self.edit = QPushButton("Modifier le texte…")
-        self.sync = QPushButton("Synchroniser")
+        self.edit = QPushButton(translate("LyricsView", "Modifier le texte…"))
+        self.sync = QPushButton(translate("LyricsView", "Synchroniser"))
         self.sync.setCheckable(True)
         self.sync.setToolTip(
-            "Mode synchronisation : choisissez une ligne, lancez la lecture, puis appuyez sur "
-            "Entrée au début de chaque ligne chantée."
+            translate(
+                "LyricsView",
+                "Mode synchronisation : choisissez une ligne, lancez la lecture, puis "
+                "appuyez sur Entrée au début de chaque ligne chantée.",
+            )
         )
         self.offset = Stepper(
-            "Décalage",
+            translate("LyricsView", "Décalage"),
             -200,
             200,
             0,
             lambda v: f"{v / 10:+.1f} s" if v else "0 s",
-            "Avancer ou retarder toutes les paroles d'un coup",
+            translate("LyricsView", "Avancer ou retarder toutes les paroles d'un coup"),
         )
-        self.text_size = Stepper("Texte", *SIZES, 20, str, "Taille du texte (Ctrl + molette)")
-        self.follow = QPushButton("Suivre")
+        self.text_size = Stepper(
+            translate("LyricsView", "Texte"),
+            *SIZES,
+            20,
+            str,
+            translate("LyricsView", "Taille du texte (Ctrl + molette)"),
+        )
+        self.follow = QPushButton(translate("LyricsView", "Suivre"))
         self.follow.setCheckable(True)
-        self.follow.setToolTip("Faire défiler les paroles avec la lecture")
+        self.follow.setToolTip(translate("LyricsView", "Faire défiler les paroles avec la lecture"))
         self.more = QToolButton()
         self.more.setIcon(theme.icon("menu"))
         self.more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.more.setMenu(QMenu(self.more))
-        self.more.setToolTip("Autres actions sur les paroles")
-        self.more.setAccessibleName("Autres actions sur les paroles")
+        self.more.setToolTip(translate("LyricsView", "Autres actions sur les paroles"))
+        self.more.setAccessibleName(translate("LyricsView", "Autres actions sur les paroles"))
         for w in (
             self.get,
             self.edit,
@@ -834,7 +857,7 @@ class LyricsPage(QWidget):
         self.work_bar.setRange(0, 1000)
         self.work_bar.setTextVisible(False)
         self.work_bar.setMaximumWidth(260)
-        self.work_cancel = QPushButton("Annuler")
+        self.work_cancel = QPushButton(translate("LyricsView", "Annuler"))
         work.addWidget(self.work_text, 1)
         work.addWidget(self.work_bar)
         work.addWidget(self.work_cancel)
@@ -859,12 +882,15 @@ class LyricsPage(QWidget):
         self.empty.setObjectName("page")
         box = QVBoxLayout(self.empty)
         box.addStretch()
-        title = QLabel("Pas encore de paroles pour ce morceau")
+        title = QLabel(translate("LyricsView", "Pas encore de paroles pour ce morceau"))
         title.setObjectName("title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         detail = QLabel(
-            "Utilisez un fichier de paroles (.lrc, .srt, .txt), cherchez-les dans une base libre, "
-            "transcrivez-les sur cet ordinateur ou saisissez-les."
+            translate(
+                "LyricsView",
+                "Utilisez un fichier de paroles (.lrc, .srt, .txt), cherchez-les dans "
+                "une base libre, transcrivez-les sur cet ordinateur ou saisissez-les.",
+            )
         )
         detail.setObjectName("muted")
         detail.setWordWrap(True)
@@ -929,17 +955,19 @@ class LyricsController(QObject):
 
         # The button in the song's top bar.
         self.button = QToolButton()
-        self.button.setText("Paroles")
+        self.button.setText(translate("LyricsView", "Paroles"))
         self.button.setIcon(theme.icon("lyrics", size=16))
         self.button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         s.collapsible.append(self.button)
         self.button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.button.setToolTip("Grille, paroles, ou paroles et accords (K)")
-        self.button.setAccessibleName("Paroles")
+        self.button.setToolTip(
+            translate("LyricsView", "Grille, paroles, ou paroles et accords (K)")
+        )
+        self.button.setAccessibleName(translate("LyricsView", "Paroles"))
         menu = QMenu(self.button)
         self.mode_actions = {}
         for value, text in MODES.items():
-            action = menu.addAction(text, lambda v=value: self.set_mode(v))
+            action = menu.addAction(translate("LyricsView", text), lambda v=value: self.set_mode(v))
             action.setCheckable(True)
             self.mode_actions[value] = action
         self.button.setMenu(menu)
@@ -951,10 +979,14 @@ class LyricsController(QObject):
         p.text_size.set_value(int(settings.get("lyrics_size", 20)))
         p.follow.setChecked(bool(settings.get("lyrics_follow", True)))
         get = p.get.menu()
-        get.addAction("Rechercher en ligne (LRCLIB)…", self.search_online)
-        get.addAction("Importer un fichier (.lrc, .srt, .txt)…", self.import_file)
-        get.addAction("Transcrire avec l'IA, sur cet ordinateur…", self.transcribe)
-        get.addAction("Saisir ou coller les paroles…", self.edit_text)
+        get.addAction(translate("LyricsView", "Rechercher en ligne (LRCLIB)…"), self.search_online)
+        get.addAction(
+            translate("LyricsView", "Importer un fichier (.lrc, .srt, .txt)…"), self.import_file
+        )
+        get.addAction(
+            translate("LyricsView", "Transcrire avec l'IA, sur cet ordinateur…"), self.transcribe
+        )
+        get.addAction(translate("LyricsView", "Saisir ou coller les paroles…"), self.edit_text)
         p.edit.clicked.connect(self.edit_text)
         p.sync.toggled.connect(self._sync_toggled)
         p.offset.changed.connect(self._offset_changed)
@@ -962,32 +994,48 @@ class LyricsController(QObject):
         p.follow.toggled.connect(lambda on: self.w._remember("lyrics_follow", on))
         p.work_cancel.clicked.connect(self.cancel)
         more = p.more.menu()
-        more.addAction("Modifier le texte…", self.edit_text)
-        self.sync_action = more.addAction("Mode synchronisation", p.sync.toggle)
-        more.addAction("Décaler toutes les paroles de -0,1 s", lambda: p.offset.step(-1))
-        more.addAction("Décaler toutes les paroles de +0,1 s", lambda: p.offset.step(1))
-        more.addAction("Texte plus grand", lambda: p.text_size.step(2))
-        more.addAction("Texte plus petit", lambda: p.text_size.step(-2))
-        more.addAction("Suivre la lecture", p.follow.toggle)
-        motion = more.addMenu("Animation des paroles")
+        more.addAction(translate("LyricsView", "Modifier le texte…"), self.edit_text)
+        self.sync_action = more.addAction(
+            translate("LyricsView", "Mode synchronisation"), p.sync.toggle
+        )
+        more.addAction(
+            translate("LyricsView", "Décaler toutes les paroles de -0,1 s"),
+            lambda: p.offset.step(-1),
+        )
+        more.addAction(
+            translate("LyricsView", "Décaler toutes les paroles de +0,1 s"),
+            lambda: p.offset.step(1),
+        )
+        more.addAction(translate("LyricsView", "Texte plus grand"), lambda: p.text_size.step(2))
+        more.addAction(translate("LyricsView", "Texte plus petit"), lambda: p.text_size.step(-2))
+        more.addAction(translate("LyricsView", "Suivre la lecture"), p.follow.toggle)
+        motion = more.addMenu(translate("LyricsView", "Animation des paroles"))
         group = QActionGroup(motion)
         self.motion_actions = {}
         for value, text in MOTIONS.items():
-            action = motion.addAction(text, lambda v=value: self.set_motion(v))
+            action = motion.addAction(
+                translate("LyricsView", text), lambda v=value: self.set_motion(v)
+            )
             action.setCheckable(True)
             group.addAction(action)
             self.motion_actions[value] = action
         more.addSeparator()
-        self.original_action = more.addAction("Revenir au texte d'origine", self.revert_original)
-        self.previous_action = more.addAction(
-            "Revenir aux paroles précédentes", self.revert_previous
+        self.original_action = more.addAction(
+            translate("LyricsView", "Revenir au texte d'origine"), self.revert_original
         )
-        more.addAction("Remettre tous les accords à leur place", self.reset_anchors)
+        self.previous_action = more.addAction(
+            translate("LyricsView", "Revenir aux paroles précédentes"), self.revert_previous
+        )
+        more.addAction(
+            translate("LyricsView", "Remettre tous les accords à leur place"), self.reset_anchors
+        )
         self.untime_action = more.addAction(
-            "Retirer les horodatages (garder le texte)", self.clear_times
+            translate("LyricsView", "Retirer les horodatages (garder le texte)"), self.clear_times
         )
         more.addSeparator()
-        self.delete_action = more.addAction("Supprimer les paroles", self.delete)
+        self.delete_action = more.addAction(
+            translate("LyricsView", "Supprimer les paroles"), self.delete
+        )
 
         self.sheet.seekRequested.connect(self.w.seek)
         self.sheet.chordMoved.connect(self._chord_moved)
@@ -1002,12 +1050,19 @@ class LyricsController(QObject):
         export_menu = s.export.menu()
         export_menu.addSeparator()
         self.exports = [
-            export_menu.addAction("Paroles et accords (PDF)…", self.export_pdf),
-            export_menu.addAction("Grille avec paroles (.txt)…", self.export_grid_text),
             export_menu.addAction(
-                "Paroles synchronisées (.lrc)…", lambda: self.export_lyrics("lrc")
+                translate("LyricsView", "Paroles et accords (PDF)…"), self.export_pdf
             ),
-            export_menu.addAction("Paroles (.txt)…", lambda: self.export_lyrics("txt")),
+            export_menu.addAction(
+                translate("LyricsView", "Grille avec paroles (.txt)…"), self.export_grid_text
+            ),
+            export_menu.addAction(
+                translate("LyricsView", "Paroles synchronisées (.lrc)…"),
+                lambda: self.export_lyrics("lrc"),
+            ),
+            export_menu.addAction(
+                translate("LyricsView", "Paroles (.txt)…"), lambda: self.export_lyrics("txt")
+            ),
         ]
         export_menu.setToolTipsVisible(True)
 
@@ -1089,10 +1144,14 @@ class LyricsController(QObject):
         project = self.w.project
         found = bool(self._found or (self.suggestion and self.suggestion["verdict"] == "sure"))
         if self.mode != "grid":
-            self.button.setText(MODES[self.mode])
+            self.button.setText(translate("LyricsView", MODES[self.mode]))
         else:  # the grid alone: the button says when lyrics wait to be used
             waiting = found and project is not None and project.lyrics is None
-            self.button.setText("Paroles trouvées" if waiting else "Paroles")
+            self.button.setText(
+                translate("LyricsView", "Paroles trouvées")
+                if waiting
+                else translate("LyricsView", "Paroles")
+            )
 
     # Following the project
     def refresh(self, has_grid: bool) -> None:
@@ -1139,20 +1198,28 @@ class LyricsController(QObject):
         if lyr:
             src = lyr["source"]
             kind = src.get("kind")
-            text = L.KINDS.get(kind, "")
+            text = translate("Lyrics", L.KINDS.get(kind, ""))
             if src.get("name"):
-                text += f" : {src['name']}"
+                text = translate("Lyrics", "{kind} : {name}").format(
+                    kind=text, name=translate("LyricsOnline", src["name"])
+                )
             if kind == "catalog" and src.get("artist"):
                 text += f" · {src.get('artist')} – {src.get('title')}"
             if L.edited(lyr):
-                text += " · corrigées par vous"
+                text += translate("LyricsView", " · corrigées par vous")
             p.origin.set_full_text(text)
-            p.badge.setText("Brouillon" if kind == "transcription" else "Non exportables")
+            p.badge.setText(
+                translate("LyricsView", "Brouillon")
+                if kind == "transcription"
+                else translate("LyricsView", "Non exportables")
+            )
             p.badge.setVisible(kind in ("transcription", "catalog"))
             p.badge.setToolTip(
-                "Transcription automatique : vérifiez et corrigez le texte."
+                translate(
+                    "LyricsView", "Transcription automatique : vérifiez et corrigez le texte."
+                )
                 if kind == "transcription"
-                else NOT_EXPORTABLE
+                else translate("LyricsView", NOT_EXPORTABLE)
             )
             p.offset.set_value(round(float(lyr.get("offset") or 0) * 10))
         else:
@@ -1166,7 +1233,15 @@ class LyricsController(QObject):
         ok = L.exportable(lyr)
         for action in self.exports:
             action.setEnabled(ok)
-            action.setToolTip("" if ok else (NOT_EXPORTABLE if lyr else "Pas de paroles."))
+            action.setToolTip(
+                ""
+                if ok
+                else (
+                    translate("LyricsView", NOT_EXPORTABLE)
+                    if lyr
+                    else translate("LyricsView", "Pas de paroles.")
+                )
+            )
         self.untime_action.setEnabled(L.timed(lyr))
         self._update_hint()
         self._update_mode_actions()
@@ -1193,21 +1268,43 @@ class LyricsController(QObject):
         verdict = self.suggestion["verdict"] if self.suggestion else None
         if self._found:
             name = self._found[1]["name"]
-            choices.append((f"Utiliser les paroles de « {name} »", self.use_found, True))
+            choices.append(
+                (
+                    translate("LyricsView", "Utiliser les paroles de « {name} »").format(name=name),
+                    self.use_found,
+                    True,
+                )
+            )
         elif verdict == "sure":
-            choices.append(("Utiliser les paroles trouvées", self.use_suggestion, True))
+            choices.append(
+                (
+                    translate("LyricsView", "Utiliser les paroles trouvées"),
+                    self.use_suggestion,
+                    True,
+                )
+            )
         elif verdict == "choose":
-            choices.append(("Choisir parmi les versions trouvées…", self.choose_suggestion, True))
+            choices.append(
+                (
+                    translate("LyricsView", "Choisir parmi les versions trouvées…"),
+                    self.choose_suggestion,
+                    True,
+                )
+            )
         free = not choices  # nothing found yet: searching first, or transcribing when it failed
         choices += [
-            ("Rechercher en ligne (LRCLIB)…", self.search_online, free and verdict != "none"),
             (
-                "Transcrire avec l'IA, sur cet ordinateur…",
+                translate("LyricsView", "Rechercher en ligne (LRCLIB)…"),
+                self.search_online,
+                free and verdict != "none",
+            ),
+            (
+                translate("LyricsView", "Transcrire avec l'IA, sur cet ordinateur…"),
                 self.transcribe,
                 free and verdict == "none",
             ),
-            ("Importer un fichier…", self.import_file, False),
-            ("Saisir ou coller les paroles…", self.edit_text, False),
+            (translate("LyricsView", "Importer un fichier…"), self.import_file, False),
+            (translate("LyricsView", "Saisir ou coller les paroles…"), self.edit_text, False),
         ]
         for text, fn, primary in choices:
             button = QPushButton(text)
@@ -1223,31 +1320,37 @@ class LyricsController(QObject):
             p.hint.hide()
             return
         if p.sync.isChecked():
-            text = (
-                "Synchronisation : cliquez la ligne à minuter, lancez la lecture, puis Entrée "
-                "au début de chaque ligne chantée. Ctrl + Z annule."
+            text = translate(
+                "LyricsView",
+                "Synchronisation : cliquez la ligne à minuter, lancez la lecture, puis "
+                "Entrée au début de chaque ligne chantée. Ctrl + Z annule.",
             )
         elif not L.timed(lyr):
-            text = (
-                "Ces paroles n'ont pas d'horodatage : elles ne suivent pas la lecture. "
-                "« Synchroniser » permet de les minuter ligne par ligne."
+            text = translate(
+                "LyricsView",
+                "Ces paroles n'ont pas d'horodatage : elles ne suivent pas la lecture. « "
+                "Synchroniser » permet de les minuter ligne par ligne.",
             )
         elif self.mode == "sheet" and export.approximate(self.rows):
-            text = (
-                "En italique gris : accord placé approximativement dans la ligne. Glissez un "
-                "nom d'accord sur le bon mot pour le corriger ; l'harmonie ne change pas."
+            text = translate(
+                "LyricsView",
+                "En italique gris : accord placé approximativement dans la ligne. "
+                "Glissez un nom d'accord sur le bon mot pour le corriger ; l'harmonie ne "
+                "change pas.",
             )
         elif self.mode == "sheet":
-            text = (
-                "Glissez un nom d'accord sur un autre mot pour le déplacer ; un clic sur une "
-                "ligne lit depuis elle."
+            text = translate(
+                "LyricsView",
+                "Glissez un nom d'accord sur un autre mot pour le déplacer ; un clic sur "
+                "une ligne lit depuis elle.",
             )
         else:
-            text = "Un clic sur une ligne lit depuis elle."
+            text = translate("LyricsView", "Un clic sur une ligne lit depuis elle.")
         if self.motion == "animated" and L.timed(lyr) and not self.sheet.timing:
-            text += (
-                " Les mots s'éclairent un à un seulement avec un minutage mot à mot (LRC enrichi "
-                "ou transcription) : ces paroles sont minutées ligne par ligne."
+            text += translate(
+                "LyricsView",
+                " Les mots s'éclairent un à un seulement avec un minutage mot à mot (LRC "
+                "enrichi ou transcription) : ces paroles sont minutées ligne par ligne.",
             )
         p.hint.setText(text)
         p.hint.show()
@@ -1341,67 +1444,111 @@ class LyricsController(QObject):
         """(text, [(action, fn)]) for the invitation; None where the page already says it."""
         project = self.w.project
         who = self.identity(project)
-        name = f"« {who['title']} »" + (f" ({who['artist']})" if who["artist"] else "")
+        name = translate("LyricsView", "« {title} »").format(title=who["title"]) + (
+            f" ({who['artist']})" if who["artist"] else ""
+        )
         verdict = self.suggestion["verdict"] if self.suggestion else None
-        search = ("Rechercher les paroles", self.search_online)
-        transcribe_ = ("Transcrire avec l'IA", self.transcribe)
-        import_ = ("Importer", self.import_file)
+        search = (translate("LyricsView", "Rechercher les paroles"), self.search_online)
+        transcribe_ = (translate("LyricsView", "Transcrire avec l'IA"), self.transcribe)
+        import_ = (translate("LyricsView", "Importer"), self.import_file)
         if self.task is not None:  # a transcription: the page has its bar, the grid this line
             if full:
                 return None
-            return (self.page.work_text.text(), [("Annuler", self.cancel)])
+            return (self.page.work_text.text(), [(translate("LyricsView", "Annuler"), self.cancel)])
         if self._found:
             if full:
                 return None
             return (
-                f"Paroles trouvées sur cet ordinateur : « {self._found[1]['name']} »",
-                [("Utiliser", self.use_found), ("Autres choix", lambda: self.set_mode("lyrics"))],
+                translate("LyricsView", "Paroles trouvées sur cet ordinateur : « {name} »").format(
+                    name=self._found[1]["name"]
+                ),
+                [
+                    (translate("LyricsView", "Utiliser"), self.use_found),
+                    (translate("LyricsView", "Autres choix"), lambda: self.set_mode("lyrics")),
+                ],
             )
         if self.lookup is not None and self.lookup_for is project:
-            return (f"Recherche des paroles de {name} sur LRCLIB…", [])
+            return (
+                translate("LyricsView", "Recherche des paroles de {name} sur LRCLIB…").format(
+                    name=name
+                ),
+                [],
+            )
         if verdict == "sure":
             best = self.suggestion["candidates"][0]
-            how = "synchronisées" if self.suggestion["synced"] else "texte seul"
+            how = (
+                translate("LyricsView", "synchronisées")
+                if self.suggestion["synced"]
+                else translate("LyricsView", "texte seul")
+            )
             if best.get("syncedLyrics") and not self.suggestion["synced"]:
-                how += " (autre version : les horodatages du catalogue ne tomberaient pas juste)"
+                how += translate(
+                    "LyricsView",
+                    " (autre version : les horodatages du catalogue ne tomberaient pas juste)",
+                )
             return (
-                f"Paroles trouvées : {best.get('artistName')} – {best.get('trackName')} · {how}",
+                translate("LyricsView", "Paroles trouvées : {artist} – {title} · {how}").format(
+                    artist=best.get("artistName"), title=best.get("trackName"), how=how
+                ),
                 [
-                    ("Utiliser", self.use_suggestion),
-                    ("Voir les autres versions", self.choose_suggestion),
-                    ("Modifier la recherche", self.search_online),
+                    (translate("LyricsView", "Utiliser"), self.use_suggestion),
+                    (translate("LyricsView", "Voir les autres versions"), self.choose_suggestion),
+                    (translate("LyricsView", "Modifier la recherche"), self.search_online),
                 ],
             )
         if verdict == "choose":
             n = len(self.suggestion["candidates"])
             return (
-                f"{n} version{'s' if n > 1 else ''} possible{'s' if n > 1 else ''} pour {name} "
-                "sur LRCLIB : à vous de choisir",
+                translate(
+                    "LyricsView",
+                    "%n version(s) possible(s) pour {name} sur LRCLIB : à vous de choisir",
+                    None,
+                    n,
+                ).format(name=name),
                 [
-                    ("Choisir…", self.choose_suggestion),
-                    ("Modifier la recherche", self.search_online),
+                    (translate("LyricsView", "Choisir…"), self.choose_suggestion),
+                    (translate("LyricsView", "Modifier la recherche"), self.search_online),
                 ],
             )
         if self.w.settings.get("lyrics_auto") is None and identify.searchable(who):
             return (
-                "Rechercher automatiquement les paroles des morceaux sur LRCLIB ? Seuls le titre, "
-                "l'artiste, l'album et la durée sont envoyés, jamais l'audio.",
+                translate(
+                    "LyricsView",
+                    "Rechercher automatiquement les paroles des morceaux sur LRCLIB ? Seuls "
+                    "le titre, l'artiste, l'album et la durée sont envoyés, jamais l'audio.",
+                ),
                 [
-                    ("Autoriser", lambda: self.allow_auto(True)),
-                    ("Non merci", lambda: self.allow_auto(False)),
+                    (translate("LyricsView", "Autoriser"), lambda: self.allow_auto(True)),
+                    (translate("LyricsView", "Non merci"), lambda: self.allow_auto(False)),
                 ],
             )
         if verdict == "none":  # better none than another song's: the transcription comes first
             return (
-                f"Aucune parole fiable trouvée sur LRCLIB pour {name}",
-                [transcribe_, ("Modifier la recherche", self.search_online), import_],
+                translate(
+                    "LyricsView", "Aucune parole fiable trouvée sur LRCLIB pour {name}"
+                ).format(name=name),
+                [
+                    transcribe_,
+                    (translate("LyricsView", "Modifier la recherche"), self.search_online),
+                    import_,
+                ],
             )
         if verdict == "error":
-            return (f"Recherche des paroles impossible : {self.suggestion['error']}", [search])
+            return (
+                translate("LyricsView", "Recherche des paroles impossible : {error}").format(
+                    error=self.suggestion["error"]
+                ),
+                [search],
+            )
         if full:
             return None  # the page lists the same choices, larger
-        unknown = "" if identify.searchable(who) else " (morceau non identifié)"
-        return (f"Aucune parole disponible{unknown}", [search, transcribe_, import_])
+        unknown = (
+            "" if identify.searchable(who) else translate("LyricsView", " (morceau non identifié)")
+        )
+        return (
+            translate("LyricsView", "Aucune parole disponible{unknown}").format(unknown=unknown),
+            [search, transcribe_, import_],
+        )
 
     def _update_prompt(self) -> None:
         project = self.w.project
@@ -1608,7 +1755,7 @@ class LyricsController(QObject):
     # Getting lyrics
     def _replace(self, lines: list[dict], source: dict) -> None:
         if not any(x["text"] for x in lines):
-            self.w._alert("Ces paroles sont vides.")
+            self.w._alert(translate("LyricsView", "Ces paroles sont vides."))
             return
         old = self.w.project.lyrics
         self._apply(L.replaced(old, lines, source))
@@ -1621,9 +1768,12 @@ class LyricsController(QObject):
             return True
         answer = QMessageBox.question(
             self.w,
-            "Remplacer les paroles",
-            "Ces paroles ont été corrigées. Les remplacer ? Elles resteront accessibles avec "
-            "« Revenir aux paroles précédentes » et Ctrl + Z.",
+            translate("LyricsView", "Remplacer les paroles"),
+            translate(
+                "LyricsView",
+                "Ces paroles ont été corrigées. Les remplacer ? Elles resteront "
+                "accessibles avec « Revenir aux paroles précédentes » et Ctrl + Z.",
+            ),
         )
         return answer == QMessageBox.StandardButton.Yes
 
@@ -1637,14 +1787,21 @@ class LyricsController(QObject):
             return
         start = str(Path(self.w.project.audio.get("path", "")).parent)
         path, _ = QFileDialog.getOpenFileName(
-            self.w, "Importer des paroles", start, "Paroles (*.lrc *.srt *.txt)"
+            self.w,
+            translate("LyricsView", "Importer des paroles"),
+            start,
+            translate("LyricsView", "Paroles (*.lrc *.srt *.txt)"),
         )
         if not path:
             return
         try:
             lines = L.read_file(Path(path))
         except OSError as exc:
-            self.w._alert(f"Lecture impossible : {exc.strerror or exc}")
+            self.w._alert(
+                translate("LyricsView", "Lecture impossible : {reason}").format(
+                    reason=exc.strerror or exc
+                )
+            )
             return
         self._replace(lines, {"kind": "file", "name": Path(path).name, "exportable": True})
 
@@ -1686,7 +1843,7 @@ class LyricsController(QObject):
         s.title.set_full_text(title)
         s.subtitle.set_full_text(artist)
         s.subtitle.setVisible(bool(artist))
-        self.w.setWindowTitle(f"{title} : LocalChords")
+        self.w.setWindowTitle(translate("MainWindow", "{title} : LocalChords").format(title=title))
 
     def edit_text(self) -> None:
         from .lyrics_dialogs import LyricsEditor
@@ -1736,8 +1893,8 @@ class LyricsController(QObject):
     def delete(self) -> None:
         answer = QMessageBox.question(
             self.w,
-            "Supprimer les paroles",
-            "Supprimer les paroles de ce morceau ? Ctrl + Z les rétablit.",
+            translate("LyricsView", "Supprimer les paroles"),
+            translate("LyricsView", "Supprimer les paroles de ce morceau ? Ctrl + Z les rétablit."),
         )
         if answer == QMessageBox.StandardButton.Yes:
             self._apply(None)
@@ -1751,7 +1908,12 @@ class LyricsController(QObject):
             return
         path = library.audio_file(project.audio)
         if not path.is_file():
-            self.w._alert("Le fichier audio est introuvable : il faut l'écouter pour transcrire.")
+            self.w._alert(
+                translate(
+                    "LyricsView",
+                    "Le fichier audio est introuvable : il faut l'écouter pour transcrire.",
+                )
+            )
             return
         dialog = TranscribeDialog(
             self.w.settings.get("whisper_model", transcribe.DEFAULT_MODEL),
@@ -1767,7 +1929,7 @@ class LyricsController(QObject):
         self.task_info = {"model": model, "language": language, "began": time.monotonic()}
         self.task = transcribe.run(lambda t: transcribe.transcribe(path, model, language, t))
         p = self.page
-        p.work_text.setText("Transcription en cours, sur cet ordinateur…")
+        p.work_text.setText(translate("LyricsView", "Transcription en cours, sur cet ordinateur…"))
         p.work_bar.setValue(0)
         p.work.show()
         self._update_prompt()
@@ -1781,8 +1943,12 @@ class LyricsController(QObject):
         elapsed = time.monotonic() - self.task_info["began"]
         p.work_bar.setValue(int(task.progress * 1000))
         p.work_text.setText(
-            f"Transcription en cours, sur cet ordinateur : {task.status} "
-            f"{round(task.progress * 100)} % · {fmt_time(elapsed)}"
+            translate(
+                "LyricsView",
+                "Transcription en cours, sur cet ordinateur : {status} {round} % · {fmt_time}",
+            ).format(
+                status=task.status, round=round(task.progress * 100), fmt_time=fmt_time(elapsed)
+            )
         )
         if self.prompt.isVisible():
             self._update_prompt()
@@ -1800,7 +1966,7 @@ class LyricsController(QObject):
         model = transcribe.model_info(self.task_info["model"])
         source = {
             "kind": "transcription",
-            "name": f"whisper.cpp, modèle {model['id']}",
+            "name": translate("LyricsView", "whisper.cpp, modèle {id}").format(id=model["id"]),
             "model": model["id"],
             "language": result["language"],
             "date": date.today().isoformat(),
@@ -1809,8 +1975,11 @@ class LyricsController(QObject):
         }
         if not result["lines"]:
             self.w._alert(
-                "Aucune parole reconnue : le morceau est peut-être instrumental, ou la "
-                "voix trop couverte par la musique."
+                translate(
+                    "LyricsView",
+                    "Aucune parole reconnue : le morceau est peut-être instrumental, ou la "
+                    "voix trop couverte par la musique.",
+                )
             )
             return
         project, file = self.task_target
@@ -1826,7 +1995,11 @@ class LyricsController(QObject):
                 other.set_lyrics(L.replaced(other.lyrics, result["lines"], source))
                 other.save(file)
             except (ProjectError, OSError) as exc:
-                self.w._alert(f"La transcription n'a pas pu être enregistrée : {exc}")
+                self.w._alert(
+                    translate(
+                        "LyricsView", "La transcription n'a pas pu être enregistrée : {exc}"
+                    ).format(exc=exc)
+                )
 
     def cancel(self) -> None:
         if self.task is not None:
@@ -1836,7 +2009,11 @@ class LyricsController(QObject):
     def _save_path(self, title: str, suffix: str, kind: str) -> Path | None:
         project = self.w.project
         if not project or not L.exportable(project.lyrics):
-            self.w._alert(NOT_EXPORTABLE if project and project.lyrics else "Pas de paroles.")
+            self.w._alert(
+                translate("LyricsView", NOT_EXPORTABLE)
+                if project and project.lyrics
+                else translate("LyricsView", "Pas de paroles.")
+            )
             return None
         name = f"{project.audio.get('title') or 'paroles'}{suffix}"
         path, _ = QFileDialog.getSaveFileName(self.w, title, name, kind)
@@ -1844,7 +2021,9 @@ class LyricsController(QObject):
 
     def export_lyrics(self, kind: str) -> None:
         path = self._save_path(
-            "Exporter les paroles", f".{kind}", "LRC (*.lrc)" if kind == "lrc" else "Texte (*.txt)"
+            translate("LyricsView", "Exporter les paroles"),
+            f".{kind}",
+            "LRC (*.lrc)" if kind == "lrc" else translate("LyricsView", "Texte (*.txt)"),
         )
         if path:
             project = self.w.project
@@ -1861,7 +2040,9 @@ class LyricsController(QObject):
 
     def export_grid_text(self) -> None:
         path = self._save_path(
-            "Exporter la grille avec les paroles", " - paroles et accords.txt", "Texte (*.txt)"
+            translate("LyricsView", "Exporter la grille avec les paroles"),
+            translate("LyricsView", " - paroles et accords.txt"),
+            translate("LyricsView", "Texte (*.txt)"),
         )
         if path:
             self._write(path, export.to_text_with_lyrics(self.w.project))
@@ -1870,7 +2051,11 @@ class LyricsController(QObject):
         try:
             path.write_text(text, encoding="utf-8")
         except OSError as exc:
-            self.w._alert(f"Export impossible : {exc.strerror or exc}")
+            self.w._alert(
+                translate("LyricsView", "Export impossible : {reason}").format(
+                    reason=exc.strerror or exc
+                )
+            )
 
     def export_pdf(self) -> None:
         from .lyrics_dialogs import LyricsPdfDialog
@@ -1878,7 +2063,11 @@ class LyricsController(QObject):
 
         project = self.w.project
         if not project or not L.exportable(project.lyrics):
-            self.w._alert(NOT_EXPORTABLE if project and project.lyrics else "Pas de paroles.")
+            self.w._alert(
+                translate("LyricsView", NOT_EXPORTABLE)
+                if project and project.lyrics
+                else translate("LyricsView", "Pas de paroles.")
+            )
             return
         dialog = LyricsPdfDialog(self.w.settings.get("lyrics_pdf") or {}, self.w)
         if not dialog.exec():
@@ -1886,7 +2075,9 @@ class LyricsController(QObject):
         options = dialog.options()
         self.w._remember("lyrics_pdf", options)
         path = self._save_path(
-            "Exporter les paroles et accords", " - paroles et accords.pdf", "PDF (*.pdf)"
+            translate("LyricsView", "Exporter les paroles et accords"),
+            translate("LyricsView", " - paroles et accords.pdf"),
+            "PDF (*.pdf)",
         )
         if path:
             try:
@@ -1894,7 +2085,11 @@ class LyricsController(QObject):
                     project, path, options, self.w.song.chords.all_items, self.w.song.positions
                 )
             except OSError as exc:
-                self.w._alert(f"Export impossible : {exc.strerror or exc}")
+                self.w._alert(
+                    translate("LyricsView", "Export impossible : {reason}").format(
+                        reason=exc.strerror or exc
+                    )
+                )
 
 
 def _moved_anchors(before: dict, lines: list[dict]) -> dict:

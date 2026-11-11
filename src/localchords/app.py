@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import multiprocessing
 
+from .i18n import translate
+
 
 def _data_location() -> str | None:
     """Portable mode, when its marker is there: Data next to the program, or, when that cannot be
@@ -60,21 +62,28 @@ def main() -> int:
         QMessageBox.critical(
             None,
             "LocalChords",
-            f"Une erreur inattendue est survenue :\n{value}\n\n"
-            f"Détails dans {library.data_dir() / 'log.txt'}",
+            translate(
+                "App", "Une erreur inattendue est survenue :\n{error}\n\nDétails dans {log}"
+            ).format(error=value, log=library.data_dir() / "log.txt"),
         )
 
     sys.excepthook = report
     if fallback is not None:
         box = QMessageBox(
             QMessageBox.Icon.Warning,
-            "LocalChords — mode portable",
-            f"Le dossier Data à côté du programme ne peut pas être écrit ({fallback}) : support en "
-            "lecture seule, protégé ou plein.\n\nContinuer avec les données de ce PC "
-            f"({library.classic_dir()}) pendant cette session ? Rien n'est copié ni supprimé.",
+            translate("App", "LocalChords — mode portable"),
+            translate(
+                "App",
+                "Le dossier Data à côté du programme ne peut pas être écrit ({fallback}) "
+                ": support en lecture seule, protégé ou plein.\n\nContinuer avec les "
+                "données de ce PC ({classic_dir}) pendant cette session ? Rien n'est "
+                "copié ni supprimé.",
+            ).format(fallback=fallback, classic_dir=library.classic_dir()),
         )
-        go = box.addButton("Continuer avec ce PC", QMessageBox.ButtonRole.AcceptRole)
-        box.addButton("Quitter", QMessageBox.ButtonRole.RejectRole)
+        go = box.addButton(
+            translate("App", "Continuer avec ce PC"), QMessageBox.ButtonRole.AcceptRole
+        )
+        box.addButton(translate("App", "Quitter"), QMessageBox.ButtonRole.RejectRole)
         box.exec()
         if box.clickedButton() is not go:
             return 1
@@ -82,9 +91,12 @@ def main() -> int:
         QMessageBox.warning(
             None,
             "LocalChords",
-            f"Il reste {library.free_mb(library.data_dir())} Mo sur le support de "
-            f"{library.data_dir()}. Les analyses déjà faites s'ouvrent, mais une sauvegarde ou "
-            "l'import d'un lien peut échouer faute de place.",
+            translate(
+                "App",
+                "Il reste {free_mb} Mo sur le support de {data_dir}. Les analyses déjà "
+                "faites s'ouvrent, mais une sauvegarde ou l'import d'un lien peut "
+                "échouer faute de place.",
+            ).format(free_mb=library.free_mb(library.data_dir()), data_dir=library.data_dir()),
         )
     window = MainWindow()
     window.show()
